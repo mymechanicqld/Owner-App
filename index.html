@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1" />
+  <meta name="robots" content="noindex,nofollow" />
+  <meta name="theme-color" content="#1E3A8A" />
+  <!-- Add-to-home-screen (iOS), no manifest by design -->
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="My Mechanic QLD" />
+  <title>My Mechanic QLD</title>
+  <link rel="stylesheet" href="styles.css" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+</head>
+<body>
+
+<div class="app">
+  <header class="header">
+    <div class="logo">M</div>
+    <div style="flex:1">
+      <h1>My Mechanic QLD</h1>
+      <div class="sub" id="header-sub">Owner console</div>
+    </div>
+    <button class="hbtn" id="btn-refresh" aria-label="Refresh">
+      <i data-lucide="refresh-cw"></i>
+    </button>
+  </header>
+
+  <main class="main">
+    <section class="view active" id="view-dashboard"></section>
+    <section class="view" id="view-inquiries"></section>
+    <section class="view" id="view-search"></section>
+    <section class="view" id="view-analytics"></section>
+  </main>
+
+  <nav class="nav" id="nav">
+    <button data-view="dashboard" class="active"><i data-lucide="layout-dashboard"></i>Dashboard</button>
+    <button data-view="inquiries"><i data-lucide="inbox"></i>Inquiries</button>
+    <button data-view="search"><i data-lucide="search"></i>Search</button>
+    <button data-view="analytics"><i data-lucide="bar-chart-3"></i>Analytics</button>
+  </nav>
+</div>
+
+<!-- detail / reply sheet -->
+<div class="scrim" id="scrim"></div>
+<div class="sheet" id="sheet">
+  <div class="grip"></div>
+  <div class="shead">
+    <div class="ttl">
+      <h2 id="sheet-title">Customer</h2>
+      <div class="sub" id="sheet-sub"></div>
+    </div>
+    <button class="x" id="sheet-close" aria-label="Close"><i data-lucide="x"></i></button>
+  </div>
+  <div class="sbody" id="sheet-body"></div>
+</div>
+
+<div class="toasts" id="toasts" aria-live="polite"></div>
+
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
