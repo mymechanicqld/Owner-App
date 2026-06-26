@@ -1,22 +1,31 @@
 /* ============================================================================
    My Mechanic QLD - Owner app configuration
    ----------------------------------------------------------------------------
-   Edit this one file to point the app at your accounts. It is safe for the
-   Supabase publishable key and the Google client id to be public (they rely on
-   Row Level Security and OAuth consent). Never put a Supabase SECRET key or any
-   API secret in here, this file ships to the browser.
+   Credentials are "rambled" (obfuscated, charCode + 13) and un-rambled in the
+   browser at runtime. NOTE: this is obscurity only, not real security. Anyone
+   can read this file and decode it. The Supabase publishable key and Google
+   client id are public-safe anyway (RLS + OAuth consent). NEVER put a Supabase
+   secret key or an OAuth client secret in here, even rambled.
+
+   To regenerate the rambled strings:
+     node -e 'const enc=s=>[...s].map(c=>c.charCodeAt(0)+13).join("."); console.log(enc("YOUR_VALUE"))'
    ========================================================================== */
 
-const CONFIG = {
-  // --- Supabase (read customer submissions) -------------------------------
-  // After you rotate keys, paste the new URL + publishable key here.
-  SUPABASE_URL: 'https://depduvjclelykqcnhlsm.supabase.co',
-  SUPABASE_KEY: 'sb_publishable_cgK1KYRlLrYrn1YjhQTVcg_hSJzcOxr',
+const _unramble = (s) => s.split('.').map((n) => String.fromCharCode(parseInt(n, 10) - 13)).join('');
 
-  // --- Google (send threaded Gmail replies from the browser) --------------
-  // Create a "Web application" OAuth client (see README), add your GitHub Pages
-  // URL as an authorised JavaScript origin, then paste the client id here.
-  GOOGLE_CLIENT_ID: 'PASTE_YOUR_WEB_OAUTH_CLIENT_ID.apps.googleusercontent.com',
+const _RAMBLED = {
+  url: '117.129.129.125.128.71.60.60.113.114.125.113.130.131.119.112.121.114.121.134.120.126.112.123.117.121.128.122.59.128.130.125.110.111.110.128.114.59.112.124',
+  key: '128.111.108.125.130.111.121.118.128.117.110.111.121.114.108.112.116.88.62.88.102.95.121.89.127.102.127.123.62.102.119.117.94.97.99.112.116.108.117.96.87.135.112.92.133.127',
+  cid: '69.69.68.67.68.65.62.61.62.67.66.68.58.130.70.110.123.121.131.114.70.122.115.62.125.62.120.123.64.61.123.126.114.128.115.126.115.121.113.121.68.130.122.113.63.59.110.125.125.128.59.116.124.124.116.121.114.130.128.114.127.112.124.123.129.114.123.129.59.112.124.122',
+};
+
+const CONFIG = {
+  // --- Supabase (read customer submissions), un-rambled client side -------
+  SUPABASE_URL: _unramble(_RAMBLED.url),
+  SUPABASE_KEY: _unramble(_RAMBLED.key),
+
+  // --- Google Web OAuth client id (send threaded Gmail replies) -----------
+  GOOGLE_CLIENT_ID: _unramble(_RAMBLED.cid),
 
   // --- Optional passcode gate ---------------------------------------------
   // Leave empty for no gate (current choice). Set a PIN (e.g. '4821') later to
