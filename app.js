@@ -287,6 +287,8 @@ function openDetail(id) {
       <button class="btn primary full" id="act-reply"><i data-lucide="send"></i>Reply by email</button>
       ${s.phone ? `<a class="btn ghost" href="tel:${esc(tel)}"><i data-lucide="phone"></i>Call</a>` : ''}
       ${s.phone ? `<a class="btn ghost" href="sms:${esc(tel)}"><i data-lucide="message-circle"></i>Text</a>` : '<a class="btn ghost full" href="mailto:'+esc(s.email)+'"><i data-lucide="mail"></i>Open in mail</a>'}
+      <button class="btn ghost" id="act-invoice"><i data-lucide="file-text"></i>Invoice</button>
+      <button class="btn ghost" id="act-inspection"><i data-lucide="clipboard-check"></i>Inspection</button>
     </div>
   `;
   openSheet();
@@ -298,6 +300,18 @@ function openDetail(id) {
     s.status = ns; toast('Marked ' + STATUS_LABEL[ns], 'ok'); render();
   });
   $('#act-reply').addEventListener('click', () => openReply(id));
+  const genParams = () => new URLSearchParams({
+    id: s.id || '',
+    name: s.full_name || '',
+    email: s.email || '',
+    phone: s.phone || '',
+    suburb: s.suburb || '',
+    rego: s.vehicle_rego || '',
+    make: carDesc(s) || s.vehicle_make || '',
+    year: s.vehicle_year || '',
+  }).toString();
+  $('#act-invoice').addEventListener('click', () => { location.href = 'invoice/index.html?' + genParams(); });
+  $('#act-inspection').addEventListener('click', () => { location.href = 'inspection/index.html?' + genParams(); });
 }
 
 /* -------------------------------------------------------- reply composer -- */

@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#1E3A8A" />
+<title>Invoice Generator · My Mechanic QLD</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet"
+  href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" />
+
+<link rel="stylesheet" href="styles.css" />
+
+<!-- pdfmake — real client-side PDF generator. Produces selectable text,
+     not screenshots. Total bundle ~1.3 MB but cached after first load. -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.10/pdfmake.min.js" defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.10/vfs_fonts.js" defer></script>
+</head>
+<body>
+
+<header class="topbar">
+  <a class="brand" href="../index.html" aria-label="Business tools">
+    <span class="brand__mark">
+      <img id="brandLogo" alt="" />
+    </span>
+    <span class="brand__text">
+      <span class="brand__name">My Mechanic QLD</span>
+      <span class="brand__sub">Invoice generator</span>
+    </span>
+  </a>
+
+  <div class="topbar__actions">
+    <button class="iconbtn" id="newBtn" title="New invoice" aria-label="New invoice">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    </button>
+    <button class="iconbtn" id="loadBtn" title="Drafts" aria-label="Drafts">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 7v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-7l-2-2H5a2 2 0 0 0-2 2z"/></svg>
+    </button>
+  </div>
+</header>
+
+<main class="page">
+
+  <!-- Hero -->
+  <section class="hero">
+    <h1>New invoice</h1>
+    <p>Fill in the details, tap <strong>Export PDF</strong>. Designed for use on the phone.</p>
+  </section>
+
+  <!-- Customer card -->
+  <section class="card">
+    <header class="card__head">
+      <h2>Customer</h2>
+    </header>
+    <div class="card__body">
+      <label class="field">
+        <span class="field__label">Customer name</span>
+        <input id="custName" type="text" autocomplete="off" placeholder="Clinton Case" data-bind="customer.name" />
+      </label>
+      <label class="field">
+        <span class="field__label">Billing address</span>
+        <textarea id="custAddr" rows="3" placeholder="201/56 Caloola Dr, Tweed Heads&#10;NSW 2485&#10;Australia" data-bind="customer.address"></textarea>
+      </label>
+    </div>
+  </section>
+
+  <!-- Vehicle card -->
+  <section class="card">
+    <header class="card__head">
+      <h2>Vehicle</h2>
+      <span class="card__hint">For your records on the invoice</span>
+    </header>
+    <div class="card__body">
+      <label class="field">
+        <span class="field__label">Registration number</span>
+        <input id="vehRego" type="text" autocomplete="off" placeholder="ABC123" data-bind="vehicle.rego" class="input--mono input--upper" />
+      </label>
+      <div class="row-2">
+        <label class="field">
+          <span class="field__label">Make &amp; model</span>
+          <input id="vehMake" type="text" placeholder="Toyota Hilux SR5" data-bind="vehicle.makeModel" />
+        </label>
+        <label class="field">
+          <span class="field__label">Year</span>
+          <input id="vehYear" type="text" inputmode="numeric" placeholder="2019" data-bind="vehicle.year" />
+        </label>
+      </div>
+    </div>
+  </section>
+
+  <!-- Invoice meta card -->
+  <section class="card">
+    <header class="card__head">
+      <h2>Invoice details</h2>
+      <span class="card__hint" id="autoNumberHint">Auto-numbered</span>
+    </header>
+    <div class="card__body">
+      <label class="field">
+        <span class="field__label">Invoice number</span>
+        <input id="invNumber" type="text" data-bind="invoice.number" class="input--mono" />
+      </label>
+      <div class="row-2">
+        <label class="field">
+          <span class="field__label">Issue date</span>
+          <input id="invDate" type="date" data-bind="invoice.date" />
+        </label>
+        <label class="field">
+          <span class="field__label">Due by</span>
+          <input id="invDue" type="date" data-bind="invoice.due" />
+        </label>
+      </div>
+      <fieldset class="field">
+        <legend class="field__label">Status</legend>
+        <div class="seg" id="statusSeg" role="radiogroup">
+          <button type="button" class="seg__opt seg__opt--paid"        data-status="paid">Paid</button>
+          <button type="button" class="seg__opt seg__opt--partial"     data-status="partial">Partial</button>
+          <button type="button" class="seg__opt seg__opt--outstanding" data-status="outstanding">Outstanding</button>
+        </div>
+      </fieldset>
+    </div>
+  </section>
+
+  <!-- Line items card -->
+  <section class="card">
+    <header class="card__head">
+      <h2>Line items</h2>
+      <span class="card__hint" id="itemsCountHint">0 items</span>
+    </header>
+    <div class="card__body card__body--flush">
+      <div id="itemsList" class="items"></div>
+      <button class="add-btn" id="addItem" type="button">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Add item
+      </button>
+    </div>
+  </section>
+
+  <!-- GST + Totals snapshot -->
+  <section class="card">
+    <header class="card__head">
+      <h2>GST &amp; total</h2>
+    </header>
+    <div class="card__body">
+      <label class="toggle-row">
+        <span>
+          <span class="toggle-row__title">Prices include GST</span>
+          <span class="toggle-row__sub">10% GST is extracted from the gross subtotal</span>
+        </span>
+        <span class="toggle" id="gstToggle" role="switch" tabindex="0">
+          <span class="toggle__knob"></span>
+        </span>
+      </label>
+
+      <div class="totals" id="totalsBlock">
+        <!-- rendered by JS -->
+      </div>
+    </div>
+  </section>
+
+  <!-- Receipts card -->
+  <section class="card">
+    <header class="card__head">
+      <h2>Payments received</h2>
+      <span class="card__hint" id="receiptsCountHint">0 payments</span>
+    </header>
+    <div class="card__body card__body--flush">
+      <div id="receiptsList" class="items items--receipts"></div>
+      <button class="add-btn" id="addReceipt" type="button">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Add payment
+      </button>
+    </div>
+  </section>
+
+  <!-- Notes card -->
+  <section class="card">
+    <header class="card__head">
+      <h2>Notes (optional)</h2>
+    </header>
+    <div class="card__body">
+      <label class="field">
+        <textarea id="notes" rows="3" placeholder="Bank: BSB 064-000, Acc 123456789. Reference the invoice number on transfer." data-bind="notes"></textarea>
+      </label>
+    </div>
+  </section>
+
+</main>
+
+<!-- Sticky bottom action bar -->
+<div class="fab">
+  <button class="fab__btn fab__btn--secondary" id="saveBtn">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/></svg>
+    Save
+  </button>
+  <button class="fab__btn fab__btn--primary" id="pdfBtn">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+    Export PDF
+  </button>
+  <button class="fab__btn fab__btn--primary" id="sendBtn">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+    Send to client
+  </button>
+</div>
+
+<!-- Drafts drawer -->
+<div class="drafts" id="draftsPanel" hidden>
+  <div class="drafts__head">
+    <h3>Drafts</h3>
+    <button class="iconbtn" id="closeDraftsBtn" aria-label="Close">
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+  </div>
+  <div class="drafts__list" id="draftsList"></div>
+</div>
+<div class="scrim" id="scrim" hidden></div>
+
+<!-- Toast container -->
+<div class="toasts" id="toastWrap"></div>
+
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="../config.js"></script>
+<script src="../gmail-send.js" defer></script>
+<script src="assets.js" defer></script>
+<script src="app.js" defer></script>
+
+</body>
+</html>

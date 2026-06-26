@@ -1,0 +1,292 @@
+<!doctype html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#1E3A8A" />
+<title>Vehicle Inspection Report · My Mechanic QLD</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet"
+  href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" />
+
+<link rel="stylesheet" href="styles.css" />
+
+<!-- pdfmake — real client-side PDF generator (selectable text, small files). -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.10/pdfmake.min.js" defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.10/vfs_fonts.js" defer></script>
+</head>
+<body>
+
+<header class="topbar">
+  <a class="brand" href="../index.html" aria-label="Business tools">
+    <span class="brand__mark">
+      <img id="brandLogo" alt="" />
+    </span>
+    <span class="brand__text">
+      <span class="brand__name">My Mechanic QLD</span>
+      <span class="brand__sub">Inspection report</span>
+    </span>
+  </a>
+
+  <div class="topbar__actions">
+    <button class="iconbtn" id="newBtn" title="New report" aria-label="New report">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    </button>
+    <button class="iconbtn" id="loadBtn" title="Drafts" aria-label="Drafts">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 7v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-7l-2-2H5a2 2 0 0 0-2 2z"/></svg>
+    </button>
+  </div>
+</header>
+
+<!-- Progress strip — fills as the inspector touches sections -->
+<div class="progress" aria-hidden="true"><span class="progress__bar" id="progressBar"></span></div>
+
+<main class="page">
+
+  <!-- Hero -->
+  <section class="hero">
+    <h1>New inspection</h1>
+    <p>Default grade is <strong>Fair</strong> on every criterion. Tap to change. Bulk-set the whole section if everything looks the same.</p>
+  </section>
+
+  <!-- ─────────── Report details ─────────── -->
+  <details class="sec" open data-key="report">
+    <summary class="sec__head">
+      <span class="sec__num sec__num--info">i</span>
+      <span class="sec__title">Report details</span>
+      <svg class="sec__chev" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
+    </summary>
+    <div class="sec__body">
+      <label class="field">
+        <span class="field__label">Report number</span>
+        <input type="text" data-bind="reportNumber" class="input--mono" />
+      </label>
+      <div class="row-2">
+        <label class="field">
+          <span class="field__label">Report date</span>
+          <input type="date" data-bind="reportDate" />
+        </label>
+        <label class="field">
+          <span class="field__label">Appointment date</span>
+          <input type="date" data-bind="appointmentDate" />
+        </label>
+      </div>
+      <div class="row-2">
+        <label class="field">
+          <span class="field__label">From</span>
+          <input type="text" data-bind="appointmentStart" placeholder="1:00 PM" />
+        </label>
+        <label class="field">
+          <span class="field__label">To</span>
+          <input type="text" data-bind="appointmentEnd" placeholder="2:00 PM" />
+        </label>
+      </div>
+    </div>
+  </details>
+
+  <!-- ─────────── Client details ─────────── -->
+  <details class="sec" data-key="client">
+    <summary class="sec__head">
+      <span class="sec__num sec__num--info">i</span>
+      <span class="sec__title">Client details</span>
+      <svg class="sec__chev" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
+    </summary>
+    <div class="sec__body">
+      <label class="field">
+        <span class="field__label">Contact name</span>
+        <input type="text" data-bind="client.contact" placeholder="Thomas De Brito" />
+      </label>
+      <label class="field">
+        <span class="field__label">Contact phone</span>
+        <input type="tel" data-bind="client.phone" placeholder="0403 808 757" />
+      </label>
+      <label class="field">
+        <span class="field__label">Address</span>
+        <input type="text" data-bind="client.address" placeholder="40 Steel Pl, Morningside QLD 4170" />
+      </label>
+    </div>
+  </details>
+
+  <!-- ─────────── Inspection details (vehicle) ─────────── -->
+  <details class="sec" data-key="vehicle">
+    <summary class="sec__head">
+      <span class="sec__num">1</span>
+      <span class="sec__title">Vehicle &amp; inspection</span>
+      <svg class="sec__chev" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
+    </summary>
+    <div class="sec__body">
+      <!-- Vehicle rego given a prominent treatment -->
+      <label class="field field--rego">
+        <span class="field__label">Registration number</span>
+        <input type="text" data-bind="inspection.registration" class="input--rego" placeholder="ABC123" autocapitalize="characters" />
+      </label>
+      <div class="row-2">
+        <label class="field">
+          <span class="field__label">Make &amp; model</span>
+          <input type="text" data-bind="inspection.makeModel" placeholder="VW Golf" />
+        </label>
+        <label class="field">
+          <span class="field__label">Year</span>
+          <input type="text" inputmode="numeric" data-bind="inspection.year" placeholder="2015" />
+        </label>
+      </div>
+      <div class="row-2">
+        <label class="field">
+          <span class="field__label">Inspection location</span>
+          <input type="text" data-bind="inspection.location" placeholder="40 Steel Pl, Morningside" />
+        </label>
+        <label class="field">
+          <span class="field__label">Inspection date</span>
+          <input type="date" data-bind="inspection.date" />
+        </label>
+      </div>
+      <label class="field">
+        <span class="field__label">Odometer reading (km)</span>
+        <input type="text" inputmode="numeric" data-bind="inspection.odometer" placeholder="116000" />
+      </label>
+    </div>
+  </details>
+
+  <!-- ─────────── Inspection sections (rendered by JS) ─────────── -->
+  <div id="inspectionSections"></div>
+
+  <!-- ─────────── Images ─────────── -->
+  <details class="sec" data-key="images">
+    <summary class="sec__head">
+      <span class="sec__num sec__num--accent">
+        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+      </span>
+      <span class="sec__title">Images <span class="sec__title-count" id="imageCount">0</span></span>
+      <svg class="sec__chev" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
+    </summary>
+    <div class="sec__body">
+      <label class="dropzone" id="dropzone">
+        <div class="dropzone__icon">
+          <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+        </div>
+        <div class="dropzone__title">Tap to upload or capture</div>
+        <div class="dropzone__hint">
+          On mobile, your camera opens directly. Please capture in <strong>landscape</strong> orientation —
+          images render two per row in the PDF.
+        </div>
+        <input type="file" accept="image/*" capture="environment" multiple id="imgInput" />
+      </label>
+
+      <div id="imageGrid" class="imgs"></div>
+    </div>
+  </details>
+
+  <!-- ─────────── Overall rating ─────────── -->
+  <details class="sec" data-key="rating">
+    <summary class="sec__head">
+      <span class="sec__num">7</span>
+      <span class="sec__title">Overall rating &amp; comments</span>
+      <svg class="sec__chev" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
+    </summary>
+    <div class="sec__body">
+      <fieldset class="field">
+        <legend class="field__label">Overall rating</legend>
+        <div class="grades grades--big" id="overallGrades" role="radiogroup"></div>
+      </fieldset>
+      <label class="field">
+        <span class="field__label">General comments</span>
+        <textarea rows="4" data-bind="overallComments" placeholder="Optional summary or recommendations…"></textarea>
+      </label>
+    </div>
+  </details>
+
+  <!-- ─────────── Signature ─────────── -->
+  <details class="sec" data-key="sig">
+    <summary class="sec__head">
+      <span class="sec__num">8</span>
+      <span class="sec__title">Sign-off</span>
+      <svg class="sec__chev" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
+    </summary>
+    <div class="sec__body">
+      <div class="callout">
+        I confirm I have inspected and road-tested the above vehicle as per the findings of this report.
+      </div>
+      <label class="field">
+        <span class="field__label">Inspector name</span>
+        <input type="text" data-bind="signature.name" placeholder="Full name" />
+      </label>
+      <label class="field">
+        <span class="field__label">Date</span>
+        <input type="date" data-bind="signature.date" />
+      </label>
+      <div class="field">
+        <span class="field__label">Signature</span>
+        <div class="sig">
+          <canvas id="sigCanvas" class="sig__canvas"></canvas>
+          <div class="sig__actions">
+            <span class="sig__hint">Sign with your finger</span>
+            <button class="link-btn" id="sigClearBtn" type="button">Clear</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </details>
+
+  <!-- ─────────── Terms & Conditions ─────────── -->
+  <details class="sec" data-key="terms">
+    <summary class="sec__head">
+      <span class="sec__num">9</span>
+      <span class="sec__title">Terms &amp; conditions</span>
+      <svg class="sec__chev" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
+    </summary>
+    <div class="sec__body">
+      <label class="field">
+        <span class="field__label">Disclaimer (one bullet per line)</span>
+        <textarea rows="10" data-bind="terms.disclaimer"></textarea>
+      </label>
+      <label class="field">
+        <span class="field__label">My Mechanic QLD does not check (one per line)</span>
+        <textarea rows="6" data-bind="terms.notChecked"></textarea>
+      </label>
+      <button class="link-btn" id="termsResetBtn" type="button">Reset to default</button>
+    </div>
+  </details>
+
+</main>
+
+<!-- Sticky action bar -->
+<div class="fab">
+  <button class="fab__btn fab__btn--secondary" id="saveBtn">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/></svg>
+    Save
+  </button>
+  <button class="fab__btn fab__btn--primary" id="pdfBtn">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+    Export PDF
+  </button>
+  <button class="fab__btn fab__btn--primary" id="sendBtn">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+    Send to client
+  </button>
+</div>
+
+<!-- Drafts -->
+<div class="drafts" id="draftsPanel" hidden>
+  <div class="drafts__head">
+    <h3>Drafts</h3>
+    <button class="iconbtn" id="closeDraftsBtn" aria-label="Close">
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+  </div>
+  <div class="drafts__list" id="draftsList"></div>
+</div>
+<div class="scrim" id="scrim" hidden></div>
+
+<!-- Toasts -->
+<div class="toasts" id="toastWrap"></div>
+
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="../config.js"></script>
+<script src="../gmail-send.js" defer></script>
+<script src="assets.js" defer></script>
+<script src="app.js" defer></script>
+
+</body>
+</html>
