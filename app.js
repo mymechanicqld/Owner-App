@@ -760,7 +760,9 @@ function boot() {
   icons();
   loadData();
   setInterval(() => loadData(false), 60000);
-  if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(() => {});
+  // NOTE: we deliberately do NOT register a service worker. A controlling SW
+  // triggers an iOS WebKit bug where cross-origin POSTs (PDF uploads) fail with
+  // "Load failed". The kill-switch in each page's <head> removes any old one.
 }
 if (CONFIG.GATE_PIN) {
   const pin = prompt('Enter passcode');

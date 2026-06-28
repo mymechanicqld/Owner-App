@@ -2,6 +2,22 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
+  <script>
+  /* Remove any previously-installed service worker. A controlling SW triggers an
+     iOS WebKit bug where cross-origin POST uploads fail with "Load failed". We
+     no longer register one; this evicts old ones and reloads once so the page
+     is no longer SW-controlled. */
+  (function(){
+    if(!('serviceWorker' in navigator))return;
+    navigator.serviceWorker.getRegistrations().then(function(rs){
+      var had=rs.length>0;
+      Promise.all(rs.map(function(r){return r.unregister();})).then(function(){
+        if(window.caches&&caches.keys){caches.keys().then(function(ks){ks.forEach(function(k){caches.delete(k);});});}
+        if(had&&!sessionStorage.getItem('mmqld_sw_removed')){sessionStorage.setItem('mmqld_sw_removed','1');location.reload();}
+      });
+    }).catch(function(){});
+  })();
+  </script>
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1" />
   <meta name="robots" content="noindex,nofollow" />
   <meta name="theme-color" content="#1E3A8A" />
@@ -88,7 +104,7 @@
 
 <div class="toasts" id="toasts" aria-live="polite"></div>
 
-<script src="config.js?v=18"></script>
-<script src="app.js?v=18"></script>
+<script src="config.js?v=19"></script>
+<script src="app.js?v=19"></script>
 </body>
 </html>

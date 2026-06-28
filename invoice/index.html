@@ -2,6 +2,20 @@
 <html lang="en-AU">
 <head>
 <meta charset="utf-8" />
+<script>
+/* Remove any previously-installed service worker (iOS WebKit fails cross-origin
+   POST uploads with "Load failed" when a SW controls the page). */
+(function(){
+  if(!('serviceWorker' in navigator))return;
+  navigator.serviceWorker.getRegistrations().then(function(rs){
+    var had=rs.length>0;
+    Promise.all(rs.map(function(r){return r.unregister();})).then(function(){
+      if(window.caches&&caches.keys){caches.keys().then(function(ks){ks.forEach(function(k){caches.delete(k);});});}
+      if(had&&!sessionStorage.getItem('mmqld_sw_removed')){sessionStorage.setItem('mmqld_sw_removed','1');location.reload();}
+    });
+  }).catch(function(){});
+})();
+</script>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <meta name="theme-color" content="#1E3A8A" />
 <title>Invoice Generator · My Mechanic QLD</title>
@@ -265,12 +279,12 @@
 <div class="toasts" id="toastWrap"></div>
 
 <script src="https://accounts.google.com/gsi/client" async defer></script>
-<script src="../config.js?v=18"></script>
+<script src="../config.js?v=19"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="../storage.js?v=18" defer></script>
-<script src="../gmail-send.js?v=18" defer></script>
-<script src="assets.js?v=18" defer></script>
-<script src="app.js?v=18" defer></script>
+<script src="../storage.js?v=19" defer></script>
+<script src="../gmail-send.js?v=19" defer></script>
+<script src="assets.js?v=19" defer></script>
+<script src="app.js?v=19" defer></script>
 
 </body>
 </html>
