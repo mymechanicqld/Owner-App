@@ -24,19 +24,30 @@
   }
 
   // Upload a base64 PDF to a storage bucket. Returns { path, url }.
-  async function uploadPdf(bucket, name, pdfBase64) {
-    const blob = b64ToBlob(pdfBase64, 'application/pdf');
-    const url = base() + '/storage/v1/object/' + bucket + '/' + encodeURIComponent(name);
-    const r = await fetch(url, {
-      method: 'POST',
-      headers: { ...authHeaders(), 'Content-Type': 'application/pdf', 'x-upsert': 'true', 'cache-control': '3600' },
-      body: blob,
+  // Uses XMLHttpRequest, not fetch: iOS WebKit (all iPhone browsers) fails with
+  // "Load failed" when fetch()'ing a Blob body, but XHR uploads it reliably.
+  function uploadPdf(bucket, name, pdfBase64) {
+    return new Promise((resolve, reject) => {
+      const blob = b64ToBlob(pdfBase64, 'application/pdf');
+      const url = base() + '/storage/v1/object/' + bucket + '/' + encodeURIComponent(name);
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', url, true);
+      xhr.setRequestHeader('apikey', CONFIG.SUPABASE_KEY);
+      xhr.setRequestHeader('Authorization', 'Bearer ' + CONFIG.SUPABASE_KEY);
+      xhr.setRequestHeader('Content-Type', 'application/pdf');
+      xhr.setRequestHeader('x-upsert', 'true');
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          resolve({ path: name, url: base() + '/storage/v1/object/public/' + bucket + '/' + name });
+        } else {
+          reject(new Error('upload ' + xhr.status + ' ' + String(xhr.responseText || '').slice(0, 100)));
+        }
+      };
+      xhr.onerror = () => reject(new Error('upload network error (storage)'));
+      xhr.ontimeout = () => reject(new Error('upload timed out'));
+      xhr.timeout = 60000;
+      xhr.send(blob);
     });
-    if (!r.ok) {
-      const t = await r.text().catch(() => '');
-      throw new Error('upload ' + r.status + ' ' + t.slice(0, 100));
-    }
-    return { path: name, url: base() + '/storage/v1/object/public/' + bucket + '/' + name };
   }
 
   // Insert a row into a table via PostgREST.
