@@ -201,10 +201,11 @@ function renderItems() {
           <input class="item__num" type="number" inputmode="decimal" min="0" step="0.01"
                  placeholder="0.00" data-field="price" value="${it.price || ''}" />
         </label>
-        <div class="item__cell">
+        <label class="item__cell">
           <span class="item__cell-label">Amount</span>
-          <span class="item__amount" data-amount-for="${it.id}">${fmtMoney(it.qty * it.price)}</span>
-        </div>
+          <input class="item__num" type="number" inputmode="decimal" min="0" step="0.01"
+                 placeholder="0.00" data-field="amount" value="${(it.qty && it.price) ? (Math.round(it.qty * it.price * 100) / 100) : ''}" />
+        </label>
         <button type="button" class="item__remove" data-remove="${it.id}" aria-label="Remove item">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         </button>
@@ -298,8 +299,16 @@ document.addEventListener('input', (e) => {
     if (!item) return;
     if (t.dataset.field === 'qty' || t.dataset.field === 'price') {
       item[t.dataset.field] = Number(t.value) || 0;
-      const amount = $(`[data-amount-for="${item.id}"]`);
-      if (amount) amount.textContent = fmtMoney(item.qty * item.price);
+      const amtIn = itemEl.querySelector('[data-field="amount"]');
+      if (amtIn && document.activeElement !== amtIn) amtIn.value = (item.qty && item.price) ? (Math.round(item.qty * item.price * 100) / 100) : '';
+      renderTotals();
+    } else if (t.dataset.field === 'amount') {
+      // Editing the line total back-calculates the unit price (qty stays).
+      const amt = Number(t.value) || 0;
+      const q = item.qty || 1;
+      item.price = q ? amt / q : amt;
+      const priceIn = itemEl.querySelector('[data-field="price"]');
+      if (priceIn && document.activeElement !== priceIn) priceIn.value = item.price || '';
       renderTotals();
     } else {
       item[t.dataset.field] = t.value;

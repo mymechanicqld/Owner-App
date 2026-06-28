@@ -1,16 +1,13 @@
 /* ============================================================================
    Shared Supabase storage + logging for saved documents.
-   Saves invoice / inspection PDFs into per-type storage buckets and logs the
-   text data into tables so they are searchable later. Relies on config.js
-   (CONFIG.SUPABASE_URL / SUPABASE_KEY / STORAGE) loaded first.
-   Files are named  <YYYY-MM-DD>_<REGO>.pdf  for easy lookup by date or rego.
+   Uses direct REST/Storage fetch calls (no supabase-js dependency), so it works
+   even if the supabase-js CDN does not load on the device. Files are named
+   <YYYY-MM-DD>_<REGO>.pdf for easy lookup by date or rego.
+   Relies on config.js (CONFIG.SUPABASE_URL / SUPABASE_KEY / STORAGE).
    ========================================================================== */
 (function () {
-  let client = null;
-  function db() {
-    if (!client) client = window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_KEY, { auth: { persistSession: false } });
-    return client;
-  }
+  const base = () => CONFIG.SUPABASE_URL.replace(/\/+$/, '');
+  const authHeaders = () => ({ apikey: CONFIG.SUPABASE_KEY, Authorization: 'Bearer ' + CONFIG.SUPABASE_KEY });
 
   function fileName(rego, suffix) {
     const d = new Date();
@@ -26,21 +23,35 @@
     return new Blob([u8], { type: type || 'application/pdf' });
   }
 
-  // Upload a base64 PDF; returns { path, url }
+  // Upload a base64 PDF to a storage bucket. Returns { path, url }.
   async function uploadPdf(bucket, name, pdfBase64) {
     const blob = b64ToBlob(pdfBase64, 'application/pdf');
-    const { error } = await db().storage.from(bucket).upload(name, blob, { contentType: 'application/pdf', upsert: true });
-    if (error) throw error;
-    const { data } = db().storage.from(bucket).getPublicUrl(name);
-    return { path: name, url: data ? data.publicUrl : '' };
+    const url = base() + '/storage/v1/object/' + bucket + '/' + encodeURIComponent(name);
+    const r = await fetch(url, {
+      method: 'POST',
+      headers: { ...authHeaders(), 'Content-Type': 'application/pdf', 'x-upsert': 'true', 'cache-control': '3600' },
+      body: blob,
+    });
+    if (!r.ok) {
+      const t = await r.text().catch(() => '');
+      throw new Error('upload ' + r.status + ' ' + t.slice(0, 100));
+    }
+    return { path: name, url: base() + '/storage/v1/object/public/' + bucket + '/' + name };
   }
 
+  // Insert a row into a table via PostgREST.
   async function logRow(table, row) {
-    const { error } = await db().from(table).insert(row);
-    if (error) throw error;
+    const r = await fetch(base() + '/rest/v1/' + table, {
+      method: 'POST',
+      headers: { ...authHeaders(), 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+      body: JSON.stringify(row),
+    });
+    if (!r.ok) {
+      const t = await r.text().catch(() => '');
+      throw new Error('log ' + r.status + ' ' + t.slice(0, 100));
+    }
   }
 
-  // Save an invoice: upload PDF then log the text record. Returns the file path.
   async function saveInvoice(meta, pdfBase64) {
     const name = fileName(meta.vehicle_rego, meta.invoice_number ? String(meta.invoice_number).replace(/[^A-Za-z0-9]/g, '') : '');
     const up = await uploadPdf(CONFIG.STORAGE.invoices, name, pdfBase64);
@@ -55,5 +66,5 @@
     return up;
   }
 
-  window.MMQLD_STORE = { db, fileName, uploadPdf, saveInvoice, saveInspection };
+  window.MMQLD_STORE = { fileName, uploadPdf, saveInvoice, saveInspection };
 })();
