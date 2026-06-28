@@ -15,14 +15,20 @@ const STATUS_COLOR = { new: '#2563EB', contacted: '#B45309', quoted: '#7C3AED', 
 const STATE = {
   view: 'dashboard',
   rows: [],
+  events: [],
   loaded: false,
   inqRange: '48h',
   period: 'daily',
   search: '',
   activeId: null,
   replyTmpl: 'service',
+  msgTmpl: 'website',
+  calView: 'week',
+  calRef: null,
+  editEventId: null,
   gtoken: null,
   gexp: 0,
+  _calErr: null,
 };
 
 /* --------------------------------------------------------------- helpers -- */
@@ -73,7 +79,20 @@ async function loadData(spinner = true) {
   if (error) { toast('Could not load data', 'err'); console.error(error); return; }
   STATE.rows = data || [];
   STATE.loaded = true;
+  await loadEvents();
   render();
+}
+
+async function loadEvents() {
+  try {
+    const { data, error } = await sb.from('calendar_events').select('*').order('starts_at', { ascending: true });
+    if (error) throw error;
+    STATE.events = data || [];
+    STATE._calErr = null;
+  } catch (e) {
+    STATE.events = [];
+    STATE._calErr = e.message || 'calendar unavailable';
+  }
 }
 
 const rangeMs = { '48h': 1.728e8, 'week': 6.048e8, 'month': 2.592e9, 'year': 3.1536e10 };
@@ -88,6 +107,8 @@ function setView(v) {
   STATE.view = v;
   document.querySelectorAll('.view').forEach((el) => el.classList.toggle('active', el.id === 'view-' + v));
   document.querySelectorAll('.nav button').forEach((b) => b.classList.toggle('active', b.dataset.view === v));
+  document.querySelectorAll('#sidebar-nav button[data-view]').forEach((b) => b.classList.toggle('active', b.dataset.view === v));
+  closeSidebar();
   $('.main').scrollTop = 0;
   render();
   icons();
@@ -95,10 +116,15 @@ function setView(v) {
 function render() {
   if (STATE.view === 'dashboard') renderDashboard();
   else if (STATE.view === 'inquiries') renderInquiries();
+  else if (STATE.view === 'calendar') renderCalendar();
   else if (STATE.view === 'search') renderSearch();
   else if (STATE.view === 'analytics') renderAnalytics();
+  else if (STATE.view === 'invoices') renderInvoices();
+  else if (STATE.view === 'inspections') renderInspections();
   icons();
 }
+function closeSidebar() { $('#sidebar').classList.remove('open'); $('#side-scrim').classList.remove('open'); }
+function openSidebar() { $('#sidebar').classList.add('open'); $('#side-scrim').classList.add('open'); }
 
 /* ----------------------------------------------------------- row builder -- */
 function rowHtml(s) {
@@ -276,7 +302,10 @@ function openDetail(id) {
     ${field('map-pin', 'Suburb', esc(s.suburb))}
     ${field('car-front', 'Vehicle', [esc(carDesc(s)), s.vehicle_rego ? `<span class="rego">${esc(s.vehicle_rego)}</span>` : ''].filter(Boolean).join(' '))}
     ${field('wrench', 'Service', esc(sv.label))}
-    ${field('calendar-days', 'Preferred date', s.preferred_date ? fmtDate(s.preferred_date) : '')}
+    <div class="field"><div class="fic"><i data-lucide="calendar-days"></i></div>
+      <div style="flex:1"><div class="fl">Preferred date</div><div class="fv">${s.preferred_date ? fmtDate(s.preferred_date) : 'Not specified'}</div></div>
+      <button class="addcal" id="act-addcal"><i data-lucide="calendar-plus"></i>Add</button>
+    </div>
     ${s.symptoms ? `<div class="field notes"><div class="fic"><i data-lucide="message-square"></i></div><div><div class="fl">Notes</div><div class="fv">${esc(s.symptoms)}</div></div></div>` : ''}
     ${field('clock', 'Submitted', fmtDateTime(s.created_at))}
     <div class="field"><div class="fic"><i data-lucide="flag"></i></div><div style="flex:1"><div class="fl">Status</div>
@@ -286,7 +315,7 @@ function openDetail(id) {
     <div class="actions">
       <button class="btn primary full" id="act-reply"><i data-lucide="send"></i>Reply by email</button>
       ${s.phone ? `<a class="btn ghost" href="tel:${esc(tel)}"><i data-lucide="phone"></i>Call</a>` : ''}
-      ${s.phone ? `<a class="btn ghost" href="sms:${esc(tel)}"><i data-lucide="message-circle"></i>Text</a>` : '<a class="btn ghost full" href="mailto:'+esc(s.email)+'"><i data-lucide="mail"></i>Open in mail</a>'}
+      ${s.phone ? `<button class="btn ghost" id="act-message"><i data-lucide="message-circle"></i>Message</button>` : '<a class="btn ghost" href="mailto:'+esc(s.email)+'"><i data-lucide="mail"></i>Mail</a>'}
       <button class="btn ghost" id="act-invoice"><i data-lucide="file-text"></i>Invoice</button>
       <button class="btn ghost" id="act-inspection"><i data-lucide="clipboard-check"></i>Inspection</button>
     </div>
@@ -312,6 +341,8 @@ function openDetail(id) {
   }).toString();
   $('#act-invoice').addEventListener('click', () => { location.href = 'invoice/index.html?' + genParams(); });
   $('#act-inspection').addEventListener('click', () => { location.href = 'inspection/index.html?' + genParams(); });
+  const mBtn = $('#act-message'); if (mBtn) mBtn.addEventListener('click', () => openMessage(id));
+  const cBtn = $('#act-addcal'); if (cBtn) cBtn.addEventListener('click', () => openEvent(eventFromSubmission(s)));
 }
 
 /* -------------------------------------------------------- reply composer -- */
@@ -383,6 +414,183 @@ async function sendReplyNow(id) {
   }
 }
 
+/* --------------------------------------------------------------- calendar -- */
+function startOfDay(d) { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; }
+function addDays(d, n) { const x = new Date(d); x.setDate(x.getDate() + n); return x; }
+function weekStartM(d) { const x = startOfDay(d); return addDays(x, -((x.getDay() + 6) % 7)); }
+function sameDay(a, b) { return startOfDay(a).getTime() === startOfDay(b).getTime(); }
+function fmtTime(iso) { return iso ? new Date(iso).toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit' }) : ''; }
+function toLocalInput(d) { const x = new Date(d); const p = (n) => String(n).padStart(2, '0'); return x.getFullYear() + '-' + p(x.getMonth() + 1) + '-' + p(x.getDate()) + 'T' + p(x.getHours()) + ':' + p(x.getMinutes()); }
+
+function renderCalendar() {
+  if (!STATE.calRef) STATE.calRef = new Date();
+  const ref = STATE.calRef;
+  const days = STATE.calView === 'day' ? [startOfDay(ref)] : Array.from({ length: 7 }, (_, i) => addDays(weekStartM(ref), i));
+  const title = STATE.calView === 'day'
+    ? ref.toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long' })
+    : days[0].toLocaleDateString('en-AU', { day: 'numeric', month: 'short' }) + ' - ' + days[6].toLocaleDateString('en-AU', { day: 'numeric', month: 'short' });
+  const evByDay = (d) => STATE.events.filter((e) => sameDay(e.starts_at, d)).sort((a, b) => new Date(a.starts_at) - new Date(b.starts_at));
+  const dayBlock = (d) => `
+    <div class="cal-day ${sameDay(d, new Date()) ? 'today' : ''}">
+      <div class="cal-day__h"><span class="dn">${d.toLocaleDateString('en-AU', { weekday: 'long' })}</span><span class="dd">${d.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}</span></div>
+      ${evByDay(d).length ? evByDay(d).map(eventChip).join('') : '<div class="cal-empty">No bookings</div>'}
+    </div>`;
+  $('#view-calendar').innerHTML = `
+    <div class="cal-head"><h2>${esc(title)}</h2>
+      <div class="cal-nav">
+        <button id="cal-prev" aria-label="Previous"><i data-lucide="chevron-left"></i></button>
+        <button class="cal-today" id="cal-today">Today</button>
+        <button id="cal-next" aria-label="Next"><i data-lucide="chevron-right"></i></button>
+      </div>
+    </div>
+    <div class="seg" id="cal-seg"><button data-cv="day" class="${STATE.calView === 'day' ? 'active' : ''}">Day</button><button data-cv="week" class="${STATE.calView === 'week' ? 'active' : ''}">Week</button></div>
+    ${STATE._calErr ? `<div class="cal-empty" style="color:var(--rose)">Calendar not set up yet. Run owner-app-schema.sql in Supabase.</div>` : ''}
+    ${days.map(dayBlock).join('')}
+    <button class="fab-new" id="cal-add" aria-label="New booking"><i data-lucide="plus"></i></button>
+  `;
+}
+function eventChip(e) {
+  const t = e.all_day ? 'All day' : fmtTime(e.starts_at) + (e.ends_at ? ' - ' + fmtTime(e.ends_at) : '');
+  const meta = [e.customer_name, e.vehicle_rego, e.suburb].filter(Boolean).join(' · ');
+  return `<div class="event" data-ev="${e.id}"><div class="et">${esc(t)}</div><div class="eb"><div class="etitle">${esc(e.title)}</div>${meta ? `<div class="emeta">${esc(meta)}</div>` : ''}</div></div>`;
+}
+
+function openEvent(ev) {
+  const isEdit = ev && ev.id;
+  STATE.editEventId = isEdit ? ev.id : null;
+  const start = ev && ev.starts_at ? new Date(ev.starts_at) : (() => { const d = new Date(); d.setHours(9, 0, 0, 0); return d; })();
+  const end = ev && ev.ends_at ? new Date(ev.ends_at) : new Date(start.getTime() + 3600000);
+  $('#sheet-title').textContent = isEdit ? 'Edit booking' : 'New booking';
+  $('#sheet-sub').textContent = isEdit ? 'Update or delete this booking' : 'Check the details, then add it';
+  const fld = (label, id, type, val, ph) => `<label class="form-field"><span>${label}</span><input id="${id}" type="${type}" value="${esc(val || '')}" placeholder="${ph || ''}" /></label>`;
+  $('#sheet-body').innerHTML = `
+    <label class="form-field"><span>Title</span><input id="ev-title" type="text" value="${esc((ev && ev.title) || '')}" placeholder="e.g. Logbook service - Toyota" /></label>
+    <div class="row-2">${fld('Starts', 'ev-start', 'datetime-local', toLocalInput(start))}${fld('Ends', 'ev-end', 'datetime-local', toLocalInput(end))}</div>
+    <div class="row-2">${fld('Customer', 'ev-cust', 'text', ev && ev.customer_name)}${fld('Phone', 'ev-phone', 'tel', ev && ev.customer_phone)}</div>
+    <div class="row-2">${fld('Rego', 'ev-rego', 'text', ev && ev.vehicle_rego)}${fld('Suburb', 'ev-suburb', 'text', ev && ev.suburb)}</div>
+    <label class="form-field"><span>Notes</span><textarea id="ev-notes" rows="2">${esc((ev && ev.notes) || '')}</textarea></label>
+    <div class="actions">
+      <button class="btn primary full" id="ev-save"><i data-lucide="check"></i>${isEdit ? 'Save changes' : 'Add to calendar'}</button>
+      ${isEdit ? `<button class="btn ghost full danger-text" id="ev-del"><i data-lucide="trash-2"></i>Delete booking</button>` : ''}
+    </div>
+  `;
+  openSheet(); icons();
+  $('#ev-save').addEventListener('click', saveEvent);
+  if (isEdit) $('#ev-del').addEventListener('click', () => deleteEvent(ev.id));
+}
+async function saveEvent() {
+  const title = $('#ev-title').value.trim();
+  if (!title) return toast('Add a title', 'err');
+  if (!$('#ev-start').value) return toast('Pick a start time', 'err');
+  const row = {
+    title,
+    starts_at: new Date($('#ev-start').value).toISOString(),
+    ends_at: $('#ev-end').value ? new Date($('#ev-end').value).toISOString() : null,
+    customer_name: $('#ev-cust').value.trim() || null,
+    customer_phone: $('#ev-phone').value.trim() || null,
+    vehicle_rego: $('#ev-rego').value.trim() || null,
+    suburb: $('#ev-suburb').value.trim() || null,
+    notes: $('#ev-notes').value.trim() || null,
+    updated_at: new Date().toISOString(),
+  };
+  const btn = $('#ev-save'); btn.disabled = true; btn.innerHTML = '<span class="spin"></span>Saving...';
+  try {
+    if (STATE.editEventId) { const { error } = await sb.from('calendar_events').update(row).eq('id', STATE.editEventId); if (error) throw error; }
+    else { const { error } = await sb.from('calendar_events').insert(row); if (error) throw error; }
+    await loadEvents(); toast('Booking saved', 'ok'); closeSheet(); STATE.view = 'calendar'; setView('calendar');
+  } catch (e) { toast('Save failed: ' + String(e.message || e).slice(0, 50), 'err'); btn.disabled = false; btn.innerHTML = 'Save'; icons(); }
+}
+async function deleteEvent(id) {
+  if (!confirm('Delete this booking?')) return;
+  try { const { error } = await sb.from('calendar_events').delete().eq('id', id); if (error) throw error; await loadEvents(); toast('Booking deleted', 'ok'); closeSheet(); renderCalendar(); icons(); }
+  catch (e) { toast('Delete failed', 'err'); }
+}
+function eventFromSubmission(s) {
+  const start = s.preferred_date ? new Date(s.preferred_date + 'T09:00:00') : (() => { const d = new Date(); d.setHours(9, 0, 0, 0); return d; })();
+  const sv = svc(s.service_needed);
+  return {
+    title: sv.label + ' - ' + (s.full_name || 'Customer'),
+    starts_at: start.toISOString(), ends_at: new Date(start.getTime() + 3600000).toISOString(),
+    customer_name: s.full_name, customer_phone: s.phone, vehicle_rego: s.vehicle_rego, suburb: s.suburb,
+    service: sv.label, notes: s.symptoms || '',
+  };
+}
+
+/* ----------------------------------------------------------- message sheet -- */
+function openMessage(id) {
+  const s = STATE.rows.find((r) => r.id === id);
+  if (!s) return;
+  if (!s.phone) return toast('No phone number on file', 'err');
+  STATE.activeId = id; STATE.msgTmpl = 'website';
+  const first = firstName(s.full_name);
+  const tel = s.phone.replace(/\s/g, '');
+  $('#sheet-title').textContent = 'Message ' + first;
+  $('#sheet-sub').textContent = 'Opens your messaging app, pre-filled';
+  const keys = Object.keys(MSG_TEMPLATES);
+  $('#sheet-body').innerHTML = `
+    <button class="btn ghost" id="msg-back" style="margin-bottom:14px;width:auto;display:inline-flex"><i data-lucide="chevron-left"></i>Back</button>
+    <div class="reply-to">To <b>${esc(s.phone)}</b></div>
+    <div class="tmpl-seg" id="msg-seg">${keys.map((k) => `<button data-mt="${k}" class="${k === 'website' ? 'active' : ''}">${MSG_TEMPLATES[k].label}</button>`).join('')}</div>
+    <textarea class="composer" id="msg-body">${esc(MSG_TEMPLATES.website.build(first))}</textarea>
+    <div class="actions"><a class="btn primary full" id="msg-send"><i data-lucide="send"></i>Open in Messages</a></div>
+    <p style="font-size:12px;color:var(--subtle);margin-top:10px;text-align:center">The default message links to our website form, so when they tap it their details land straight in the system.</p>
+  `;
+  openSheet(); icons();
+  const updateHref = () => { $('#msg-send').setAttribute('href', `sms:${tel}?&body=${encodeURIComponent($('#msg-body').value)}`); };
+  updateHref();
+  $('#msg-seg').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-mt]'); if (!b) return;
+    STATE.msgTmpl = b.dataset.mt;
+    document.querySelectorAll('#msg-seg button').forEach((x) => x.classList.toggle('active', x === b));
+    $('#msg-body').value = MSG_TEMPLATES[STATE.msgTmpl].build(first);
+    updateHref();
+  });
+  $('#msg-body').addEventListener('input', updateHref);
+  $('#msg-back').addEventListener('click', () => openDetail(id));
+}
+
+/* --------------------------------------------------- invoice/inspection log -- */
+function pdfUrl(bucket, path) { if (!path) return ''; const { data } = sb.storage.from(bucket).getPublicUrl(path); return data ? data.publicUrl : ''; }
+function logRowHtml(icon, title, line, when, url) {
+  return `<div class="row" data-pdf="${esc(url)}"><div class="ic"><i data-lucide="${icon}"></i></div><div class="body"><div class="name">${title}</div><div class="line">${line}</div></div><div class="when">${esc(when)}</div></div>`;
+}
+async function renderInvoices() {
+  const el = $('#view-invoices');
+  el.innerHTML = `<div class="view-head"><h2>Invoices</h2></div><div class="list">${'<div class="skeleton" style="height:66px"></div>'.repeat(4)}</div>`;
+  try {
+    const { data, error } = await sb.from('invoices').select('*').order('created_at', { ascending: false }).limit(500);
+    if (error) throw error;
+    const rows = data || [];
+    el.innerHTML = `<div class="view-head"><h2>Invoices</h2><div class="meta">${rows.length}</div></div>` +
+      (rows.length ? `<div class="list">${rows.map((r) => logRowHtml('file-text',
+        `${esc(r.customer_name || 'Customer')}${r.total != null ? ' · $' + esc(r.total) : ''}`,
+        `${r.vehicle_rego ? `<span class="rego">${esc(r.vehicle_rego)}</span> ` : ''}${esc(r.invoice_number || '')}${r.status ? ' · ' + esc(r.status) : ''}`,
+        relTime(r.created_at), pdfUrl(CONFIG.STORAGE.invoices, r.pdf_path))).join('')}</div>`
+        : emptyHtml('file-text', 'No invoices yet', 'Create one from a customer and it is logged here.'));
+  } catch (e) {
+    el.innerHTML = `<div class="view-head"><h2>Invoices</h2></div>${emptyHtml('file-text', 'Not set up yet', 'Run owner-app-schema.sql in Supabase, then saved invoices appear here.')}`;
+  }
+  icons();
+}
+async function renderInspections() {
+  const el = $('#view-inspections');
+  el.innerHTML = `<div class="view-head"><h2>Inspection reports</h2></div><div class="list">${'<div class="skeleton" style="height:66px"></div>'.repeat(4)}</div>`;
+  try {
+    const { data, error } = await sb.from('inspection_reports').select('*').order('created_at', { ascending: false }).limit(500);
+    if (error) throw error;
+    const rows = data || [];
+    el.innerHTML = `<div class="view-head"><h2>Inspection reports</h2><div class="meta">${rows.length}</div></div>` +
+      (rows.length ? `<div class="list">${rows.map((r) => logRowHtml('clipboard-check',
+        `${esc(r.customer_name || 'Customer')}${r.overall_rating ? ' · ' + esc(r.overall_rating) : ''}`,
+        `${r.vehicle_rego ? `<span class="rego">${esc(r.vehicle_rego)}</span> ` : ''}${esc(r.vehicle || '')}`,
+        relTime(r.created_at), pdfUrl(CONFIG.STORAGE.inspections, r.pdf_path))).join('')}</div>`
+        : emptyHtml('clipboard-check', 'No reports yet', 'Create one from a customer and it is logged here.'));
+  } catch (e) {
+    el.innerHTML = `<div class="view-head"><h2>Inspection reports</h2></div>${emptyHtml('clipboard-check', 'Not set up yet', 'Run owner-app-schema.sql in Supabase, then saved reports appear here.')}`;
+  }
+  icons();
+}
+
 /* ------------------------------------------------------------ gmail (GIS) -- */
 let tokenClient = null, tokenResolver = null;
 function getToken() {
@@ -445,13 +653,24 @@ async function sendThreaded(to, body, found) {
 /* ------------------------------------------------------------------ wire -- */
 document.addEventListener('click', (e) => {
   const nav = e.target.closest('.nav button'); if (nav) return setView(nav.dataset.view);
+  const side = e.target.closest('#sidebar-nav button[data-view]'); if (side) return setView(side.dataset.view);
+  const pdfRow = e.target.closest('.row[data-pdf]');
+  if (pdfRow) { const u = pdfRow.dataset.pdf; if (u) window.open(u, '_blank'); else toast('PDF not available'); return; }
   const row = e.target.closest('.row[data-id]'); if (row) return openDetail(row.dataset.id);
+  const evEl = e.target.closest('.event[data-ev]'); if (evEl) { const ev = STATE.events.find((x) => x.id === evEl.dataset.ev); if (ev) openEvent(ev); return; }
   const chip = e.target.closest('.chip[data-range]'); if (chip) { STATE.inqRange = chip.dataset.range; renderInquiries(); icons(); return; }
   const per = e.target.closest('.seg button[data-period]'); if (per) { STATE.period = per.dataset.period; renderAnalytics(); icons(); return; }
+  const cv = e.target.closest('#cal-seg button[data-cv]'); if (cv) { STATE.calView = cv.dataset.cv; renderCalendar(); icons(); return; }
+  if (e.target.closest('#cal-prev')) { STATE.calRef = addDays(STATE.calRef || new Date(), STATE.calView === 'day' ? -1 : -7); renderCalendar(); icons(); return; }
+  if (e.target.closest('#cal-next')) { STATE.calRef = addDays(STATE.calRef || new Date(), STATE.calView === 'day' ? 1 : 7); renderCalendar(); icons(); return; }
+  if (e.target.closest('#cal-today')) { STATE.calRef = new Date(); renderCalendar(); icons(); return; }
+  if (e.target.closest('#cal-add')) return openEvent(null);
   if (e.target.closest('#see-all')) return setView('inquiries');
 });
 $('#scrim').addEventListener('click', closeSheet);
 $('#sheet-close').addEventListener('click', closeSheet);
+$('#side-scrim').addEventListener('click', closeSidebar);
+$('#btn-menu').addEventListener('click', openSidebar);
 $('#btn-refresh').addEventListener('click', () => { loadData(false); toast('Refreshed'); });
 
 /* gate (optional) + boot */

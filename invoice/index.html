@@ -186,6 +186,30 @@
     </div>
   </section>
 
+  <!-- Customer signature card -->
+  <section class="card">
+    <header class="card__head">
+      <h2>Customer signature</h2>
+      <span class="card__hint">Optional, appears on the invoice</span>
+    </header>
+    <div class="card__body">
+      <label class="field">
+        <span class="field__label">Signed by</span>
+        <input id="sigName" type="text" autocomplete="off" placeholder="Customer name" data-bind="signature.name" />
+      </label>
+      <div class="field">
+        <span class="field__label">Signature</span>
+        <div class="sig">
+          <canvas id="sigCanvas" class="sig__canvas"></canvas>
+          <div class="sig__actions">
+            <span class="sig__hint">Sign with your finger</span>
+            <button class="link-btn" id="sigClearBtn" type="button">Clear</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
 </main>
 
 <!-- Sticky bottom action bar -->
@@ -221,6 +245,8 @@
 
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="../config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../storage.js" defer></script>
 <script src="../gmail-send.js" defer></script>
 <script src="assets.js" defer></script>
 <script src="app.js" defer></script>

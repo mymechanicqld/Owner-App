@@ -80,6 +80,7 @@ function sampleState() {
       { id: uid(), date: today(), ref: 'PR00045', amount: 2224 },
     ],
     notes: '',
+    signature: { name: '', dataUrl: '' },
   };
 }
 
@@ -92,6 +93,7 @@ function blankState() {
     gstInclusive: true,
     receipts: [],
     notes: '',
+    signature: { name: '', dataUrl: '' },
   };
 }
 
@@ -475,6 +477,8 @@ $('#draftsList').addEventListener('click', (e) => {
     const d = loadDrafts().find(x => x.id === load.dataset.load);
     if (!d) return;
     state = d.state;
+    // Older drafts predate the signature field — keep state shape stable.
+    if (!state.signature) state.signature = { name: '', dataUrl: '' };
     renderAll();
     closeDrafts();
     toast('Draft loaded.');
@@ -537,8 +541,47 @@ async function exportPdf() {
     } catch (err) { reject(err); }
   });
 
+  // Also log the record to Supabase (does not block the download).
+  pdfMake.createPdf(docDef).getBase64(b64 => saveInvoiceRecord(b64));
+
   bumpInvoiceCounter();
   toast('PDF downloaded.', 'success');
+}
+
+/* ────────────────────────────────────────────────────────────────────
+   Save record to Supabase — logs the computed invoice + uploads the PDF.
+   Never blocks export/send; failure just shows a soft toast.
+   ─────────────────────────────────────────────────────────────────── */
+async function saveInvoiceRecord(b64) {
+  try {
+    const t = compute();
+    const vehicle = [state.vehicle.makeModel, state.vehicle.year]
+      .filter(Boolean).join(' ').trim();
+    const meta = {
+      invoice_number: state.invoice.number || null,
+      customer_name:  state.customer.name || null,
+      customer_email: PREFILL.email || null,
+      vehicle_rego:   state.vehicle.rego || null,
+      vehicle:        vehicle || null,
+      issue_date:     state.invoice.date || null,
+      due_date:       state.invoice.due || null,
+      status:         state.invoice.status || null,
+      subtotal:       t.subtotal,
+      gst:            t.gst,
+      total:          t.total,
+      paid:           t.paid,
+      balance:        t.outstanding,
+      items:          state.items,
+      signer_name:    (state.signature && state.signature.name) || state.customer.name || null,
+      notes:          state.notes || null,
+      submission_id:  PREFILL.id || null,
+    };
+    await MMQLD_STORE.saveInvoice(meta, b64);
+    toast('Saved to records', 'success');
+  } catch (err) {
+    console.error(err);
+    toast('Saved PDF, but could not log it (Supabase not set up?)');
+  }
 }
 
 function buildInvoiceDoc(t, A) {
@@ -717,6 +760,9 @@ function buildInvoiceDoc(t, A) {
 
       /* ─── Receipts table + subtle status pill (only when there are receipts) ─── */
       paymentSection(status, t),
+
+      /* ─── Customer signature block (only when signed) ─── */
+      ...signatureBlock(),
 
       /* ─── Sign-off line ─── */
       {
@@ -1017,6 +1063,29 @@ function paymentSection(status, t) {
   };
 }
 
+function signatureBlock() {
+  // Only render when the customer has actually signed.
+  const sig = state.signature || {};
+  if (!sig.dataUrl) return [];
+  const signer = sig.name || state.customer.name || '';
+  return [{
+    margin: [0, 24, 0, 0],
+    columns: [
+      { width: '*', text: '' },
+      {
+        width: 220,
+        stack: [
+          { text: 'CUSTOMER SIGNATURE', style: 'eyebrow', margin: [0, 0, 0, 4] },
+          { image: sig.dataUrl, fit: [160, 64], margin: [0, 0, 0, 4] },
+          { canvas: [{ type: 'line', x1: 0, y1: 0, x2: 200, y2: 0, lineWidth: 0.6, lineColor: COLOR.ink }] },
+          { text: 'Signed by: ' + (signer || '—'), color: COLOR.muted, fontSize: 10, margin: [0, 5, 0, 0] },
+          { text: fmtDate(state.invoice.date), color: COLOR.subtle, fontSize: 9.5, margin: [0, 1, 0, 0] },
+        ],
+      },
+    ],
+  }];
+}
+
 /* ────────────────────────────────────────────────────────────────────
    Bootstrap — wait for assets.js, render the form, then we're live.
    ─────────────────────────────────────────────────────────────────── */
@@ -1038,7 +1107,7 @@ function applyPrefill() {
   const year   = get('year');
 
   // Stash for the send step (email is not a form field)
-  PREFILL = { email, phone, rego, name };
+  PREFILL = { email, phone, rego, name, id: get('id') };
 
   if (name)   setByPath(state, 'customer.name', name);
   if (suburb) setByPath(state, 'customer.address', suburb);
@@ -1089,6 +1158,8 @@ My Mechanic QLD
         to: PREFILL.email, subject, bodyText, filename, pdfBase64: b64, thread,
       });
       toast('Sent to client', 'success');
+      // Sending also logs the record (reuse the same base64).
+      await saveInvoiceRecord(b64);
     } catch (err) {
       console.error(err);
       toast(err.message || String(err), 'error');
@@ -1103,6 +1174,80 @@ My Mechanic QLD
 const _sendBtn = $('#sendBtn');
 if (_sendBtn) _sendBtn.addEventListener('click', (e) => sendToClient(e.currentTarget));
 
+/* ────────────────────────────────────────────────────────────────────
+   Customer signature pad — mirrors the inspection generator's canvas
+   approach (mouse + touch, stores a PNG dataURL in state.signature).
+   ─────────────────────────────────────────────────────────────────── */
+let sigCtx = null, sigDrawing = false, sigLast = null;
+function setupSignature() {
+  const canvas = $('#sigCanvas');
+  if (!canvas) return;
+
+  function resizeCanvas() {
+    const r = canvas.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    if (canvas.width !== Math.round(r.width * dpr) || canvas.height !== Math.round(r.height * dpr)) {
+      const prev = canvas.toDataURL();
+      canvas.width = Math.round(r.width * dpr);
+      canvas.height = Math.round(r.height * dpr);
+      sigCtx = canvas.getContext('2d');
+      sigCtx.scale(dpr, dpr);
+      sigCtx.lineWidth = 2.4;
+      sigCtx.lineCap = 'round';
+      sigCtx.lineJoin = 'round';
+      sigCtx.strokeStyle = '#0C0A09';
+      if (prev && prev !== 'data:,' && prev.length > 100) {
+        const im = new Image();
+        im.onload = () => sigCtx.drawImage(im, 0, 0, r.width, r.height);
+        im.src = prev;
+      }
+    }
+  }
+  resizeCanvas();
+  new ResizeObserver(resizeCanvas).observe(canvas.parentElement);
+
+  // Restore a saved signature (e.g. loaded draft)
+  if (state.signature && state.signature.dataUrl) {
+    const im = new Image();
+    im.onload = () => sigCtx.drawImage(im, 0, 0, canvas.getBoundingClientRect().width, canvas.getBoundingClientRect().height);
+    im.src = state.signature.dataUrl;
+  }
+
+  const pt = (e) => {
+    const r = canvas.getBoundingClientRect();
+    const ev = e.touches ? e.touches[0] : e;
+    return [ev.clientX - r.left, ev.clientY - r.top];
+  };
+  const start = (x, y) => { sigDrawing = true; sigLast = [x, y]; };
+  const move = (x, y) => {
+    if (!sigDrawing) return;
+    sigCtx.beginPath();
+    sigCtx.moveTo(sigLast[0], sigLast[1]);
+    sigCtx.lineTo(x, y);
+    sigCtx.stroke();
+    sigLast = [x, y];
+  };
+  const end = () => {
+    if (!sigDrawing) return;
+    sigDrawing = false;
+    state.signature.dataUrl = canvas.toDataURL('image/png');
+  };
+
+  canvas.addEventListener('mousedown', e => { const [x, y] = pt(e); start(x, y); });
+  canvas.addEventListener('mousemove', e => { const [x, y] = pt(e); move(x, y); });
+  canvas.addEventListener('mouseup', end);
+  canvas.addEventListener('mouseleave', end);
+  canvas.addEventListener('touchstart', e => { e.preventDefault(); const [x, y] = pt(e); start(x, y); }, { passive: false });
+  canvas.addEventListener('touchmove', e => { e.preventDefault(); const [x, y] = pt(e); move(x, y); }, { passive: false });
+  canvas.addEventListener('touchend', end);
+
+  const clearBtn = $('#sigClearBtn');
+  if (clearBtn) clearBtn.addEventListener('click', () => {
+    sigCtx.clearRect(0, 0, canvas.width, canvas.height);
+    state.signature.dataUrl = '';
+  });
+}
+
 function init() {
   if (!window.MMQLD_ASSETS) {
     // assets.js may load slightly after app.js — wait a tick.
@@ -1110,7 +1255,12 @@ function init() {
     return;
   }
   applyPrefill();
+  // Default the "Signed by" name to the customer when not already set.
+  if (state.signature && !state.signature.name) {
+    state.signature.name = state.customer.name || PREFILL.name || '';
+  }
   renderAll();
+  setupSignature();
 }
 
 init();

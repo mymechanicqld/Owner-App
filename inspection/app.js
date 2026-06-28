@@ -220,7 +220,7 @@ let state = demoState();
 
 /* URL-param prefill — populated in init() from the query string. email is
    kept here because it is not a form field but is needed for the send step. */
-let PREFILL = { email: '', phone: '', rego: '', name: '' };
+let PREFILL = { email: '', phone: '', rego: '', name: '', id: '' };
 
 /* ────────────────────────────────────────────────────────────────────
    Render — inspection sections (built dynamically)
@@ -448,7 +448,7 @@ document.addEventListener('change', async (e) => {
   toast(`Processing ${files.length} image${files.length > 1 ? 's' : ''}…`);
   for (const f of files) {
     try {
-      const dataUrl = await compressImage(f, 1400, 0.82);
+      const dataUrl = await compressImage(f, 1600, 0.72);
       state.images.push({ id: uid(), dataUrl, caption: '' });
     } catch (err) {
       console.error(err);
@@ -700,6 +700,41 @@ const COLOR = {
 const GRADE_BG = { Good: COLOR.goodBg, Fair: COLOR.fairBg, Repair: COLOR.repairBg, NA: COLOR.naBg };
 const GRADE_FG = { Good: COLOR.goodFg, Fair: COLOR.fairFg, Repair: COLOR.repairFg, NA: COLOR.naFg };
 
+/* ─── Save record to Supabase (non-blocking) ─── */
+async function saveInspectionRecord(b64) {
+  try {
+    const v = state.inspection;
+    const vehicle = [v.makeModel, v.year].filter(Boolean).join(' ').trim();
+    const sections = SECTIONS.map(sec => {
+      const sst = state.sections[sec.id];
+      return {
+        id: sec.id,
+        title: sec.title,
+        criteria: sec.criteria.map((label, idx) => ({ label, grade: sst.grades[idx] })),
+        comments: sst.comments || '',
+      };
+    });
+    const meta = {
+      report_number:   state.reportNumber || null,
+      customer_name:   state.client.contact || PREFILL.name || null,
+      customer_phone:  state.client.phone || PREFILL.phone || null,
+      vehicle_rego:    v.registration || null,
+      vehicle:         vehicle || null,
+      odometer:        v.odometer || null,
+      overall_rating:  state.overall || null,
+      inspection_date: v.date || null,
+      sections:        sections,
+      comments:        state.overallComments || null,
+      submission_id:   PREFILL.id || null,
+    };
+    await MMQLD_STORE.saveInspection(meta, b64);
+    toast('Saved to records', 'success');
+  } catch (err) {
+    console.error(err);
+    toast('Saved PDF, but could not log it (Supabase not set up?)');
+  }
+}
+
 async function exportPdf() {
   if (typeof pdfMake === 'undefined') throw new Error('PDF library still loading');
   toast('Generating PDF…');
@@ -710,6 +745,8 @@ async function exportPdf() {
       pdfMake.createPdf(doc).download(filename, () => resolve());
     } catch (err) { reject(err); }
   });
+  // Log the record to Supabase (non-blocking — must not break the download)
+  pdfMake.createPdf(doc).getBase64(b64 => saveInspectionRecord(b64));
   bumpReportCounter();
   toast('PDF downloaded.', 'success');
 }
@@ -1290,9 +1327,10 @@ function applyPrefill() {
   const rego   = get('rego');
   const make   = get('make');
   const year   = get('year');
+  const id     = get('id');
 
   // Stash for the send step (email is not a form field)
-  PREFILL = { email, phone, rego, name };
+  PREFILL = { email, phone, rego, name, id };
 
   if (name)   setByPath(state, 'client.contact', name);
   if (phone)  setByPath(state, 'client.phone', phone);
@@ -1344,6 +1382,7 @@ My Mechanic QLD
         to: PREFILL.email, subject, bodyText, filename, pdfBase64: b64, thread,
       });
       toast('Sent to client', 'success');
+      await saveInspectionRecord(b64);
     } catch (err) {
       console.error(err);
       toast(err.message || String(err), 'error');

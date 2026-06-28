@@ -621,6 +621,40 @@ input, textarea, select { width: 100%; }
   to { transform: translateY(0); opacity: 1; }
 }
 
+/* ───── Customer signature pad ───── */
+.sig {
+  border: 1px dashed var(--strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+  padding: 4px;
+}
+.sig__canvas {
+  width: 100%;
+  height: 160px;
+  background: var(--surface);
+  border-radius: 8px;
+  touch-action: none;
+  display: block;
+}
+.sig__actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 6px 4px;
+}
+.sig__hint { color: var(--subtle); font-size: 12px; }
+.link-btn {
+  background: none;
+  border: none;
+  color: var(--navy);
+  font: inherit;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  padding: 4px 6px;
+}
+.link-btn:hover { text-decoration: underline; }
+
 /* ───── Print mode (browser print fallback) ───── */
 @media print {
   .topbar, .fab, .drafts, .scrim, .toasts { display: none !important; }

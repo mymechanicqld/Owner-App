@@ -40,6 +40,28 @@ const CONFIG = {
   // --- Default prices for the quick-reply templates -----------------------
   DEFAULT_SERVICE_PRICE: '369',
   DEFAULT_DIAGNOSTIC_PRICE: '189',
+
+  // --- Website inquiry form (used by the default SMS template) ------------
+  WEBSITE_FORM_URL: 'https://mymechanicqld.com.au/book/',
+
+  // --- Supabase storage buckets for saved PDFs ---------------------------
+  STORAGE: { invoices: 'invoices', inspections: 'inspections' },
+}
+
+/* SMS templates for the "Message" button on a customer. {first} = first name,
+   {url} = the website form link. The website-link one is the default. */
+const MSG_TEMPLATES = {
+  website: {
+    label: 'Website link',
+    build: (first) =>
+`Hi ${first}, thanks for reaching out to My Mechanic QLD. The quickest way for us to get you a price is to pop your car and job details in here: ${CONFIG.WEBSITE_FORM_URL} . Takes a minute and we will get straight back to you. Thanks, Ashley`,
+  },
+  callback: {
+    label: 'Quick call',
+    build: (first) =>
+`Hi ${first}, it is Ashley from My Mechanic QLD returning your enquiry. Are you free for a quick call to sort out your booking? Thanks.`,
+  },
+  custom: { label: 'Custom', build: () => '' },
 }
 
 /* Service slug -> display label + Lucide icon. Covers both slug spellings the

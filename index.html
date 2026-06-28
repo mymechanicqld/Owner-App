@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1" />
   <meta name="robots" content="noindex,nofollow" />
   <meta name="theme-color" content="#1E3A8A" />
-  <!-- Add-to-home-screen (iOS), no manifest by design -->
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="My Mechanic QLD" />
@@ -19,32 +18,57 @@
 
 <div class="app">
   <header class="header">
-    <div class="logo">M</div>
+    <button class="hbtn" id="btn-menu" aria-label="Menu"><i data-lucide="menu"></i></button>
     <div style="flex:1">
       <h1>My Mechanic QLD</h1>
       <div class="sub" id="header-sub">Owner console</div>
     </div>
-    <button class="hbtn" id="btn-refresh" aria-label="Refresh">
-      <i data-lucide="refresh-cw"></i>
-    </button>
+    <button class="hbtn" id="btn-refresh" aria-label="Refresh"><i data-lucide="refresh-cw"></i></button>
   </header>
 
   <main class="main">
     <section class="view active" id="view-dashboard"></section>
     <section class="view" id="view-inquiries"></section>
+    <section class="view" id="view-calendar"></section>
     <section class="view" id="view-search"></section>
     <section class="view" id="view-analytics"></section>
+    <section class="view" id="view-invoices"></section>
+    <section class="view" id="view-inspections"></section>
   </main>
 
   <nav class="nav" id="nav">
     <button data-view="dashboard" class="active"><i data-lucide="layout-dashboard"></i>Dashboard</button>
     <button data-view="inquiries"><i data-lucide="inbox"></i>Inquiries</button>
+    <button data-view="calendar"><i data-lucide="calendar"></i>Calendar</button>
     <button data-view="search"><i data-lucide="search"></i>Search</button>
     <button data-view="analytics"><i data-lucide="bar-chart-3"></i>Analytics</button>
   </nav>
 </div>
 
-<!-- detail / reply sheet -->
+<!-- Sidebar drawer -->
+<div class="scrim" id="side-scrim"></div>
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar__head">
+    <div class="logo">M</div>
+    <div><div class="sidebar__name">My Mechanic QLD</div><div class="sidebar__sub">Owner console</div></div>
+  </div>
+  <nav class="sidebar__nav" id="sidebar-nav">
+    <button data-view="dashboard"><i data-lucide="layout-dashboard"></i>Dashboard</button>
+    <button data-view="inquiries"><i data-lucide="inbox"></i>Inquiries</button>
+    <button data-view="calendar"><i data-lucide="calendar"></i>Calendar</button>
+    <button data-view="search"><i data-lucide="search"></i>Search</button>
+    <button data-view="analytics"><i data-lucide="bar-chart-3"></i>Analytics</button>
+    <div class="sidebar__divider"></div>
+    <button data-view="invoices"><i data-lucide="file-text"></i>Invoices</button>
+    <button data-view="inspections"><i data-lucide="clipboard-check"></i>Inspection reports</button>
+    <div class="sidebar__divider"></div>
+    <a href="invoice/index.html"><i data-lucide="file-plus"></i>New invoice</a>
+    <a href="inspection/index.html"><i data-lucide="clipboard-plus"></i>New inspection</a>
+  </nav>
+  <div class="sidebar__foot">More tools coming soon</div>
+</aside>
+
+<!-- bottom sheet (customer detail / reply / message / event) -->
 <div class="scrim" id="scrim"></div>
 <div class="sheet" id="sheet">
   <div class="grip"></div>
