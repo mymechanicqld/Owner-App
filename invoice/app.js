@@ -53,6 +53,16 @@ const today = () => new Date().toISOString().slice(0, 10);
 const uid   = () => crypto.randomUUID();
 
 const blankItem    = () => ({ id: uid(), desc: '', qty: 1, price: 0 });
+
+/* Pre-saved common line items, for the "Saved items" quick-add picker. */
+const SAVED_ITEMS = [
+  { desc: 'Standard (regular) service', price: 369 },
+  { desc: 'Mobile diagnostic (inspect and test)', price: 189 },
+  { desc: 'Front brake pads supplied and fitted', price: 359 },
+  { desc: 'Rear brake pads supplied and fitted', price: 369 },
+  { desc: 'Battery replacement (supplied and fitted)', price: 260 },
+  { desc: 'Mobile service fee', price: 55 },
+];
 const blankReceipt = () => ({ id: uid(), date: today(), ref: '', amount: 0 });
 
 function sampleState() {
@@ -378,21 +388,36 @@ $('#newBtn').addEventListener('click', () => {
   toast('New invoice started.');
 });
 
-// Drafts panel
+// Drafts + saved-items panels (share the scrim)
 const draftsPanel = $('#draftsPanel');
+const savedPanel = $('#savedPanel');
 const scrim = $('#scrim');
-function openDrafts() {
-  renderDrafts();
-  draftsPanel.hidden = false;
-  scrim.hidden = false;
-}
-function closeDrafts() {
-  draftsPanel.hidden = true;
-  scrim.hidden = true;
+function closeOverlays() { draftsPanel.hidden = true; savedPanel.hidden = true; scrim.hidden = true; }
+function openDrafts() { renderDrafts(); draftsPanel.hidden = false; scrim.hidden = false; }
+function closeDrafts() { closeOverlays(); }
+function openSaved() { renderSaved(); savedPanel.hidden = false; scrim.hidden = false; }
+function renderSaved() {
+  $('#savedList').innerHTML = SAVED_ITEMS.map((it, i) =>
+    `<label class="saved-item"><input type="checkbox" data-i="${i}"><span class="saved-item__desc">${escA(it.desc)}</span><span class="saved-item__price">$${it.price}</span></label>`
+  ).join('');
 }
 $('#loadBtn').addEventListener('click', openDrafts);
 $('#closeDraftsBtn').addEventListener('click', closeDrafts);
-$('#scrim').addEventListener('click', closeDrafts);
+$('#savedItemsBtn').addEventListener('click', openSaved);
+$('#closeSavedBtn').addEventListener('click', closeOverlays);
+$('#scrim').addEventListener('click', closeOverlays);
+$('#addSelectedBtn').addEventListener('click', () => {
+  const checks = $$('#savedList input[type="checkbox"]');
+  let added = 0;
+  checks.forEach((c) => {
+    if (c.checked) { const it = SAVED_ITEMS[+c.dataset.i]; state.items.push({ id: uid(), desc: it.desc, qty: 1, price: it.price }); added++; }
+  });
+  if (!added) { toast('Select at least one item'); return; }
+  renderItems();
+  renderTotals();
+  closeOverlays();
+  toast(added + (added > 1 ? ' items' : ' item') + ' added');
+});
 
 // Save draft
 $('#saveBtn').addEventListener('click', () => {
