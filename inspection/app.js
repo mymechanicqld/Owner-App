@@ -733,7 +733,7 @@ async function saveInspectionRecord(b64) {
     toast('Saved to records', 'success');
   } catch (err) {
     console.error(err);
-    toast('Could not save: ' + String((err && err.message) || err).slice(0, 80));
+    toast('Could not save: ' + String((err && err.message) || err).slice(0, 200));
   }
 }
 

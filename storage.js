@@ -49,28 +49,70 @@
   }
 
   // Upload a base64 PDF to a storage bucket. Returns { path, url }.
-  // Sends raw bytes (not a Blob) to dodge the iOS WebKit binary-body bug, and
-  // verifies the object afterwards so a misreported error still counts as saved.
+  // iOS WebKit (esp. when the page is controlled by a service worker) refuses
+  // some cross-origin POST body shapes with a bare "Load failed". We try a few
+  // shapes in order and accept the first that returns OK or that we can verify
+  // actually landed via the public GET. Each failure is recorded so a total
+  // failure reports exactly which shapes were blocked.
   async function uploadPdf(bucket, name, pdfBase64) {
     const bytes = b64ToBytes(pdfBase64);
-    const url = base() + '/storage/v1/object/' + bucket + '/' + encodeURIComponent(name);
+    const path = base() + '/storage/v1/object/' + bucket + '/' + encodeURIComponent(name);
     const pub = base() + '/storage/v1/object/public/' + bucket + '/' + name;
-    let lastErr = null;
-    try {
-      const r = await fetch(url, {
-        method: 'POST',
-        headers: { ...authHeaders(), 'Content-Type': 'application/pdf', 'x-upsert': 'true' },
-        body: bytes,
-      });
-      if (r.ok) return { path: name, url: pub };
-      lastErr = new Error('upload ' + r.status + ' ' + (await r.text().catch(() => '')).slice(0, 80));
-    } catch (e) {
-      lastErr = tag('upload', e);
+    const ok = { path: name, url: pub };
+    const errors = [];
+
+    const strategies = [
+      // 1. fetch, raw bytes (smallest payload, no multipart framing)
+      async () => {
+        const r = await fetch(path, { method: 'POST', headers: { ...authHeaders(), 'Content-Type': 'application/pdf', 'x-upsert': 'true' }, body: bytes });
+        if (!r.ok) throw new Error('http ' + r.status + ' ' + (await r.text().catch(() => '')).slice(0, 50));
+      },
+      // 2. fetch, Blob body (different body machinery than a typed array)
+      async () => {
+        const r = await fetch(path, { method: 'POST', headers: { ...authHeaders(), 'Content-Type': 'application/pdf', 'x-upsert': 'true' }, body: new Blob([bytes], { type: 'application/pdf' }) });
+        if (!r.ok) throw new Error('http ' + r.status);
+      },
+      // 3. fetch, multipart FormData (browser sets the content-type; storage-api
+      //    accepts the file part — this is the path supabase-js uses on RN/iOS)
+      async () => {
+        const fd = new FormData();
+        fd.append('cacheControl', '3600');
+        fd.append('', new Blob([bytes], { type: 'application/pdf' }), name);
+        const r = await fetch(path, { method: 'POST', headers: { ...authHeaders(), 'x-upsert': 'true' }, body: fd });
+        if (!r.ok) throw new Error('http ' + r.status);
+      },
+      // 4. XMLHttpRequest, Blob body (entirely separate network stack from fetch)
+      async () => {
+        await new Promise((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          xhr.open('POST', path, true);
+          const h = authHeaders();
+          xhr.setRequestHeader('apikey', h.apikey);
+          xhr.setRequestHeader('Authorization', h.Authorization);
+          xhr.setRequestHeader('Content-Type', 'application/pdf');
+          xhr.setRequestHeader('x-upsert', 'true');
+          xhr.onload = () => (xhr.status >= 200 && xhr.status < 300) ? resolve() : reject(new Error('http ' + xhr.status));
+          xhr.onerror = () => reject(new Error('network'));
+          xhr.send(new Blob([bytes], { type: 'application/pdf' }));
+        });
+      },
+    ];
+
+    for (let i = 0; i < strategies.length; i++) {
+      try {
+        await strategies[i]();
+        return ok; // got a 2xx
+      } catch (e) {
+        const m = (e instanceof TypeError) ? 'network' : ((e && e.message) || String(e));
+        errors.push('#' + (i + 1) + ' ' + m);
+        // The request may have landed even if the browser reported an error.
+        if (await objectExists(bucket, name)) return ok;
+      }
     }
-    // The request may have actually succeeded even if the browser reported an
-    // error. Check the object, and treat its presence as success.
-    if (await objectExists(bucket, name)) return { path: name, url: pub };
-    throw lastErr || new Error('upload: failed (storage)');
+    const e = new Error('upload all-blocked [' + errors.join(' | ').slice(0, 160) + ']');
+    e.step = 'upload';
+    e.network = true;
+    throw e;
   }
 
   // Insert a row into a table via PostgREST. Step-tagged on failure.
