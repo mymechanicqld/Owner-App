@@ -26,6 +26,10 @@ const STATE = {
   calView: 'week',
   calRef: null,
   editEventId: null,
+  invoices: null,
+  inspections: null,
+  invSearch: '',
+  inspSearch: '',
   gtoken: null,
   gexp: 0,
   _calErr: null,
@@ -556,45 +560,109 @@ function openMessage(id) {
 }
 
 /* --------------------------------------------------- invoice/inspection log -- */
-function pdfUrl(bucket, path) { if (!path) return ''; const { data } = sb.storage.from(bucket).getPublicUrl(path); return data ? data.publicUrl : ''; }
-function logRowHtml(icon, title, line, when, url) {
-  return `<div class="row" data-pdf="${esc(url)}"><div class="ic"><i data-lucide="${icon}"></i></div><div class="body"><div class="name">${title}</div><div class="line">${line}</div></div><div class="when">${esc(when)}</div></div>`;
+function pdfUrl(bucket, path) { if (!path) return ''; return CONFIG.SUPABASE_URL.replace(/\/+$/, '') + '/storage/v1/object/public/' + bucket + '/' + path; }
+function monthKey(iso) { const d = new Date(iso); return d.getFullYear() + '-' + d.getMonth(); }
+function monthLabel(iso) { return new Date(iso).toLocaleDateString('en-AU', { month: 'long', year: 'numeric' }); }
+function groupByMonth(rows) {
+  const groups = [], map = {};
+  rows.forEach((r) => { const k = monthKey(r.created_at); if (!map[k]) { map[k] = { label: monthLabel(r.created_at), items: [] }; groups.push(map[k]); } map[k].items.push(r); });
+  return groups;
 }
+function searchBar(id, value, ph) {
+  return `<div class="search-bar"><i data-lucide="search"></i><input id="${id}" type="search" placeholder="${ph}" value="${esc(value)}" autocomplete="off" /></div>`;
+}
+const SKEL = '<div class="list">' + '<div class="skeleton" style="height:66px;margin-bottom:10px"></div>'.repeat(4) + '</div>';
+
 async function renderInvoices() {
   const el = $('#view-invoices');
-  el.innerHTML = `<div class="view-head"><h2>Invoices</h2></div><div class="list">${'<div class="skeleton" style="height:66px"></div>'.repeat(4)}</div>`;
+  el.innerHTML = `<div class="view-head"><h2>Invoices</h2><div class="meta" id="inv-meta"></div></div>${searchBar('inv-search', STATE.invSearch, 'Search name, rego or number')}<div id="inv-list">${SKEL}</div>`;
+  icons();
+  $('#inv-search').addEventListener('input', (e) => { STATE.invSearch = e.target.value; drawInvList(); });
   try {
-    const { data, error } = await sb.from('invoices').select('*').order('created_at', { ascending: false }).limit(500);
+    const { data, error } = await sb.from('invoices').select('*').order('created_at', { ascending: false }).limit(1000);
     if (error) throw error;
-    const rows = data || [];
-    el.innerHTML = `<div class="view-head"><h2>Invoices</h2><div class="meta">${rows.length}</div></div>` +
-      (rows.length ? `<div class="list">${rows.map((r) => logRowHtml('file-text',
-        `${esc(r.customer_name || 'Customer')}${r.total != null ? ' · $' + esc(r.total) : ''}`,
-        `${r.vehicle_rego ? `<span class="rego">${esc(r.vehicle_rego)}</span> ` : ''}${esc(r.invoice_number || '')}${r.status ? ' · ' + esc(r.status) : ''}`,
-        relTime(r.created_at), pdfUrl(CONFIG.STORAGE.invoices, r.pdf_path))).join('')}</div>`
-        : emptyHtml('file-text', 'No invoices yet', 'Create one from a customer and it is logged here.'));
+    STATE.invoices = data || [];
+    drawInvList();
   } catch (e) {
-    el.innerHTML = `<div class="view-head"><h2>Invoices</h2></div>${emptyHtml('file-text', 'Not set up yet', 'Run owner-app-schema.sql in Supabase, then saved invoices appear here.')}`;
+    STATE.invoices = null;
+    $('#inv-list').innerHTML = emptyHtml('file-text', 'Not set up yet', 'Run owner-app-schema.sql in Supabase, then saved invoices appear here.');
+    icons();
   }
+}
+function drawInvList() {
+  const q = (STATE.invSearch || '').toLowerCase();
+  let rows = STATE.invoices || [];
+  if (q) rows = rows.filter((r) => [r.customer_name, r.vehicle_rego, r.invoice_number, r.vehicle].some((v) => (v || '').toString().toLowerCase().includes(q)));
+  $('#inv-meta').textContent = rows.length + (rows.length === 1 ? ' invoice' : ' invoices');
+  const cont = $('#inv-list');
+  if (!rows.length) { cont.innerHTML = emptyHtml('file-text', q ? 'No matches' : 'No invoices yet', q ? 'Try a different search.' : 'Create one from a customer and it is logged here.'); icons(); return; }
+  cont.innerHTML = groupByMonth(rows).map((g) => `<div class="log-month">${esc(g.label)}</div><div class="list">${g.items.map(invRow).join('')}</div>`).join('');
   icons();
 }
+function invRow(r) {
+  return `<div class="row" data-pdf="${esc(pdfUrl(CONFIG.STORAGE.invoices, r.pdf_path))}">
+    <div class="ic"><i data-lucide="file-text"></i></div>
+    <div class="body"><div class="name">${esc(r.customer_name || 'Customer')}${r.total != null ? ' · $' + esc(r.total) : ''}</div>
+      <div class="line">${r.vehicle_rego ? `<span class="rego">${esc(r.vehicle_rego)}</span> ` : ''}${esc(r.invoice_number || '')}${r.status ? ' · ' + esc(r.status) : ''}</div></div>
+    <button class="row-del" data-del-invoice="${r.id}" aria-label="Delete invoice"><i data-lucide="trash-2"></i></button>
+  </div>`;
+}
+
 async function renderInspections() {
   const el = $('#view-inspections');
-  el.innerHTML = `<div class="view-head"><h2>Inspection reports</h2></div><div class="list">${'<div class="skeleton" style="height:66px"></div>'.repeat(4)}</div>`;
-  try {
-    const { data, error } = await sb.from('inspection_reports').select('*').order('created_at', { ascending: false }).limit(500);
-    if (error) throw error;
-    const rows = data || [];
-    el.innerHTML = `<div class="view-head"><h2>Inspection reports</h2><div class="meta">${rows.length}</div></div>` +
-      (rows.length ? `<div class="list">${rows.map((r) => logRowHtml('clipboard-check',
-        `${esc(r.customer_name || 'Customer')}${r.overall_rating ? ' · ' + esc(r.overall_rating) : ''}`,
-        `${r.vehicle_rego ? `<span class="rego">${esc(r.vehicle_rego)}</span> ` : ''}${esc(r.vehicle || '')}`,
-        relTime(r.created_at), pdfUrl(CONFIG.STORAGE.inspections, r.pdf_path))).join('')}</div>`
-        : emptyHtml('clipboard-check', 'No reports yet', 'Create one from a customer and it is logged here.'));
-  } catch (e) {
-    el.innerHTML = `<div class="view-head"><h2>Inspection reports</h2></div>${emptyHtml('clipboard-check', 'Not set up yet', 'Run owner-app-schema.sql in Supabase, then saved reports appear here.')}`;
-  }
+  el.innerHTML = `<div class="view-head"><h2>Inspection reports</h2><div class="meta" id="insp-meta"></div></div>${searchBar('insp-search', STATE.inspSearch, 'Search name, rego or number')}<div id="insp-list">${SKEL}</div>`;
   icons();
+  $('#insp-search').addEventListener('input', (e) => { STATE.inspSearch = e.target.value; drawInspList(); });
+  try {
+    const { data, error } = await sb.from('inspection_reports').select('*').order('created_at', { ascending: false }).limit(1000);
+    if (error) throw error;
+    STATE.inspections = data || [];
+    drawInspList();
+  } catch (e) {
+    STATE.inspections = null;
+    $('#insp-list').innerHTML = emptyHtml('clipboard-check', 'Not set up yet', 'Run owner-app-schema.sql in Supabase, then saved reports appear here.');
+    icons();
+  }
+}
+function drawInspList() {
+  const q = (STATE.inspSearch || '').toLowerCase();
+  let rows = STATE.inspections || [];
+  if (q) rows = rows.filter((r) => [r.customer_name, r.vehicle_rego, r.report_number, r.vehicle].some((v) => (v || '').toString().toLowerCase().includes(q)));
+  $('#insp-meta').textContent = rows.length + (rows.length === 1 ? ' report' : ' reports');
+  const cont = $('#insp-list');
+  if (!rows.length) { cont.innerHTML = emptyHtml('clipboard-check', q ? 'No matches' : 'No reports yet', q ? 'Try a different search.' : 'Create one from a customer and it is logged here.'); icons(); return; }
+  cont.innerHTML = groupByMonth(rows).map((g) => `<div class="log-month">${esc(g.label)}</div><div class="list">${g.items.map(inspRow).join('')}</div>`).join('');
+  icons();
+}
+function inspRow(r) {
+  return `<div class="row" data-pdf="${esc(pdfUrl(CONFIG.STORAGE.inspections, r.pdf_path))}">
+    <div class="ic"><i data-lucide="clipboard-check"></i></div>
+    <div class="body"><div class="name">${esc(r.customer_name || 'Customer')}${r.overall_rating ? ' · ' + esc(r.overall_rating) : ''}</div>
+      <div class="line">${r.vehicle_rego ? `<span class="rego">${esc(r.vehicle_rego)}</span> ` : ''}${esc(r.vehicle || '')}</div></div>
+    <button class="row-del" data-del-inspection="${r.id}" aria-label="Delete report"><i data-lucide="trash-2"></i></button>
+  </div>`;
+}
+
+async function deleteLog(kind, table, bucket, id) {
+  if (!confirm('Delete this permanently? This cannot be undone.')) return;
+  const arr = kind === 'invoices' ? STATE.invoices : STATE.inspections;
+  const rec = (arr || []).find((r) => r.id === id);
+  try {
+    const { error } = await sb.from(table).delete().eq('id', id);
+    if (error) throw error;
+    if (rec && rec.pdf_path) {
+      // best effort; needs the storage delete policy to actually remove the file
+      try {
+        await fetch(CONFIG.SUPABASE_URL.replace(/\/+$/, '') + '/storage/v1/object/' + bucket + '/' + encodeURIComponent(rec.pdf_path),
+          { method: 'DELETE', headers: { apikey: CONFIG.SUPABASE_KEY, Authorization: 'Bearer ' + CONFIG.SUPABASE_KEY } });
+      } catch (_) {}
+    }
+    if (kind === 'invoices') { STATE.invoices = (STATE.invoices || []).filter((r) => r.id !== id); drawInvList(); }
+    else { STATE.inspections = (STATE.inspections || []).filter((r) => r.id !== id); drawInspList(); }
+    toast('Deleted', 'ok');
+  } catch (e) {
+    toast('Delete failed: ' + String((e && e.message) || e).slice(0, 50), 'err');
+  }
 }
 
 /* ------------------------------------------------------------ gmail (GIS) -- */
@@ -664,6 +732,10 @@ async function sendThreaded(to, body, found) {
 document.addEventListener('click', (e) => {
   const nav = e.target.closest('.nav button'); if (nav) return setView(nav.dataset.view);
   const side = e.target.closest('#sidebar-nav button[data-view]'); if (side) return setView(side.dataset.view);
+  const delInv = e.target.closest('[data-del-invoice]');
+  if (delInv) { e.stopPropagation(); deleteLog('invoices', 'invoices', CONFIG.STORAGE.invoices, delInv.dataset.delInvoice); return; }
+  const delInsp = e.target.closest('[data-del-inspection]');
+  if (delInsp) { e.stopPropagation(); deleteLog('inspections', 'inspection_reports', CONFIG.STORAGE.inspections, delInsp.dataset.delInspection); return; }
   const pdfRow = e.target.closest('.row[data-pdf]');
   if (pdfRow) { const u = pdfRow.dataset.pdf; if (u) window.open(u, '_blank'); else toast('PDF not available'); return; }
   const row = e.target.closest('.row[data-id]'); if (row) return openDetail(row.dataset.id);

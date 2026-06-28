@@ -111,6 +111,11 @@ create policy "docs_update" on storage.objects
   using (bucket_id in ('invoices', 'inspections'))
   with check (bucket_id in ('invoices', 'inspections'));
 
+drop policy if exists "docs_delete" on storage.objects;
+create policy "docs_delete" on storage.objects
+  for delete to anon, authenticated
+  using (bucket_id in ('invoices', 'inspections'));
+
 -- ============================================================================
 -- Done. Files are named <date>_<rego>.pdf inside each bucket.
 -- ============================================================================

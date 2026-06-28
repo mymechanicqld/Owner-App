@@ -307,3 +307,10 @@ input, textarea, select { font-family: inherit; font-size: 16px; } /* 16px stops
 /* inline add-to-calendar chip in a detail field */
 .field .addcal { margin-left: auto; background: var(--accent-soft); color: var(--accent); border-radius: 9px; padding: 8px 11px; font-size: 12px; font-weight: 700; display: inline-flex; align-items: center; gap: 5px; flex: 0 0 auto; }
 .field .addcal svg { width: 14px; height: 14px; }
+
+/* Invoice / inspection log: month groups + per-row delete */
+.log-month { font-size: 12px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--subtle); margin: 18px 2px 8px; }
+#inv-list > .log-month:first-child, #insp-list > .log-month:first-child { margin-top: 4px; }
+.row-del { flex: 0 0 auto; width: 38px; height: 38px; border-radius: 10px; display: grid; place-items: center; color: var(--rose); background: transparent; }
+.row-del:active { background: #FFF1F2; }
+.row-del svg { width: 18px; height: 18px; }
