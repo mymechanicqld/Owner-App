@@ -1,0 +1,14 @@
+{
+  "name": "My Mechanic QLD",
+  "short_name": "MMQLD",
+  "description": "Owner console for My Mechanic QLD: inquiries, calendar, invoices and inspection reports.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#FAFAF8",
+  "theme_color": "#1E3A8A",
+  "icons": [
+    { "src": "icon.svg", "sizes": "192x192 512x512 any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

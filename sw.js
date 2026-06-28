@@ -1,8 +1,8 @@
 /* Service worker: network-first so the app always loads the latest code when
-   online, falling back to cache only when offline. No manifest by design.
+   online, falling back to cache only when offline.
    Data (Supabase, Gmail, CDNs) is cross-origin and goes straight to network. */
-const CACHE = 'mmqld-owner-v12';
-const ASSETS = ['./', './index.html', './styles.css', './app.js', './config.js'];
+const CACHE = 'mmqld-owner-v13';
+const ASSETS = ['./', './index.html', './styles.css', './app.js', './config.js', './manifest.json', './icon.svg'];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ASSETS)).then(() => self.skipWaiting()));
