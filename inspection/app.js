@@ -216,7 +216,7 @@ function demoState() {
   return s;
 }
 
-let state = demoState();
+let state = newState();
 
 /* URL-param prefill — populated in init() from the query string. email is
    kept here because it is not a form field but is needed for the send step. */

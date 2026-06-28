@@ -107,7 +107,7 @@ function blankState() {
   };
 }
 
-let state = sampleState();
+let state = blankState();
 
 /* URL-param prefill — populated in init() from query string. email is kept
    here because it is not a form field but is needed for the send step. */
