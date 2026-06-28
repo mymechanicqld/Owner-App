@@ -12,7 +12,11 @@
    ========================================================================== */
 (function () {
   const base = () => CONFIG.SUPABASE_URL.replace(/\/+$/, '');
-  const authHeaders = () => ({ apikey: CONFIG.SUPABASE_KEY, Authorization: 'Bearer ' + CONFIG.SUPABASE_KEY });
+  // apikey header ONLY. The publishable key is not a JWT, so sending it as an
+  // Authorization: Bearer token is what iOS WebKit appears to choke on (403 on
+  // the upload). Supabase accepts the apikey header alone for anon, verified
+  // against storage upload + PostgREST read/insert/delete from a real browser.
+  const authHeaders = () => ({ apikey: CONFIG.SUPABASE_KEY });
 
   // Wrap a thrown error so the surfaced message names the step + whether it was
   // a network/CORS failure (TypeError "Load failed") or a real HTTP response.
@@ -93,9 +97,7 @@
         await new Promise((resolve, reject) => {
           const xhr = new XMLHttpRequest();
           xhr.open('POST', path, true);
-          const h = authHeaders();
-          xhr.setRequestHeader('apikey', h.apikey);
-          xhr.setRequestHeader('Authorization', h.Authorization);
+          xhr.setRequestHeader('apikey', authHeaders().apikey);
           xhr.setRequestHeader('Content-Type', 'application/pdf');
           xhr.setRequestHeader('x-upsert', 'true');
           xhr.onload = () => (xhr.status >= 200 && xhr.status < 300) ? resolve() : reject(new Error('http ' + xhr.status + ' ' + String(xhr.responseText || '').slice(0, 60)));
@@ -116,7 +118,7 @@
         if (await objectExists(bucket, name)) return ok;
       }
     }
-    const e = new Error('upload all-blocked [' + errors.join(' | ').slice(0, 160) + ']');
+    const e = new Error('upload all-blocked ' + bucket + '/' + name + ' [' + errors.join(' | ').slice(0, 220) + ']');
     e.step = 'upload';
     e.network = true;
     throw e;

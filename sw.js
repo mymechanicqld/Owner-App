@@ -1,31 +1,24 @@
-/* Service worker: network-first so the app always loads the latest code when
-   online, falling back to cache only when offline.
+/* Service worker: NO caching of app code.
+   Repeated stale-cache problems on iOS (old service workers serving old JS that
+   never updated) outweigh any offline benefit for this owner console. This SW
+   deletes every cache it finds and serves nothing from cache, so the app always
+   loads the latest code straight from the network. A no-op fetch handler is
+   kept only so the app still satisfies Android's installability requirement.
    Data (Supabase, Gmail, CDNs) is cross-origin and goes straight to network. */
-const CACHE = 'mmqld-owner-v17';
-const ASSETS = ['./', './index.html', './styles.css', './app.js', './config.js', './manifest.json', './favicon-32x32.png', './icon-192.png', './icon-512.png', './apple-touch-icon.png'];
+const VERSION = 'mmqld-owner-v18-nocache';
 
-self.addEventListener('install', (e) => {
-  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ASSETS)).then(() => self.skipWaiting()));
+self.addEventListener('install', () => {
+  self.skipWaiting();
 });
 
 self.addEventListener('activate', (e) => {
-  e.waitUntil(
-    caches.keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
-      .then(() => self.clients.claim())
-  );
+  e.waitUntil((async () => {
+    const keys = await caches.keys();
+    await Promise.all(keys.map((k) => caches.delete(k)));
+    await self.clients.claim();
+  })());
 });
 
-self.addEventListener('fetch', (e) => {
-  const url = new URL(e.request.url);
-  if (e.request.method !== 'GET' || url.origin !== location.origin) return; // let network handle API/CDN
-  // Network-first: fetch fresh, cache it, fall back to cache only when offline.
-  e.respondWith(
-    fetch(e.request)
-      .then((res) => {
-        if (res && res.status === 200) { const clone = res.clone(); caches.open(CACHE).then((c) => c.put(e.request, clone)); }
-        return res;
-      })
-      .catch(() => caches.match(e.request))
-  );
-});
+/* Pass-through: do NOT call respondWith, so the browser handles every request
+   over the network. Present purely so the app counts as installable. */
+self.addEventListener('fetch', () => {});
