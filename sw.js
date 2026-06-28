@@ -1,6 +1,6 @@
 /* Service worker: caches the app shell so it loads fast and works offline.
    No manifest by design. Data (Supabase, Gmail, CDNs) goes straight to network. */
-const CACHE = 'mmqld-owner-v3';
+const CACHE = 'mmqld-owner-v4';
 const ASSETS = ['./', './index.html', './styles.css', './app.js', './config.js'];
 
 self.addEventListener('install', (e) => {

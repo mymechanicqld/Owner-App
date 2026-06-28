@@ -623,6 +623,9 @@ async function gFetch(path, opts = {}) {
   return r.json();
 }
 function b64url(str) { return btoa(unescape(encodeURIComponent(str))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); }
+function u8b64(str) { return btoa(unescape(encodeURIComponent(str))); }
+// Email headers must be ASCII; encode non-ASCII (e.g. em-dash, middot) per RFC 2047.
+function encHeader(str) { return /[^\x00-\x7F]/.test(str) ? '=?UTF-8?B?' + u8b64(str) + '?=' : str; }
 
 async function findThread(email, rego) {
   const tryQ = async (q) => (await gFetch('/users/me/messages?maxResults=10&q=' + encodeURIComponent(q))).messages || [];
@@ -642,9 +645,10 @@ async function findThread(email, rego) {
 async function sendThreaded(to, body, found) {
   let subject = found && found.subject ? found.subject : 'Your enquiry with ' + CONFIG.BUSINESS_NAME;
   if (!/^re:/i.test(subject)) subject = 'Re: ' + subject;
-  const lines = ['To: ' + to, 'Subject: ' + subject, 'MIME-Version: 1.0', 'Content-Type: text/plain; charset="UTF-8"'];
+  const lines = ['To: ' + to, 'Subject: ' + encHeader(subject), 'MIME-Version: 1.0',
+    'Content-Type: text/plain; charset="UTF-8"', 'Content-Transfer-Encoding: base64'];
   if (found && found.messageId) { lines.push('In-Reply-To: ' + found.messageId); lines.push('References: ' + found.messageId); }
-  const raw = b64url(lines.join('\r\n') + '\r\n\r\n' + body);
+  const raw = b64url(lines.join('\r\n') + '\r\n\r\n' + u8b64(body));
   const payload = { raw };
   if (found && found.threadId) payload.threadId = found.threadId;
   return gFetch('/users/me/messages/send', { method: 'POST', body: JSON.stringify(payload) });

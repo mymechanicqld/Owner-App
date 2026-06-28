@@ -55,6 +55,8 @@
 
   const u8b64 = (str) => btoa(unescape(encodeURIComponent(str)));
   const b64url = (str) => btoa(unescape(encodeURIComponent(str))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  // Email headers must be ASCII; encode non-ASCII per RFC 2047.
+  const encHeader = (str) => (/[^\x00-\x7F]/.test(str) ? '=?UTF-8?B?' + u8b64(str) + '?=' : str);
 
   // opts: { to, subject, bodyText, filename, pdfBase64, thread }
   async function sendWithAttachment(opts) {
@@ -62,7 +64,7 @@
     let subj = opts.thread && opts.thread.subject
       ? (/^re:/i.test(opts.thread.subject) ? opts.thread.subject : 'Re: ' + opts.thread.subject)
       : opts.subject;
-    const head = ['To: ' + opts.to, 'Subject: ' + subj, 'MIME-Version: 1.0', 'Content-Type: multipart/mixed; boundary="' + boundary + '"'];
+    const head = ['To: ' + opts.to, 'Subject: ' + encHeader(subj), 'MIME-Version: 1.0', 'Content-Type: multipart/mixed; boundary="' + boundary + '"'];
     if (opts.thread && opts.thread.messageId) { head.push('In-Reply-To: ' + opts.thread.messageId); head.push('References: ' + opts.thread.messageId); }
     const body = [
       '--' + boundary,
