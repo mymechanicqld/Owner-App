@@ -39,6 +39,40 @@ const STATE = {
 const $ = (s, r = document) => r.querySelector(s);
 const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const svc = (slug) => SERVICES[slug] || { label: slug ? slug.replace(/-/g, ' ') : 'Enquiry', icon: 'mail' };
+
+/* Colour per job type for the calendar, keyed by service slug. Lets the owner
+   see at a glance what kind of work each booking is. */
+const JOB_COLORS = {
+  'brake-repair': '#DC2626',
+  'alternator-starter': '#D97706',
+  'alternator-starter-motor': '#D97706',
+  'radiator-water-pump': '#0891B2',
+  'logbook-servicing': '#2563EB',
+  'pre-purchase-inspection': '#7C3AED',
+  'battery-replacement': '#059669',
+  'warning-light-diagnostics': '#EA580C',
+  'steering-suspension': '#0D9488',
+  'emergency-breakdown': '#BE123C',
+  'not-sure': '#64748B',
+  'general-enquiry': '#64748B',
+};
+const JOB_COLOR_DEFAULT = '#64748B';
+/* The service value stored on an event can be a slug or an older human label;
+   resolve either to a slug so colour + label stay consistent. */
+function svcKey(v) {
+  if (!v) return '';
+  if (SERVICES[v]) return v;
+  const low = String(v).toLowerCase();
+  return Object.keys(SERVICES).find((k) => SERVICES[k].label.toLowerCase() === low) || '';
+}
+function svcColor(v) { return JOB_COLORS[svcKey(v)] || JOB_COLOR_DEFAULT; }
+function svcLabel(v) { const k = svcKey(v); return k ? SERVICES[k].label : (v || ''); }
+/* De-duplicated [slug,label] list for the job-type picker (some labels share). */
+function jobTypeOptions() {
+  const seen = new Set(); const out = [];
+  Object.keys(SERVICES).forEach((k) => { const l = SERVICES[k].label; if (!seen.has(l)) { seen.add(l); out.push([k, l]); } });
+  return out;
+}
 const carDesc = (s) => [s.vehicle_year, s.vehicle_make, s.vehicle_model].filter(Boolean).join(' ') || s.vehicle_make || '';
 const firstName = (n) => (n || '').trim().split(/\s+/)[0] || 'there';
 
@@ -434,11 +468,19 @@ function renderCalendar() {
     ? ref.toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long' })
     : days[0].toLocaleDateString('en-AU', { day: 'numeric', month: 'short' }) + ' - ' + days[6].toLocaleDateString('en-AU', { day: 'numeric', month: 'short' });
   const evByDay = (d) => STATE.events.filter((e) => sameDay(e.starts_at, d)).sort((a, b) => new Date(a.starts_at) - new Date(b.starts_at));
-  const dayBlock = (d) => `
+  const dayBlock = (d) => {
+    const evs = evByDay(d);
+    return `
     <div class="cal-day ${sameDay(d, new Date()) ? 'today' : ''}">
       <div class="cal-day__h"><span class="dn">${d.toLocaleDateString('en-AU', { weekday: 'long' })}</span><span class="dd">${d.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}</span></div>
-      ${evByDay(d).length ? evByDay(d).map(eventChip).join('') : '<div class="cal-empty">No bookings</div>'}
+      ${evs.length ? evs.map((e, i) => eventChip(e, i, evs.length)).join('') : '<div class="cal-empty">No bookings</div>'}
     </div>`;
+  };
+  // Legend of the job types visible in the current range.
+  const visibleTypes = [...new Set(days.flatMap(evByDay).map((e) => svcKey(e.service)).filter(Boolean))];
+  const legend = visibleTypes.length
+    ? `<div class="cal-legend">${visibleTypes.map((k) => `<span class="lg"><span class="edot" style="background:${JOB_COLORS[k] || JOB_COLOR_DEFAULT}"></span>${esc(SERVICES[k].label)}</span>`).join('')}</div>`
+    : '';
   $('#view-calendar').innerHTML = `
     <div class="cal-head"><h2>${esc(title)}</h2>
       <div class="cal-nav">
@@ -448,28 +490,55 @@ function renderCalendar() {
       </div>
     </div>
     <div class="seg" id="cal-seg"><button data-cv="day" class="${STATE.calView === 'day' ? 'active' : ''}">Day</button><button data-cv="week" class="${STATE.calView === 'week' ? 'active' : ''}">Week</button></div>
+    ${legend}
     ${STATE._calErr ? `<div class="cal-empty" style="color:var(--rose)">Calendar not set up yet. Run owner-app-schema.sql in Supabase.</div>` : ''}
     ${days.map(dayBlock).join('')}
     <button class="fab-new" id="cal-add" aria-label="New booking"><i data-lucide="plus"></i></button>
   `;
 }
-function eventChip(e) {
+function eventChip(e, i, n) {
+  const color = svcColor(e.service);
   const t = e.all_day ? 'All day' : fmtTime(e.starts_at) + (e.ends_at ? ' - ' + fmtTime(e.ends_at) : '');
+  const type = svcLabel(e.service);
   const meta = [e.customer_name, e.vehicle_rego, e.suburb].filter(Boolean).join(' · ');
-  return `<div class="event" data-ev="${e.id}"><div class="et">${esc(t)}</div><div class="eb"><div class="etitle">${esc(e.title)}</div>${meta ? `<div class="emeta">${esc(meta)}</div>` : ''}</div></div>`;
+  // Up/down controls to reorder the day (swap time slots with the neighbour).
+  const moves = (n > 1) ? `<div class="emove">
+      <button class="emv" data-move-up="${e.id}" ${i > 0 ? '' : 'disabled'} aria-label="Move earlier"><i data-lucide="chevron-up"></i></button>
+      <button class="emv" data-move-down="${e.id}" ${i < n - 1 ? '' : 'disabled'} aria-label="Move later"><i data-lucide="chevron-down"></i></button>
+    </div>` : '';
+  return `<div class="event" data-ev="${e.id}" style="border-left-color:${color}">
+    <div class="et">${esc(t)}</div>
+    <div class="eb">
+      <div class="etitle">${esc(e.title)}</div>
+      ${type ? `<div class="etype"><span class="edot" style="background:${color}"></span>${esc(type)}</div>` : ''}
+      ${meta ? `<div class="emeta">${esc(meta)}</div>` : ''}
+    </div>
+    ${moves}
+  </div>`;
 }
 
 function openEvent(ev) {
   const isEdit = ev && ev.id;
   STATE.editEventId = isEdit ? ev.id : null;
   const start = ev && ev.starts_at ? new Date(ev.starts_at) : (() => { const d = new Date(); d.setHours(9, 0, 0, 0); return d; })();
-  const end = ev && ev.ends_at ? new Date(ev.ends_at) : new Date(start.getTime() + 3600000);
   $('#sheet-title').textContent = isEdit ? 'Edit booking' : 'New booking';
   $('#sheet-sub').textContent = isEdit ? 'Update or delete this booking' : 'Check the details, then add it';
   const fld = (label, id, type, val, ph) => `<label class="form-field"><span>${label}</span><input id="${id}" type="${type}" value="${esc(val || '')}" placeholder="${ph || ''}" /></label>`;
+  // Date + start time + duration (no end picker; end = start + duration, 1hr default).
+  const p2 = (n) => String(n).padStart(2, '0');
+  const dateVal = start.getFullYear() + '-' + p2(start.getMonth() + 1) + '-' + p2(start.getDate());
+  const timeVal = p2(start.getHours()) + ':' + p2(start.getMinutes());
+  const durMin = (ev && ev.starts_at && ev.ends_at) ? Math.max(15, Math.round((new Date(ev.ends_at) - new Date(ev.starts_at)) / 60000)) : 60;
+  const DURS = [[30, '30 min'], [45, '45 min'], [60, '1 hour'], [90, '1.5 hours'], [120, '2 hours'], [150, '2.5 hours'], [180, '3 hours'], [240, '4 hours'], [300, '5 hours'], [360, '6 hours'], [480, 'Full day (8h)']];
+  const durOpts = DURS.map(([v, l]) => `<option value="${v}" ${v === durMin ? 'selected' : ''}>${l}</option>`).join('')
+    + (DURS.some(([v]) => v === durMin) ? '' : `<option value="${durMin}" selected>${durMin} min</option>`);
+  const curType = svcKey(ev && ev.service);
+  const typeOpts = `<option value="">Select job type</option>` + jobTypeOptions().map(([k, l]) => `<option value="${k}" ${k === curType ? 'selected' : ''}>${esc(l)}</option>`).join('');
   $('#sheet-body').innerHTML = `
     <label class="form-field"><span>Title</span><input id="ev-title" type="text" value="${esc((ev && ev.title) || '')}" placeholder="e.g. Logbook service - Toyota" /></label>
-    <div class="row-2">${fld('Starts', 'ev-start', 'datetime-local', toLocalInput(start))}${fld('Ends', 'ev-end', 'datetime-local', toLocalInput(end))}</div>
+    <label class="form-field"><span>Job type</span><select id="ev-type" class="form-sel">${typeOpts}</select></label>
+    <div class="row-2">${fld('Date', 'ev-date', 'date', dateVal)}${fld('Start time', 'ev-time', 'time', timeVal)}</div>
+    <label class="form-field"><span>Duration</span><select id="ev-dur" class="form-sel">${durOpts}</select></label>
     <div class="row-2">${fld('Customer', 'ev-cust', 'text', ev && ev.customer_name)}${fld('Phone', 'ev-phone', 'tel', ev && ev.customer_phone)}</div>
     <div class="row-2">${fld('Rego', 'ev-rego', 'text', ev && ev.vehicle_rego)}${fld('Suburb', 'ev-suburb', 'text', ev && ev.suburb)}</div>
     <label class="form-field"><span>Notes</span><textarea id="ev-notes" rows="2">${esc((ev && ev.notes) || '')}</textarea></label>
@@ -479,17 +548,26 @@ function openEvent(ev) {
     </div>
   `;
   openSheet(); icons();
+  // Selecting a job type fills an empty title with that type's label.
+  $('#ev-type').addEventListener('change', (e) => {
+    const t = $('#ev-title');
+    if (!t.value.trim() && e.target.value) t.value = svcLabel(e.target.value);
+  });
   $('#ev-save').addEventListener('click', saveEvent);
   if (isEdit) $('#ev-del').addEventListener('click', () => deleteEvent(ev.id));
 }
 async function saveEvent() {
   const title = $('#ev-title').value.trim();
   if (!title) return toast('Add a title', 'err');
-  if (!$('#ev-start').value) return toast('Pick a start time', 'err');
+  const date = $('#ev-date').value, time = $('#ev-time').value;
+  if (!date || !time) return toast('Pick a date and start time', 'err');
+  const start = new Date(date + 'T' + time);
+  const durMin = parseInt($('#ev-dur').value, 10) || 60;
   const row = {
     title,
-    starts_at: new Date($('#ev-start').value).toISOString(),
-    ends_at: $('#ev-end').value ? new Date($('#ev-end').value).toISOString() : null,
+    service: $('#ev-type').value || null,
+    starts_at: start.toISOString(),
+    ends_at: new Date(start.getTime() + durMin * 60000).toISOString(),
     customer_name: $('#ev-cust').value.trim() || null,
     customer_phone: $('#ev-phone').value.trim() || null,
     vehicle_rego: $('#ev-rego').value.trim() || null,
@@ -509,6 +587,33 @@ async function deleteEvent(id) {
   try { const { error } = await sb.from('calendar_events').delete().eq('id', id); if (error) throw error; await loadEvents(); toast('Booking deleted', 'ok'); closeSheet(); renderCalendar(); icons(); }
   catch (e) { toast('Delete failed', 'err'); }
 }
+/* Reorder within a day: swap this booking's time slot with its neighbour
+   (dir -1 = earlier, +1 = later), keeping each booking's own duration. Lets the
+   owner shuffle a job to the morning without retyping any times. */
+async function moveEvent(id, dir) {
+  const ev = STATE.events.find((x) => x.id === id);
+  if (!ev) return;
+  const day = STATE.events
+    .filter((x) => sameDay(x.starts_at, ev.starts_at))
+    .sort((a, b) => new Date(a.starts_at) - new Date(b.starts_at));
+  const idx = day.findIndex((x) => x.id === id);
+  const swap = day[idx + dir];
+  if (!swap) return;
+  const durA = ev.ends_at ? (new Date(ev.ends_at) - new Date(ev.starts_at)) : 3600000;
+  const durB = swap.ends_at ? (new Date(swap.ends_at) - new Date(swap.starts_at)) : 3600000;
+  const startA = new Date(swap.starts_at); // ev takes the neighbour's start
+  const startB = new Date(ev.starts_at);   // neighbour takes ev's start
+  const now = new Date().toISOString();
+  const rowA = { starts_at: startA.toISOString(), ends_at: new Date(startA.getTime() + durA).toISOString(), updated_at: now };
+  const rowB = { starts_at: startB.toISOString(), ends_at: new Date(startB.getTime() + durB).toISOString(), updated_at: now };
+  Object.assign(ev, rowA); Object.assign(swap, rowB); // optimistic
+  renderCalendar(); icons();
+  try {
+    const r1 = await sb.from('calendar_events').update(rowA).eq('id', ev.id);
+    const r2 = await sb.from('calendar_events').update(rowB).eq('id', swap.id);
+    if (r1.error || r2.error) throw (r1.error || r2.error);
+  } catch (err) { toast('Could not reorder', 'err'); await loadEvents(); renderCalendar(); icons(); }
+}
 function eventFromSubmission(s) {
   const start = s.preferred_date ? new Date(s.preferred_date + 'T09:00:00') : (() => { const d = new Date(); d.setHours(9, 0, 0, 0); return d; })();
   const sv = svc(s.service_needed);
@@ -516,7 +621,7 @@ function eventFromSubmission(s) {
     title: sv.label + ' - ' + (s.full_name || 'Customer'),
     starts_at: start.toISOString(), ends_at: new Date(start.getTime() + 3600000).toISOString(),
     customer_name: s.full_name, customer_phone: s.phone, vehicle_rego: s.vehicle_rego, suburb: s.suburb,
-    service: sv.label, notes: s.symptoms || '',
+    service: s.service_needed || null, notes: s.symptoms || '',
   };
 }
 
@@ -667,9 +772,14 @@ async function deleteLog(kind, table, bucket, id) {
 
 /* ------------------------------------------------------------ gmail (GIS) -- */
 let tokenClient = null, tokenResolver = null;
+// Shared token cache (same key as gmail-send.js) so a consent granted on a
+// generator page is reused here and vice-versa, for the token's lifetime.
+const TOK_KEY = 'mmqld_gtok';
+function cachedGToken() { try { const o = JSON.parse(sessionStorage.getItem(TOK_KEY) || 'null'); if (o && o.t && Date.now() < o.e) return o; } catch (_) {} return null; }
 function getToken() {
   return new Promise((resolve, reject) => {
     if (STATE.gtoken && Date.now() < STATE.gexp) return resolve(STATE.gtoken);
+    const c = cachedGToken(); if (c) { STATE.gtoken = c.t; STATE.gexp = c.e; return resolve(STATE.gtoken); }
     if (!window.google || !google.accounts || !google.accounts.oauth2) return reject(new Error('Google sign-in still loading, try again'));
     if (CONFIG.GOOGLE_CLIENT_ID.startsWith('PASTE_')) return reject(new Error('Set GOOGLE_CLIENT_ID in config.js'));
     if (!tokenClient) {
@@ -680,12 +790,14 @@ function getToken() {
           if (resp.error) return tokenResolver && tokenResolver.reject(new Error(resp.error));
           STATE.gtoken = resp.access_token;
           STATE.gexp = Date.now() + ((resp.expires_in || 3600) - 60) * 1000;
+          try { sessionStorage.setItem(TOK_KEY, JSON.stringify({ t: STATE.gtoken, e: STATE.gexp })); } catch (_) {}
           tokenResolver && tokenResolver.resolve(STATE.gtoken);
         },
       });
     }
     tokenResolver = { resolve, reject };
-    tokenClient.requestAccessToken({ prompt: STATE.gtoken ? '' : 'consent' });
+    // Empty prompt: consent screen only if not already granted, then silent.
+    tokenClient.requestAccessToken({ prompt: '' });
   });
 }
 async function gFetch(path, opts = {}) {
@@ -739,6 +851,8 @@ document.addEventListener('click', (e) => {
   const pdfRow = e.target.closest('.row[data-pdf]');
   if (pdfRow) { const u = pdfRow.dataset.pdf; if (u) window.open(u, '_blank'); else toast('PDF not available'); return; }
   const row = e.target.closest('.row[data-id]'); if (row) return openDetail(row.dataset.id);
+  const mvUp = e.target.closest('[data-move-up]'); if (mvUp) { e.stopPropagation(); moveEvent(mvUp.dataset.moveUp, -1); return; }
+  const mvDn = e.target.closest('[data-move-down]'); if (mvDn) { e.stopPropagation(); moveEvent(mvDn.dataset.moveDown, 1); return; }
   const evEl = e.target.closest('.event[data-ev]'); if (evEl) { const ev = STATE.events.find((x) => x.id === evEl.dataset.ev); if (ev) openEvent(ev); return; }
   const chip = e.target.closest('.chip[data-range]'); if (chip) { STATE.inqRange = chip.dataset.range; renderInquiries(); icons(); return; }
   const per = e.target.closest('.seg button[data-period]'); if (per) { STATE.period = per.dataset.period; renderAnalytics(); icons(); return; }

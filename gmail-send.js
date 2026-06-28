@@ -7,9 +7,16 @@
 (function () {
   let tokenClient = null, pending = null, token = null, exp = 0;
 
+  // Shared across the app + generator pages so a consent granted anywhere is
+  // reused everywhere for the life of the access token (no repeat prompts).
+  const TOK_KEY = 'mmqld_gtok';
+  function cachedToken() { try { const o = JSON.parse(sessionStorage.getItem(TOK_KEY) || 'null'); if (o && o.t && Date.now() < o.e) return o; } catch (_) {} return null; }
+  function storeToken(t, e) { try { sessionStorage.setItem(TOK_KEY, JSON.stringify({ t: t, e: e })); } catch (_) {} }
+
   function getToken() {
     return new Promise((resolve, reject) => {
       if (token && Date.now() < exp) return resolve(token);
+      const c = cachedToken(); if (c) { token = c.t; exp = c.e; return resolve(token); }
       if (!window.google || !google.accounts || !google.accounts.oauth2) return reject(new Error('Google sign-in still loading, try again'));
       if (!window.CONFIG || String(CONFIG.GOOGLE_CLIENT_ID).indexOf('PASTE_') === 0) return reject(new Error('Google client id not set in config.js'));
       if (!tokenClient) {
@@ -19,12 +26,16 @@
           callback: (r) => {
             if (r.error) return pending && pending.reject(new Error(r.error));
             token = r.access_token; exp = Date.now() + ((r.expires_in || 3600) - 60) * 1000;
+            storeToken(token, exp);
             pending && pending.resolve(token);
           },
         });
       }
       pending = { resolve, reject };
-      tokenClient.requestAccessToken({ prompt: token ? '' : 'consent' });
+      // Empty prompt: Google shows the consent screen only if not already
+      // granted, then issues tokens silently. (Was 'consent', which forced the
+      // unverified-app warning on every send.)
+      tokenClient.requestAccessToken({ prompt: '' });
     });
   }
 
