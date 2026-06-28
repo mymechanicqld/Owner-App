@@ -63,14 +63,22 @@
     <p>Fill in the details, tap <strong>Export PDF</strong>. Designed for use on the phone.</p>
   </section>
 
-  <!-- Customer card -->
+  <!-- Customer / bill-to card -->
   <section class="card">
     <header class="card__head">
-      <h2>Customer</h2>
+      <h2>Bill to</h2>
     </header>
     <div class="card__body">
+      <div class="seg" id="billToSeg" role="radiogroup" aria-label="Bill to">
+        <button type="button" class="seg__opt" data-billto="person">A person</button>
+        <button type="button" class="seg__opt" data-billto="business">A business</button>
+      </div>
+      <label class="field" id="bizNameField" hidden>
+        <span class="field__label">Business name</span>
+        <input id="bizName" type="text" autocomplete="off" placeholder="ABC Logistics Pty Ltd" data-bind="customer.business" />
+      </label>
       <label class="field">
-        <span class="field__label">Customer name</span>
+        <span class="field__label" id="custNameLabel">Customer name</span>
         <input id="custName" type="text" autocomplete="off" placeholder="Clinton Case" data-bind="customer.name" />
       </label>
       <label class="field">
@@ -101,6 +109,10 @@
           <input id="vehYear" type="text" inputmode="numeric" placeholder="2019" data-bind="vehicle.year" />
         </label>
       </div>
+      <label class="field">
+        <span class="field__label">Odometer reading (km)</span>
+        <input id="vehOdo" type="text" inputmode="numeric" placeholder="123456" data-bind="vehicle.odometer" />
+      </label>
     </div>
   </section>
 
@@ -279,12 +291,12 @@
 <div class="toasts" id="toastWrap"></div>
 
 <script src="https://accounts.google.com/gsi/client" async defer></script>
-<script src="../config.js?v=20"></script>
+<script src="../config.js?v=21"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="../storage.js?v=20" defer></script>
-<script src="../gmail-send.js?v=20" defer></script>
-<script src="assets.js?v=20" defer></script>
-<script src="app.js?v=20" defer></script>
+<script src="../storage.js?v=21" defer></script>
+<script src="../gmail-send.js?v=21" defer></script>
+<script src="assets.js?v=21" defer></script>
+<script src="app.js?v=21" defer></script>
 
 </body>
 </html>

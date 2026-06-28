@@ -125,21 +125,31 @@
   }
 
   // Insert a row into a table via PostgREST. Step-tagged on failure.
+  // Forward-compatible: if the DB does not have a column yet (a schema migration
+  // has not been applied), drop that field and retry so saving still works.
   async function logRow(table, row) {
-    let r;
-    try {
-      r = await fetch(base() + '/rest/v1/' + table, {
-        method: 'POST',
-        headers: { ...authHeaders(), 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-        body: JSON.stringify(row),
-      });
-    } catch (e) {
-      throw tag('log-row', e);
-    }
-    if (!r.ok) {
+    const body = { ...row };
+    for (let attempt = 0; attempt < 6; attempt++) {
+      let r;
+      try {
+        r = await fetch(base() + '/rest/v1/' + table, {
+          method: 'POST',
+          headers: { ...authHeaders(), 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+          body: JSON.stringify(body),
+        });
+      } catch (e) {
+        throw tag('log-row', e);
+      }
+      if (r.ok) return;
       const t = await r.text().catch(() => '');
+      const m = t.match(/Could not find the '([^']+)' column/i);
+      if (r.status === 400 && m && Object.prototype.hasOwnProperty.call(body, m[1])) {
+        delete body[m[1]];
+        continue;
+      }
       throw new Error('log-row ' + r.status + ' ' + t.slice(0, 100));
     }
+    throw new Error('log-row: too many unknown columns');
   }
 
   async function saveInvoice(meta, pdfBase64) {

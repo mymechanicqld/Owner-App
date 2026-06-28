@@ -38,9 +38,11 @@ create table if not exists public.invoices (
   created_at     timestamptz not null default now(),
   invoice_number text,
   customer_name  text,
+  business_name  text,
   customer_email text,
   vehicle_rego   text,
   vehicle        text,
+  odometer       text,
   issue_date     date,
   due_date       date,
   status         text,
@@ -57,6 +59,10 @@ create table if not exists public.invoices (
 );
 create index if not exists invoices_rego_idx on public.invoices (vehicle_rego);
 create index if not exists invoices_created_idx on public.invoices (created_at desc);
+
+-- For invoices tables created before business_name / odometer existed:
+alter table public.invoices add column if not exists business_name text;
+alter table public.invoices add column if not exists odometer text;
 
 alter table public.invoices enable row level security;
 drop policy if exists "inv_all" on public.invoices;

@@ -96,8 +96,8 @@ function sampleState() {
 
 function blankState() {
   return {
-    customer: { name: '', address: '' },
-    vehicle:  { rego: '', makeModel: '', year: '' },
+    customer: { name: '', address: '', business: '', billTo: 'person' },
+    vehicle:  { rego: '', makeModel: '', year: '', odometer: '' },
     invoice:  { number: autoInvoiceNumber(), date: today(), due: today(), status: 'outstanding' },
     items: [blankItem()],
     gstInclusive: true,
@@ -173,6 +173,9 @@ function renderAll() {
     b.setAttribute('aria-pressed', String(b.dataset.status === state.invoice.status));
   });
 
+  // Bill-to (person vs business)
+  renderBillTo();
+
   // GST toggle
   $('#gstToggle').dataset.on = state.gstInclusive ? 'true' : 'false';
 
@@ -182,6 +185,15 @@ function renderAll() {
 
   // Totals
   renderTotals();
+}
+
+function renderBillTo() {
+  const mode = (state.customer && state.customer.billTo === 'business') ? 'business' : 'person';
+  $$('#billToSeg .seg__opt').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.billto === mode)));
+  const bizField = $('#bizNameField');
+  if (bizField) bizField.hidden = mode !== 'business';
+  const lbl = $('#custNameLabel');
+  if (lbl) lbl.textContent = mode === 'business' ? 'Contact person (optional)' : 'Customer name';
 }
 
 function renderItems() {
@@ -338,6 +350,14 @@ document.addEventListener('click', (e) => {
     $$('#statusSeg .seg__opt').forEach(b =>
       b.setAttribute('aria-pressed', String(b.dataset.status === state.invoice.status))
     );
+    return;
+  }
+
+  // Bill-to segment (person vs business)
+  const bseg = e.target.closest('#billToSeg .seg__opt');
+  if (bseg) {
+    state.customer.billTo = bseg.dataset.billto;
+    renderBillTo();
     return;
   }
 
@@ -593,12 +613,15 @@ async function saveInvoiceRecord(b64) {
     const t = compute();
     const vehicle = [state.vehicle.makeModel, state.vehicle.year]
       .filter(Boolean).join(' ').trim();
+    const isBiz = state.customer.billTo === 'business';
     const meta = {
       invoice_number: state.invoice.number || null,
-      customer_name:  state.customer.name || null,
+      customer_name:  (isBiz ? (state.customer.business || state.customer.name) : state.customer.name) || null,
+      business_name:  (isBiz ? state.customer.business : null) || null,
       customer_email: PREFILL.email || null,
       vehicle_rego:   state.vehicle.rego || null,
       vehicle:        vehicle || null,
+      odometer:       state.vehicle.odometer || null,
       issue_date:     state.invoice.date || null,
       due_date:       state.invoice.due || null,
       status:         state.invoice.status || null,
@@ -744,8 +767,7 @@ function buildInvoiceDoc(t, A) {
             width: '*',
             stack: [
               { text: 'BILL TO', style: 'eyebrow' },
-              { text: state.customer.name || '—',
-                style: 'customerName', margin: [0, 3, 0, 3] },
+              ...billToStack(),
               { text: state.customer.address || '',
                 color: COLOR.muted, fontSize: 10.5, lineHeight: 1.45 },
               ...vehicleBullets(),
@@ -826,12 +848,29 @@ function buildInvoiceDoc(t, A) {
   };
 }
 
+// BILL TO name block — business name (with optional contact) or person name.
+function billToStack() {
+  const isBiz = state.customer.billTo === 'business';
+  const name = isBiz ? (state.customer.business || '—') : (state.customer.name || '—');
+  const out = [{ text: name, style: 'customerName', margin: [0, 3, 0, (isBiz && state.customer.name) ? 1 : 3] }];
+  if (isBiz && state.customer.name) {
+    out.push({ text: 'Attn: ' + state.customer.name, color: COLOR.muted, fontSize: 10.5, margin: [0, 0, 0, 3] });
+  }
+  return out;
+}
+
+// Format an odometer value with thousands separators when it is numeric.
+function fmtOdo(v) {
+  const digits = String(v).replace(/[^0-9]/g, '');
+  return digits ? Number(digits).toLocaleString('en-AU') : String(v);
+}
+
 function vehicleBullets() {
   // Compact vehicle card under the customer address. A small navy "rego
-  // plate" sits left, make/model + year stack right, all inside a soft
-  // tinted background. Skipped entirely when no fields are filled.
+  // plate" sits left, make/model + year + odometer stack right, all inside a
+  // soft tinted background. Skipped entirely when no fields are filled.
   const v = state.vehicle || {};
-  if (!v.rego && !v.makeModel && !v.year) return [];
+  if (!v.rego && !v.makeModel && !v.year && !v.odometer) return [];
 
   // Build the right-hand stack
   const rightStack = [];
@@ -841,7 +880,10 @@ function vehicleBullets() {
   if (v.year) rightStack.push({
     text: 'Year  ' + v.year, fontSize: 10, color: COLOR.muted, margin: [0, 2, 0, 0],
   });
-  if (!v.makeModel && !v.year) rightStack.push({
+  if (v.odometer) rightStack.push({
+    text: 'Odometer  ' + fmtOdo(v.odometer) + ' km', fontSize: 10, color: COLOR.muted, margin: [0, 2, 0, 0],
+  });
+  if (!v.makeModel && !v.year && !v.odometer) rightStack.push({
     text: 'Vehicle on record', fontSize: 10, color: COLOR.subtle, italics: true,
   });
 
