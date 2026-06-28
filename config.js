@@ -53,15 +53,23 @@ const CONFIG = {
 const MSG_TEMPLATES = {
   website: {
     label: 'Website link',
+    price: '',
     build: (first) =>
-`Hi ${first}, thanks for reaching out to My Mechanic QLD. The quickest way for us to get you a price is to pop your car and job details in here: ${CONFIG.WEBSITE_FORM_URL} . Takes a minute and we will get straight back to you. Thanks, Ashley`,
+`Hi ${first}, thank you for getting in touch with My Mechanic QLD. So we can provide an accurate quote, please share your vehicle and job details through our online form here: ${CONFIG.WEBSITE_FORM_URL} . We will get back to you shortly. Kind regards, Ashley`,
   },
-  callback: {
-    label: 'Quick call',
-    build: (first) =>
-`Hi ${first}, it is Ashley from My Mechanic QLD returning your enquiry. Are you free for a quick call to sort out your booking? Thanks.`,
+  service: {
+    label: 'Service',
+    price: CONFIG.DEFAULT_SERVICE_PRICE,
+    build: (first, price) =>
+`Hi ${first}, thank you for reaching out to My Mechanic QLD. We can book you in for a standard (regular) service for $${price}, completed mobile at your location. Please reply with your preferred day and address and we will lock it in. Kind regards, Ashley`,
   },
-  custom: { label: 'Custom', build: () => '' },
+  diagnostic: {
+    label: 'Diagnostic',
+    price: CONFIG.DEFAULT_DIAGNOSTIC_PRICE,
+    build: (first, price) =>
+`Hi ${first}, thank you for reaching out to My Mechanic QLD. We can book in a diagnostic for $${price} to find out what needs doing, then quote the repair from there. Please let us know if you would like to proceed. Kind regards, Ashley`,
+  },
+  custom: { label: 'Custom', price: '', build: () => '' },
 }
 
 /* Service slug -> display label + Lucide icon. Covers both slug spellings the

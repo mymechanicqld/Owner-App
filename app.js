@@ -527,24 +527,30 @@ function openMessage(id) {
   $('#sheet-title').textContent = 'Message ' + first;
   $('#sheet-sub').textContent = 'Opens your messaging app, pre-filled';
   const keys = Object.keys(MSG_TEMPLATES);
+  const buildMsg = (tmpl, price) => MSG_TEMPLATES[tmpl].build(first, price || MSG_TEMPLATES[tmpl].price);
   $('#sheet-body').innerHTML = `
     <button class="btn ghost" id="msg-back" style="margin-bottom:14px;width:auto;display:inline-flex"><i data-lucide="chevron-left"></i>Back</button>
     <div class="reply-to">To <b>${esc(s.phone)}</b></div>
     <div class="tmpl-seg" id="msg-seg">${keys.map((k) => `<button data-mt="${k}" class="${k === 'website' ? 'active' : ''}">${MSG_TEMPLATES[k].label}</button>`).join('')}</div>
-    <textarea class="composer" id="msg-body">${esc(MSG_TEMPLATES.website.build(first))}</textarea>
+    <div class="price-row" id="msg-price-row" style="display:none"><label>Price</label><div class="pin"><span>$</span><input id="msg-price" type="number" inputmode="numeric" value="${CONFIG.DEFAULT_SERVICE_PRICE}" /></div></div>
+    <textarea class="composer" id="msg-body">${esc(buildMsg('website', ''))}</textarea>
     <div class="actions"><a class="btn primary full" id="msg-send"><i data-lucide="send"></i>Open in Messages</a></div>
-    <p style="font-size:12px;color:var(--subtle);margin-top:10px;text-align:center">The default message links to our website form, so when they tap it their details land straight in the system.</p>
+    <p style="font-size:12px;color:var(--subtle);margin-top:10px;text-align:center">The website-link message takes the customer to our form, so their details land straight in the system.</p>
   `;
   openSheet(); icons();
   const updateHref = () => { $('#msg-send').setAttribute('href', `sms:${tel}?&body=${encodeURIComponent($('#msg-body').value)}`); };
+  const refreshBody = () => { $('#msg-body').value = buildMsg(STATE.msgTmpl, $('#msg-price') ? $('#msg-price').value : ''); updateHref(); };
   updateHref();
   $('#msg-seg').addEventListener('click', (e) => {
     const b = e.target.closest('[data-mt]'); if (!b) return;
     STATE.msgTmpl = b.dataset.mt;
     document.querySelectorAll('#msg-seg button').forEach((x) => x.classList.toggle('active', x === b));
-    $('#msg-body').value = MSG_TEMPLATES[STATE.msgTmpl].build(first);
-    updateHref();
+    const needsPrice = STATE.msgTmpl === 'service' || STATE.msgTmpl === 'diagnostic';
+    $('#msg-price-row').style.display = needsPrice ? 'flex' : 'none';
+    if (needsPrice) $('#msg-price').value = MSG_TEMPLATES[STATE.msgTmpl].price;
+    refreshBody();
   });
+  $('#msg-price').addEventListener('input', refreshBody);
   $('#msg-body').addEventListener('input', updateHref);
   $('#msg-back').addEventListener('click', () => openDetail(id));
 }

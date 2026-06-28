@@ -701,7 +701,9 @@ const GRADE_BG = { Good: COLOR.goodBg, Fair: COLOR.fairBg, Repair: COLOR.repairB
 const GRADE_FG = { Good: COLOR.goodFg, Fair: COLOR.fairFg, Repair: COLOR.repairFg, NA: COLOR.naFg };
 
 /* ─── Save record to Supabase (non-blocking) ─── */
+const isUuid = (v) => typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
 async function saveInspectionRecord(b64) {
+  if (!window.MMQLD_STORE) { toast('Records helper not loaded, please refresh the page'); return; }
   try {
     const v = state.inspection;
     const vehicle = [v.makeModel, v.year].filter(Boolean).join(' ').trim();
@@ -725,13 +727,13 @@ async function saveInspectionRecord(b64) {
       inspection_date: v.date || null,
       sections:        sections,
       comments:        state.overallComments || null,
-      submission_id:   PREFILL.id || null,
+      submission_id:   isUuid(PREFILL.id) ? PREFILL.id : null,
     };
     await MMQLD_STORE.saveInspection(meta, b64);
     toast('Saved to records', 'success');
   } catch (err) {
     console.error(err);
-    toast('Saved PDF, but could not log it (Supabase not set up?)');
+    toast('Could not save: ' + String((err && err.message) || err).slice(0, 80));
   }
 }
 

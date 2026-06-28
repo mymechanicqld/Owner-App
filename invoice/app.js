@@ -552,7 +552,9 @@ async function exportPdf() {
    Save record to Supabase — logs the computed invoice + uploads the PDF.
    Never blocks export/send; failure just shows a soft toast.
    ─────────────────────────────────────────────────────────────────── */
+const isUuid = (v) => typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
 async function saveInvoiceRecord(b64) {
+  if (!window.MMQLD_STORE) { toast('Records helper not loaded, please refresh the page'); return; }
   try {
     const t = compute();
     const vehicle = [state.vehicle.makeModel, state.vehicle.year]
@@ -574,13 +576,13 @@ async function saveInvoiceRecord(b64) {
       items:          state.items,
       signer_name:    (state.signature && state.signature.name) || state.customer.name || null,
       notes:          state.notes || null,
-      submission_id:  PREFILL.id || null,
+      submission_id:  isUuid(PREFILL.id) ? PREFILL.id : null,
     };
     await MMQLD_STORE.saveInvoice(meta, b64);
     toast('Saved to records', 'success');
   } catch (err) {
     console.error(err);
-    toast('Saved PDF, but could not log it (Supabase not set up?)');
+    toast('Could not save: ' + String((err && err.message) || err).slice(0, 80));
   }
 }
 
