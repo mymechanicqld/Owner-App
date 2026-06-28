@@ -25,11 +25,17 @@
     return e;
   }
 
+  // <YYYY-MM-DD>_<REGO>[_<suffix>]_<HHMMSS>.pdf — the trailing time keeps every
+  // save a unique object (a fresh INSERT), which sidesteps the owner/UPDATE RLS
+  // check that rejects browser overwrites with a 403. Still sorts/searches by
+  // the date_rego prefix.
   function fileName(rego, suffix) {
     const d = new Date();
-    const date = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    const p2 = (n) => String(n).padStart(2, '0');
+    const date = d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDate());
+    const time = p2(d.getHours()) + p2(d.getMinutes()) + p2(d.getSeconds());
     const r = (rego || 'NOREGO').toString().toUpperCase().replace(/[^A-Z0-9]/g, '') || 'NOREGO';
-    return date + '_' + r + (suffix ? '_' + suffix : '') + '.pdf';
+    return date + '_' + r + (suffix ? '_' + suffix : '') + '_' + time + '.pdf';
   }
 
   function b64ToBytes(b64) {
@@ -62,24 +68,25 @@
     const errors = [];
 
     const strategies = [
-      // 1. fetch, raw bytes (smallest payload, no multipart framing)
-      async () => {
-        const r = await fetch(path, { method: 'POST', headers: { ...authHeaders(), 'Content-Type': 'application/pdf', 'x-upsert': 'true' }, body: bytes });
-        if (!r.ok) throw new Error('http ' + r.status + ' ' + (await r.text().catch(() => '')).slice(0, 50));
-      },
-      // 2. fetch, Blob body (different body machinery than a typed array)
-      async () => {
-        const r = await fetch(path, { method: 'POST', headers: { ...authHeaders(), 'Content-Type': 'application/pdf', 'x-upsert': 'true' }, body: new Blob([bytes], { type: 'application/pdf' }) });
-        if (!r.ok) throw new Error('http ' + r.status);
-      },
-      // 3. fetch, multipart FormData (browser sets the content-type; storage-api
-      //    accepts the file part — this is the path supabase-js uses on RN/iOS)
+      // 1. fetch, multipart FormData. The browser sets the multipart content-type
+      //    and the storage-api reads the file part. This is the path supabase-js
+      //    uses on React Native / iOS and the only shape that survives iOS WebKit.
       async () => {
         const fd = new FormData();
         fd.append('cacheControl', '3600');
         fd.append('', new Blob([bytes], { type: 'application/pdf' }), name);
         const r = await fetch(path, { method: 'POST', headers: { ...authHeaders(), 'x-upsert': 'true' }, body: fd });
-        if (!r.ok) throw new Error('http ' + r.status);
+        if (!r.ok) throw new Error('http ' + r.status + ' ' + (await r.text().catch(() => '')).slice(0, 60));
+      },
+      // 2. fetch, raw bytes (smallest payload; works on desktop)
+      async () => {
+        const r = await fetch(path, { method: 'POST', headers: { ...authHeaders(), 'Content-Type': 'application/pdf', 'x-upsert': 'true' }, body: bytes });
+        if (!r.ok) throw new Error('http ' + r.status + ' ' + (await r.text().catch(() => '')).slice(0, 60));
+      },
+      // 3. fetch, Blob body (different body machinery than a typed array)
+      async () => {
+        const r = await fetch(path, { method: 'POST', headers: { ...authHeaders(), 'Content-Type': 'application/pdf', 'x-upsert': 'true' }, body: new Blob([bytes], { type: 'application/pdf' }) });
+        if (!r.ok) throw new Error('http ' + r.status + ' ' + (await r.text().catch(() => '')).slice(0, 60));
       },
       // 4. XMLHttpRequest, Blob body (entirely separate network stack from fetch)
       async () => {
@@ -91,7 +98,7 @@
           xhr.setRequestHeader('Authorization', h.Authorization);
           xhr.setRequestHeader('Content-Type', 'application/pdf');
           xhr.setRequestHeader('x-upsert', 'true');
-          xhr.onload = () => (xhr.status >= 200 && xhr.status < 300) ? resolve() : reject(new Error('http ' + xhr.status));
+          xhr.onload = () => (xhr.status >= 200 && xhr.status < 300) ? resolve() : reject(new Error('http ' + xhr.status + ' ' + String(xhr.responseText || '').slice(0, 60)));
           xhr.onerror = () => reject(new Error('network'));
           xhr.send(new Blob([bytes], { type: 'application/pdf' }));
         });

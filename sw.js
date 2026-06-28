@@ -1,7 +1,7 @@
 /* Service worker: network-first so the app always loads the latest code when
    online, falling back to cache only when offline.
    Data (Supabase, Gmail, CDNs) is cross-origin and goes straight to network. */
-const CACHE = 'mmqld-owner-v16';
+const CACHE = 'mmqld-owner-v17';
 const ASSETS = ['./', './index.html', './styles.css', './app.js', './config.js', './manifest.json', './favicon-32x32.png', './icon-192.png', './icon-512.png', './apple-touch-icon.png'];
 
 self.addEventListener('install', (e) => {
