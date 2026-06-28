@@ -126,13 +126,13 @@ input, textarea, select { width: 100%; }
   max-width: 640px;
   margin: 0 auto;
   padding: 16px;
-  padding-bottom: 24px;
+  padding-bottom: calc(112px + env(safe-area-inset-bottom));
   display: flex;
   flex-direction: column;
   gap: 16px;
 }
 @media (min-width: 720px) {
-  .page { padding: 24px 24px 32px; }
+  .page { padding: 24px 24px calc(112px + env(safe-area-inset-bottom)); }
 }
 
 /* ───── Hero ───── */

@@ -135,6 +135,7 @@ summary::-webkit-details-marker { display: none; }
   max-width: 640px;
   margin: 0 auto;
   padding: 16px;
+  padding-bottom: calc(112px + env(safe-area-inset-bottom));
   display: flex;
   flex-direction: column;
   gap: 14px;
