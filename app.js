@@ -542,6 +542,14 @@ function openEvent(ev) {
     <div class="row-2">${fld('Customer', 'ev-cust', 'text', ev && ev.customer_name)}${fld('Phone', 'ev-phone', 'tel', ev && ev.customer_phone)}</div>
     <div class="row-2">${fld('Rego', 'ev-rego', 'text', ev && ev.vehicle_rego)}${fld('Suburb', 'ev-suburb', 'text', ev && ev.suburb)}</div>
     <label class="form-field"><span>Notes</span><textarea id="ev-notes" rows="2">${esc((ev && ev.notes) || '')}</textarea></label>
+    ${isEdit && (ev.customer_phone || ev.customer_name || ev.vehicle_rego) ? `
+    <div style="font-size:12px;font-weight:600;color:var(--subtle);margin:8px 2px 2px">Quick actions for this customer</div>
+    <div class="actions">
+      ${ev.customer_phone ? `<a class="btn ghost" href="tel:${esc((ev.customer_phone || '').replace(/\s/g, ''))}"><i data-lucide="phone"></i>Call</a>` : ''}
+      ${ev.customer_phone ? `<button type="button" class="btn ghost" id="ev-msg"><i data-lucide="message-circle"></i>Message</button>` : ''}
+      <button type="button" class="btn ghost" id="ev-invoice"><i data-lucide="file-text"></i>Invoice</button>
+      <button type="button" class="btn ghost" id="ev-inspection"><i data-lucide="clipboard-check"></i>Inspection</button>
+    </div>` : ''}
     <div class="actions">
       <button class="btn primary full" id="ev-save"><i data-lucide="check"></i>${isEdit ? 'Save changes' : 'Add to calendar'}</button>
       ${isEdit ? `<button class="btn ghost full danger-text" id="ev-del"><i data-lucide="trash-2"></i>Delete booking</button>` : ''}
@@ -554,7 +562,14 @@ function openEvent(ev) {
     if (!t.value.trim() && e.target.value) t.value = svcLabel(e.target.value);
   });
   $('#ev-save').addEventListener('click', saveEvent);
-  if (isEdit) $('#ev-del').addEventListener('click', () => deleteEvent(ev.id));
+  if (isEdit) {
+    $('#ev-del').addEventListener('click', () => deleteEvent(ev.id));
+    // Quick actions reuse the booking's own customer data.
+    const evParams = () => new URLSearchParams({ name: ev.customer_name || '', phone: ev.customer_phone || '', suburb: ev.suburb || '', rego: ev.vehicle_rego || '' }).toString();
+    const eMsg = $('#ev-msg'); if (eMsg) eMsg.addEventListener('click', () => openMessageFor(ev.customer_name, ev.customer_phone, () => openEvent(ev)));
+    const eInv = $('#ev-invoice'); if (eInv) eInv.addEventListener('click', () => { location.href = 'invoice/index.html?' + evParams(); });
+    const eIns = $('#ev-inspection'); if (eIns) eIns.addEventListener('click', () => { location.href = 'inspection/index.html?' + evParams(); });
+  }
 }
 async function saveEvent() {
   const title = $('#ev-title').value.trim();
@@ -629,17 +644,22 @@ function eventFromSubmission(s) {
 function openMessage(id) {
   const s = STATE.rows.find((r) => r.id === id);
   if (!s) return;
-  if (!s.phone) return toast('No phone number on file', 'err');
-  STATE.activeId = id; STATE.msgTmpl = 'website';
-  const first = firstName(s.full_name);
-  const tel = s.phone.replace(/\s/g, '');
+  STATE.activeId = id;
+  openMessageFor(s.full_name, s.phone, () => openDetail(id));
+}
+// Generic SMS-template sheet, reusable from an inquiry or a calendar booking.
+function openMessageFor(fullName, phone, back) {
+  if (!phone) return toast('No phone number on file', 'err');
+  STATE.msgTmpl = 'website';
+  const first = firstName(fullName);
+  const tel = phone.replace(/\s/g, '');
   $('#sheet-title').textContent = 'Message ' + first;
   $('#sheet-sub').textContent = 'Opens your messaging app, pre-filled';
   const keys = Object.keys(MSG_TEMPLATES);
   const buildMsg = (tmpl, price) => MSG_TEMPLATES[tmpl].build(first, price || MSG_TEMPLATES[tmpl].price);
   $('#sheet-body').innerHTML = `
     <button class="btn ghost" id="msg-back" style="margin-bottom:14px;width:auto;display:inline-flex"><i data-lucide="chevron-left"></i>Back</button>
-    <div class="reply-to">To <b>${esc(s.phone)}</b></div>
+    <div class="reply-to">To <b>${esc(phone)}</b></div>
     <div class="tmpl-seg" id="msg-seg">${keys.map((k) => `<button data-mt="${k}" class="${k === 'website' ? 'active' : ''}">${MSG_TEMPLATES[k].label}</button>`).join('')}</div>
     <div class="price-row" id="msg-price-row" style="display:none"><label>Price</label><div class="pin"><span>$</span><input id="msg-price" type="number" inputmode="numeric" value="${CONFIG.DEFAULT_SERVICE_PRICE}" /></div></div>
     <textarea class="composer" id="msg-body">${esc(buildMsg('website', ''))}</textarea>
@@ -661,7 +681,7 @@ function openMessage(id) {
   });
   $('#msg-price').addEventListener('input', refreshBody);
   $('#msg-body').addEventListener('input', updateHref);
-  $('#msg-back').addEventListener('click', () => openDetail(id));
+  $('#msg-back').addEventListener('click', back);
 }
 
 /* --------------------------------------------------- invoice/inspection log -- */

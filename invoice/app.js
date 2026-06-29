@@ -20,7 +20,7 @@
 const BUSINESS = {
   name:    'My Mechanic QLD',
   tagline: 'WE COME TO YOU',
-  phone:   '+61 0451 159 954',
+  phone:   '0451 159 954',
   email:   'contact@mymechanicqld.com.au',
   website: 'www.mymechanicqld.com.au',
   abn:     '85 829 529 258',
@@ -63,7 +63,8 @@ const SAVED_ITEMS = [
   { desc: 'Battery replacement (supplied and fitted)', price: 260 },
   { desc: 'Mobile service fee', price: 55 },
 ];
-const blankReceipt = () => ({ id: uid(), date: today(), ref: '', amount: 0 });
+const PAY_METHODS = ['Cash', 'Bank transfer', 'Card', 'EFTPOS', 'Cheque', 'Other'];
+const blankReceipt = () => ({ id: uid(), date: today(), method: '', amount: 0 });
 
 function sampleState() {
   return {
@@ -87,7 +88,7 @@ function sampleState() {
     ],
     gstInclusive: true,
     receipts: [
-      { id: uid(), date: today(), ref: 'PR00045', amount: 2224 },
+      { id: uid(), date: today(), method: 'Bank transfer', amount: 2224 },
     ],
     notes: '',
     signature: { name: '', dataUrl: '' },
@@ -240,8 +241,11 @@ function renderReceipts() {
             <input class="item__num" type="date" data-rfield="date" value="${r.date}" />
           </label>
           <label class="item__cell">
-            <span class="item__cell-label">Reference</span>
-            <input class="item__num" type="text" placeholder="PR00045" data-rfield="ref" value="${escA(r.ref)}" />
+            <span class="item__cell-label">Payment method</span>
+            <select class="item__num" data-rfield="method">
+              <option value="" ${!r.method ? 'selected' : ''}>Select</option>
+              ${PAY_METHODS.map(m => `<option value="${escA(m)}" ${r.method === m ? 'selected' : ''}>${escA(m)}</option>`).join('')}
+            </select>
           </label>
           <label class="item__cell">
             <span class="item__cell-label">Amount</span>
@@ -1106,13 +1110,13 @@ function paymentSection(status, t) {
       widths: [80, '*', 80],
       body: [
         [
-          { text: 'PAYMENT DATE', style: 'th' },
-          { text: 'REFERENCE',    style: 'th' },
-          { text: 'AMOUNT PAID',  style: 'th', alignment: 'right' },
+          { text: 'PAYMENT DATE',   style: 'th' },
+          { text: 'PAYMENT METHOD', style: 'th' },
+          { text: 'AMOUNT PAID',    style: 'th', alignment: 'right' },
         ],
         ...state.receipts.map(r => [
-          { text: fmtDate(r.date), fontSize: 10, margin: [0, 4, 0, 4] },
-          { text: r.ref || '—',    fontSize: 10, color: COLOR.muted, margin: [0, 4, 0, 4] },
+          { text: fmtDate(r.date),  fontSize: 10, margin: [0, 4, 0, 4] },
+          { text: r.method || '—',  fontSize: 10, color: COLOR.muted, margin: [0, 4, 0, 4] },
           { text: fmtMoney(r.amount), fontSize: 10, alignment: 'right', bold: true, margin: [0, 4, 0, 4] },
         ]),
       ],
