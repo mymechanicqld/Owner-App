@@ -161,7 +161,7 @@ function newState() {
     appointmentDate: today(),
     appointmentStart: '',
     appointmentEnd: '',
-    client: { contact: '', address: '', phone: '' },
+    client: { contact: '', address: '', phone: '', email: '' },
     inspection: {
       registration: '',
       makeModel: '',
@@ -722,7 +722,7 @@ async function saveInspectionRecord(b64) {
       report_number:   state.reportNumber || null,
       customer_name:   state.client.contact || PREFILL.name || null,
       customer_phone:  state.client.phone || PREFILL.phone || null,
-      customer_email:  PREFILL.email || null,
+      customer_email:  state.client.email || PREFILL.email || null,
       vehicle_rego:    v.registration || null,
       vehicle:         vehicle || null,
       odometer:        v.odometer || null,
@@ -1343,6 +1343,7 @@ function applyPrefill() {
 
   if (name)   setByPath(state, 'client.contact', name);
   if (phone)  setByPath(state, 'client.phone', phone);
+  if (email)  setByPath(state, 'client.email', email);
   // Prefer the full street address; fall back to suburb.
   if (address) setByPath(state, 'client.address', address);
   else if (suburb) setByPath(state, 'client.address', suburb);
@@ -1361,13 +1362,14 @@ async function sendToClient(btn) {
     toast('PDF library still loading. Try again in a second.', 'error');
     return;
   }
-  if (!PREFILL.email) {
-    toast('No customer email', 'error');
+  const email = state.client.email || PREFILL.email;
+  if (!email) {
+    toast('Add the client email above first', 'error');
     return;
   }
 
   const docDef = buildReportDoc();
-  const firstName = (PREFILL.name || '').split(/\s+/)[0] || 'there';
+  const firstName = (state.client.contact || PREFILL.name || '').split(/\s+/)[0] || 'there';
   const rego = state.inspection.registration || PREFILL.rego || '';
   const filename = 'inspection-' + (rego || 'mmqld') + '.pdf';
   const subject = 'Your vehicle inspection report';
@@ -1388,9 +1390,9 @@ My Mechanic QLD
 
   pdfMake.createPdf(docDef).getBase64(async (b64) => {
     try {
-      const thread = await MMQLD_GMAIL.findThread(PREFILL.email, PREFILL.rego);
+      const thread = await MMQLD_GMAIL.findThread(email, PREFILL.rego || state.inspection.registration);
       await MMQLD_GMAIL.sendWithAttachment({
-        to: PREFILL.email, subject, bodyText, filename, pdfBase64: b64, thread,
+        to: email, subject, bodyText, filename, pdfBase64: b64, thread,
       });
       toast('Sent to client', 'success');
       await saveInspectionRecord(b64);
@@ -1442,8 +1444,10 @@ async function loadForEdit(id) {
     }
     if (!state.signature) state.signature = { name: '', date: today(), dataUrl: '' };
     if (!state.images) state.images = [];
+    if (!state.client) state.client = { contact: '', address: '', phone: '', email: '' };
+    if (!state.client.email && row.customer_email) state.client.email = row.customer_email;
     EDIT_ID = id;
-    PREFILL = { email: row.customer_email || '', phone: state.client.phone || '', rego: state.inspection.registration || '', name: state.client.contact || '', id: row.submission_id || '' };
+    PREFILL = { email: state.client.email || row.customer_email || '', phone: state.client.phone || '', rego: state.inspection.registration || '', name: state.client.contact || '', id: row.submission_id || '' };
     const hero = document.querySelector('.hero h1'); if (hero) hero.textContent = 'Edit report';
   } catch (e) {
     toast('Could not load report for editing');

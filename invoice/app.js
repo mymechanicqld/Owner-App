@@ -97,7 +97,7 @@ function sampleState() {
 
 function blankState() {
   return {
-    customer: { name: '', address: '', business: '', billTo: 'person' },
+    customer: { name: '', email: '', address: '', business: '', billTo: 'person' },
     vehicle:  { rego: '', makeModel: '', year: '', odometer: '' },
     invoice:  { number: autoInvoiceNumber(), date: today(), due: today(), status: 'outstanding' },
     items: [blankItem()],
@@ -637,7 +637,7 @@ async function saveInvoiceRecord(b64) {
       invoice_number: state.invoice.number || null,
       customer_name:  (isBiz ? (state.customer.business || state.customer.name) : state.customer.name) || null,
       business_name:  (isBiz ? state.customer.business : null) || null,
-      customer_email: PREFILL.email || null,
+      customer_email: state.customer.email || PREFILL.email || null,
       vehicle_rego:   state.vehicle.rego || null,
       vehicle:        vehicle || null,
       odometer:       state.vehicle.odometer || null,
@@ -1211,6 +1211,7 @@ function applyPrefill() {
   PREFILL = { email, phone, rego, name, id: get('id') };
 
   if (name) setByPath(state, 'customer.name', name);
+  if (email) setByPath(state, 'customer.email', email);
   // Prefer the full street address; fall back to suburb when not provided.
   if (address) setByPath(state, 'customer.address', address);
   else if (suburb) setByPath(state, 'customer.address', suburb);
@@ -1228,8 +1229,9 @@ async function sendToClient(btn) {
     toast('PDF library still loading. Try again in a second.', 'error');
     return;
   }
-  if (!PREFILL.email) {
-    toast('No customer email', 'error');
+  const email = state.customer.email || PREFILL.email;
+  if (!email) {
+    toast('Add the customer email above first', 'error');
     return;
   }
 
@@ -1256,9 +1258,9 @@ My Mechanic QLD
 
   pdfMake.createPdf(docDef).getBase64(async (b64) => {
     try {
-      const thread = await MMQLD_GMAIL.findThread(PREFILL.email, PREFILL.rego);
+      const thread = await MMQLD_GMAIL.findThread(email, PREFILL.rego || state.vehicle.rego);
       await MMQLD_GMAIL.sendWithAttachment({
-        to: PREFILL.email, subject, bodyText, filename, pdfBase64: b64, thread,
+        to: email, subject, bodyText, filename, pdfBase64: b64, thread,
       });
       toast('Sent to client', 'success');
       // Sending also logs the record (reuse the same base64).
@@ -1379,9 +1381,11 @@ async function loadForEdit(id) {
       state.notes = row.notes || '';
     }
     if (!state.signature) state.signature = { name: '', dataUrl: '' };
-    if (!state.customer) state.customer = { name: '', address: '', business: '', billTo: 'person' };
+    if (!state.customer) state.customer = { name: '', email: '', address: '', business: '', billTo: 'person' };
+    // Make sure the email field is populated (state blob may predate the field).
+    if (!state.customer.email && row.customer_email) state.customer.email = row.customer_email;
     EDIT_ID = id;
-    PREFILL = { email: row.customer_email || '', phone: '', rego: (state.vehicle && state.vehicle.rego) || '', name: (state.customer && state.customer.name) || '', id: row.submission_id || '' };
+    PREFILL = { email: state.customer.email || row.customer_email || '', phone: '', rego: (state.vehicle && state.vehicle.rego) || '', name: (state.customer && state.customer.name) || '', id: row.submission_id || '' };
     const hero = document.querySelector('.hero h1'); if (hero) hero.textContent = 'Edit invoice';
   } catch (e) {
     toast('Could not load invoice for editing');

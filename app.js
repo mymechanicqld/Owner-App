@@ -919,11 +919,22 @@ async function sendAttachment(to, subject, bodyText, filename, pdfBase64, found)
   if (found && found.threadId) payload.threadId = found.threadId;
   return gFetch('/users/me/messages/send', { method: 'POST', body: JSON.stringify(payload) });
 }
+// Resolve a customer email for a saved doc: the stored one, else the linked
+// inquiry, else the most recent inquiry for the same rego.
+async function resolveDocEmail(r) {
+  if (r.customer_email) return r.customer_email;
+  const base = CONFIG.SUPABASE_URL.replace(/\/+$/, '');
+  const headers = { apikey: CONFIG.SUPABASE_KEY };
+  const grab = async (qs) => { try { const res = await fetch(base + '/rest/v1/quote_submissions?' + qs, { headers }); const j = await res.json(); return (j && j[0] && j[0].email) || ''; } catch (_) { return ''; } };
+  if (r.submission_id) { const e = await grab('id=eq.' + encodeURIComponent(r.submission_id) + '&select=email&limit=1'); if (e) return e; }
+  if (r.vehicle_rego) { const e = await grab('vehicle_rego=eq.' + encodeURIComponent(r.vehicle_rego) + '&select=email&order=created_at.desc&limit=1'); if (e) return e; }
+  return '';
+}
 async function sendStoredDoc(kind, r) {
   const isInv = kind === 'invoices';
-  const email = r.customer_email;
-  if (!email) return toast('No email on file. Open Edit to add one, then send.', 'err');
   if (!r.pdf_path) return toast('No PDF stored for this one', 'err');
+  const email = await resolveDocEmail(r);
+  if (!email) return toast('No email on file. Open Edit to add one, then send.', 'err');
   if (!confirm('Send this ' + (isInv ? 'invoice' : 'report') + ' to ' + email + '?')) return;
   toast('Sending to client...');
   try {

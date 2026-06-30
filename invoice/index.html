@@ -25,7 +25,7 @@
 <link rel="stylesheet"
   href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" />
 
-<link rel="stylesheet" href="styles.css?v=25" />
+<link rel="stylesheet" href="styles.css?v=27" />
 
 <!-- pdfmake — real client-side PDF generator. Produces selectable text,
      not screenshots. Total bundle ~1.3 MB but cached after first load. -->
@@ -80,6 +80,10 @@
       <label class="field">
         <span class="field__label" id="custNameLabel">Customer name</span>
         <input id="custName" type="text" autocomplete="off" placeholder="Clinton Case" data-bind="customer.name" />
+      </label>
+      <label class="field">
+        <span class="field__label">Email <span style="font-weight:500;color:var(--subtle)">(for sending)</span></span>
+        <input id="custEmail" type="email" autocomplete="off" inputmode="email" placeholder="name@example.com" data-bind="customer.email" />
       </label>
       <label class="field">
         <span class="field__label">Billing address</span>
@@ -293,12 +297,12 @@
 <div class="toasts" id="toastWrap"></div>
 
 <script src="https://accounts.google.com/gsi/client" async defer></script>
-<script src="../config.js?v=25"></script>
+<script src="../config.js?v=27"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="../storage.js?v=25" defer></script>
-<script src="../gmail-send.js?v=25" defer></script>
-<script src="assets.js?v=25" defer></script>
-<script src="app.js?v=25" defer></script>
+<script src="../storage.js?v=27" defer></script>
+<script src="../gmail-send.js?v=27" defer></script>
+<script src="assets.js?v=27" defer></script>
+<script src="app.js?v=27" defer></script>
 
 </body>
 </html>
