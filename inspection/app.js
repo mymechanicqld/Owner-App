@@ -221,6 +221,8 @@ let state = newState();
 /* URL-param prefill — populated in init() from the query string. email is
    kept here because it is not a form field but is needed for the send step. */
 let PREFILL = { email: '', phone: '', rego: '', name: '', id: '' };
+/* When editing a saved report, its row id. Export then updates that record. */
+let EDIT_ID = null;
 
 /* ────────────────────────────────────────────────────────────────────
    Render — inspection sections (built dynamically)
@@ -720,6 +722,7 @@ async function saveInspectionRecord(b64) {
       report_number:   state.reportNumber || null,
       customer_name:   state.client.contact || PREFILL.name || null,
       customer_phone:  state.client.phone || PREFILL.phone || null,
+      customer_email:  PREFILL.email || null,
       vehicle_rego:    v.registration || null,
       vehicle:         vehicle || null,
       odometer:        v.odometer || null,
@@ -728,9 +731,12 @@ async function saveInspectionRecord(b64) {
       sections:        sections,
       comments:        state.overallComments || null,
       submission_id:   isUuid(PREFILL.id) ? PREFILL.id : null,
+      // Full state so the report can be reopened and edited losslessly.
+      state:           JSON.parse(JSON.stringify(state)),
     };
-    await MMQLD_STORE.saveInspection(meta, b64);
-    toast('Saved to records', 'success');
+    if (EDIT_ID) await MMQLD_STORE.updateInspection(EDIT_ID, meta, b64);
+    else await MMQLD_STORE.saveInspection(meta, b64);
+    toast(EDIT_ID ? 'Report updated' : 'Saved to records', 'success');
   } catch (err) {
     console.error(err);
     toast('Could not save: ' + String((err && err.message) || err).slice(0, 200));
@@ -1402,14 +1408,60 @@ My Mechanic QLD
 const _sendBtn = $('#sendBtn');
 if (_sendBtn) _sendBtn.addEventListener('click', (e) => sendToClient(e.currentTarget));
 
+// Load an existing saved report into state for editing.
+async function loadForEdit(id) {
+  try {
+    const url = CONFIG.SUPABASE_URL.replace(/\/+$/, '') + '/rest/v1/inspection_reports?id=eq.' + encodeURIComponent(id) + '&select=*';
+    const r = await fetch(url, { headers: { apikey: CONFIG.SUPABASE_KEY } });
+    const rows = await r.json();
+    const row = rows && rows[0];
+    if (!row) { toast('Report not found'); return; }
+    if (row.state && typeof row.state === 'object') {
+      state = row.state;
+    } else {
+      // Older report saved before the full-state column: rebuild what we can.
+      state = newState();
+      state.reportNumber = row.report_number || state.reportNumber;
+      state.client.contact = row.customer_name || '';
+      state.client.phone = row.customer_phone || '';
+      state.inspection.registration = row.vehicle_rego || '';
+      state.inspection.makeModel = row.vehicle || '';
+      state.inspection.odometer = row.odometer || '';
+      state.inspection.date = row.inspection_date || state.inspection.date;
+      state.overall = row.overall_rating || state.overall;
+      state.overallComments = row.comments || '';
+      if (Array.isArray(row.sections)) {
+        row.sections.forEach((sec) => {
+          const tgt = state.sections[sec.id];
+          if (tgt) {
+            tgt.comments = sec.comments || '';
+            (sec.criteria || []).forEach((c, idx) => { if (Array.isArray(tgt.grades) && idx < tgt.grades.length) tgt.grades[idx] = c.grade; });
+          }
+        });
+      }
+    }
+    if (!state.signature) state.signature = { name: '', date: today(), dataUrl: '' };
+    if (!state.images) state.images = [];
+    EDIT_ID = id;
+    PREFILL = { email: row.customer_email || '', phone: state.client.phone || '', rego: state.inspection.registration || '', name: state.client.contact || '', id: row.submission_id || '' };
+    const hero = document.querySelector('.hero h1'); if (hero) hero.textContent = 'Edit report';
+  } catch (e) {
+    toast('Could not load report for editing');
+  }
+}
+
 function init() {
   if (!window.MMQLD_ASSETS) {
     setTimeout(init, 30);
     return;
   }
-  applyPrefill();
-  renderForm();
-  setupSignature();
+  const editId = new URLSearchParams(location.search).get('edit');
+  (async () => {
+    if (editId) await loadForEdit(editId);
+    else applyPrefill();
+    renderForm();
+    setupSignature();
+  })();
 }
 init();
 

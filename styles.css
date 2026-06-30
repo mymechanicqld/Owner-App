@@ -326,3 +326,18 @@ input, textarea, select { font-family: inherit; font-size: 16px; } /* 16px stops
 .row-del { flex: 0 0 auto; width: 38px; height: 38px; border-radius: 10px; display: grid; place-items: center; color: var(--rose); background: transparent; }
 .row-del:active { background: #FFF1F2; }
 .row-del svg { width: 18px; height: 18px; }
+
+/* Invoice / inspection log rows with view / edit / send / delete actions */
+.logrow { display: flex; align-items: center; gap: 8px; background: var(--surface); border: 1px solid var(--hairline); border-radius: 12px; padding: 10px 11px; box-shadow: var(--shadow-sm); margin-bottom: 8px; }
+.logrow__main { flex: 1; min-width: 0; }
+.logrow__main .name { font-weight: 700; font-size: 14.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.logrow__main .line { font-size: 12.5px; color: var(--muted); margin-top: 4px; display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+.logrow__acts { display: flex; gap: 4px; flex: none; }
+.logbtn { width: 33px; height: 33px; display: grid; place-items: center; border: 1px solid var(--hairline); border-radius: 9px; background: var(--surface); color: var(--muted); }
+.logbtn:active { background: var(--soft); }
+.logbtn.danger { color: var(--rose); }
+.logbtn svg { width: 16px; height: 16px; }
+.paypill { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; line-height: 1.5; }
+.paypill.pp-paid { background: #D1FAE5; color: #047857; }
+.paypill.pp-partial { background: #FEF3C7; color: #B45309; }
+.paypill.pp-out { background: #FEE2E2; color: #B91C1C; }

@@ -58,14 +58,17 @@ create table if not exists public.invoices (
   signer_name    text,
   notes          text,
   pdf_path       text,
+  state          jsonb,
   submission_id  uuid
 );
 create index if not exists invoices_rego_idx on public.invoices (vehicle_rego);
 create index if not exists invoices_created_idx on public.invoices (created_at desc);
 
--- For invoices tables created before business_name / odometer existed:
+-- For invoices tables created before these columns existed:
 alter table public.invoices add column if not exists business_name text;
 alter table public.invoices add column if not exists odometer text;
+-- Full generator state, so a saved invoice can be reopened and edited.
+alter table public.invoices add column if not exists state jsonb;
 
 alter table public.invoices enable row level security;
 drop policy if exists "inv_all" on public.invoices;
@@ -79,6 +82,7 @@ create table if not exists public.inspection_reports (
   report_number  text,
   customer_name  text,
   customer_phone text,
+  customer_email text,
   vehicle_rego   text,
   vehicle        text,
   odometer       text,
@@ -87,10 +91,14 @@ create table if not exists public.inspection_reports (
   sections       jsonb,
   comments       text,
   pdf_path       text,
+  state          jsonb,
   submission_id  uuid
 );
 create index if not exists insp_rego_idx on public.inspection_reports (vehicle_rego);
 create index if not exists insp_created_idx on public.inspection_reports (created_at desc);
+-- For inspection_reports tables created before these columns existed:
+alter table public.inspection_reports add column if not exists customer_email text;
+alter table public.inspection_reports add column if not exists state jsonb;
 
 alter table public.inspection_reports enable row level security;
 drop policy if exists "insp_all" on public.inspection_reports;

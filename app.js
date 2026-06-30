@@ -738,12 +738,24 @@ function drawInvList() {
   cont.innerHTML = groupByMonth(rows).map((g) => `<div class="log-month">${esc(g.label)}</div><div class="list">${g.items.map(invRow).join('')}</div>`).join('');
   icons();
 }
+function payPill(s) {
+  if (!s) return '';
+  const cls = s === 'paid' ? 'pp-paid' : s === 'partial' ? 'pp-partial' : 'pp-out';
+  return `<span class="paypill ${cls}">${esc(s.charAt(0).toUpperCase() + s.slice(1))}</span>`;
+}
 function invRow(r) {
-  return `<div class="row" data-pdf="${esc(pdfUrl(CONFIG.STORAGE.invoices, r.pdf_path))}">
-    <div class="ic"><i data-lucide="file-text"></i></div>
-    <div class="body"><div class="name">${esc(r.customer_name || 'Customer')}${r.total != null ? ' · $' + esc(r.total) : ''}</div>
-      <div class="line">${r.vehicle_rego ? `<span class="rego">${esc(r.vehicle_rego)}</span> ` : ''}${esc(r.invoice_number || '')}${r.status ? ' · ' + esc(r.status) : ''}</div></div>
-    <button class="row-del" data-del-invoice="${r.id}" aria-label="Delete invoice"><i data-lucide="trash-2"></i></button>
+  const view = pdfUrl(CONFIG.STORAGE.invoices, r.pdf_path);
+  return `<div class="logrow">
+    <div class="logrow__main">
+      <div class="name">${esc(r.customer_name || 'Customer')}${r.total != null ? ' · $' + esc(r.total) : ''}</div>
+      <div class="line">${r.vehicle_rego ? `<span class="rego">${esc(r.vehicle_rego)}</span> ` : ''}${payPill(r.status)}</div>
+    </div>
+    <div class="logrow__acts">
+      <button class="logbtn" data-inv-view="${esc(view)}" aria-label="View"><i data-lucide="eye"></i></button>
+      <button class="logbtn" data-inv-edit="${r.id}" aria-label="Edit"><i data-lucide="pencil"></i></button>
+      <button class="logbtn" data-inv-send="${r.id}" aria-label="Send"><i data-lucide="send"></i></button>
+      <button class="logbtn danger" data-inv-del="${r.id}" aria-label="Delete"><i data-lucide="trash-2"></i></button>
+    </div>
   </div>`;
 }
 
@@ -774,11 +786,18 @@ function drawInspList() {
   icons();
 }
 function inspRow(r) {
-  return `<div class="row" data-pdf="${esc(pdfUrl(CONFIG.STORAGE.inspections, r.pdf_path))}">
-    <div class="ic"><i data-lucide="clipboard-check"></i></div>
-    <div class="body"><div class="name">${esc(r.customer_name || 'Customer')}${r.overall_rating ? ' · ' + esc(r.overall_rating) : ''}</div>
-      <div class="line">${r.vehicle_rego ? `<span class="rego">${esc(r.vehicle_rego)}</span> ` : ''}${esc(r.vehicle || '')}</div></div>
-    <button class="row-del" data-del-inspection="${r.id}" aria-label="Delete report"><i data-lucide="trash-2"></i></button>
+  const view = pdfUrl(CONFIG.STORAGE.inspections, r.pdf_path);
+  return `<div class="logrow">
+    <div class="logrow__main">
+      <div class="name">${esc(r.customer_name || 'Customer')}${r.overall_rating ? ' · ' + esc(r.overall_rating) : ''}</div>
+      <div class="line">${r.vehicle_rego ? `<span class="rego">${esc(r.vehicle_rego)}</span> ` : ''}${esc(r.vehicle || '')}</div>
+    </div>
+    <div class="logrow__acts">
+      <button class="logbtn" data-insp-view="${esc(view)}" aria-label="View"><i data-lucide="eye"></i></button>
+      <button class="logbtn" data-insp-edit="${r.id}" aria-label="Edit"><i data-lucide="pencil"></i></button>
+      <button class="logbtn" data-insp-send="${r.id}" aria-label="Send"><i data-lucide="send"></i></button>
+      <button class="logbtn danger" data-insp-del="${r.id}" aria-label="Delete"><i data-lucide="trash-2"></i></button>
+    </div>
   </div>`;
 }
 
@@ -874,16 +893,67 @@ async function sendThreaded(to, body, found) {
   return gFetch('/users/me/messages/send', { method: 'POST', body: JSON.stringify(payload) });
 }
 
+// Fetch a stored PDF from the public bucket and return it as base64.
+async function fetchPdfBase64(bucket, path) {
+  const url = CONFIG.SUPABASE_URL.replace(/\/+$/, '') + '/storage/v1/object/public/' + bucket + '/' + path + '?t=' + Date.now();
+  const r = await fetch(url, { cache: 'no-store' });
+  if (!r.ok) throw new Error('PDF fetch ' + r.status);
+  const buf = new Uint8Array(await r.arrayBuffer());
+  let bin = ''; for (let i = 0; i < buf.length; i++) bin += String.fromCharCode(buf[i]);
+  return btoa(bin);
+}
+// Send an already-stored PDF (invoice/report) to the customer as an attachment,
+// threaded into their Gmail conversation when one is found.
+async function sendAttachment(to, subject, bodyText, filename, pdfBase64, found) {
+  const boundary = 'mmqld_' + Math.random().toString(36).slice(2);
+  let subj = found && found.subject ? (/^re:/i.test(found.subject) ? found.subject : 'Re: ' + found.subject) : subject;
+  const head = ['To: ' + to, 'Subject: ' + encHeader(subj), 'MIME-Version: 1.0', 'Content-Type: multipart/mixed; boundary="' + boundary + '"'];
+  if (found && found.messageId) { head.push('In-Reply-To: ' + found.messageId); head.push('References: ' + found.messageId); }
+  const body = [
+    '--' + boundary, 'Content-Type: text/plain; charset="UTF-8"', 'Content-Transfer-Encoding: base64', '', u8b64(bodyText), '',
+    '--' + boundary, 'Content-Type: application/pdf; name="' + filename + '"', 'Content-Transfer-Encoding: base64',
+    'Content-Disposition: attachment; filename="' + filename + '"', '', pdfBase64, '', '--' + boundary + '--', '',
+  ];
+  const raw = b64url(head.join('\r\n') + '\r\n\r\n' + body.join('\r\n'));
+  const payload = { raw };
+  if (found && found.threadId) payload.threadId = found.threadId;
+  return gFetch('/users/me/messages/send', { method: 'POST', body: JSON.stringify(payload) });
+}
+async function sendStoredDoc(kind, r) {
+  const isInv = kind === 'invoices';
+  const email = r.customer_email;
+  if (!email) return toast('No email on file. Open Edit to add one, then send.', 'err');
+  if (!r.pdf_path) return toast('No PDF stored for this one', 'err');
+  if (!confirm('Send this ' + (isInv ? 'invoice' : 'report') + ' to ' + email + '?')) return;
+  toast('Sending to client...');
+  try {
+    const bucket = isInv ? CONFIG.STORAGE.invoices : CONFIG.STORAGE.inspections;
+    const b64 = await fetchPdfBase64(bucket, r.pdf_path);
+    const first = firstName(r.customer_name) || 'there';
+    const subject = (isInv ? 'Invoice from ' : 'Inspection report from ') + CONFIG.BUSINESS_NAME;
+    const num = (r.invoice_number || r.report_number || 'mmqld').toString().replace(/[^A-Za-z0-9_-]/g, '');
+    const filename = (isInv ? 'invoice-' : 'inspection-') + num + '.pdf';
+    const bodyText = `Hi ${first},\n\nPlease find your ${isInv ? 'invoice' : 'inspection report'} attached. Let me know if you have any questions.\n\nThank you,\nAshley\n${CONFIG.BUSINESS_NAME}\n${CONFIG.BUSINESS_PHONE}`;
+    const found = await findThread(email, r.vehicle_rego);
+    await sendAttachment(email, subject, bodyText, filename, b64, found);
+    toast('Sent to client', 'ok');
+  } catch (e) { toast(String((e && e.message) || e).slice(0, 60), 'err'); }
+}
+
 /* ------------------------------------------------------------------ wire -- */
 document.addEventListener('click', (e) => {
   const nav = e.target.closest('.nav button'); if (nav) return setView(nav.dataset.view);
   const side = e.target.closest('#sidebar-nav button[data-view]'); if (side) return setView(side.dataset.view);
-  const delInv = e.target.closest('[data-del-invoice]');
-  if (delInv) { e.stopPropagation(); deleteLog('invoices', 'invoices', CONFIG.STORAGE.invoices, delInv.dataset.delInvoice); return; }
-  const delInsp = e.target.closest('[data-del-inspection]');
-  if (delInsp) { e.stopPropagation(); deleteLog('inspections', 'inspection_reports', CONFIG.STORAGE.inspections, delInsp.dataset.delInspection); return; }
-  const pdfRow = e.target.closest('.row[data-pdf]');
-  if (pdfRow) { const u = pdfRow.dataset.pdf; if (u) window.open(u, '_blank'); else toast('PDF not available'); return; }
+  // Invoice log actions
+  const invView = e.target.closest('[data-inv-view]'); if (invView) { const u = invView.dataset.invView; u ? window.open(u, '_blank') : toast('PDF not available'); return; }
+  const invEdit = e.target.closest('[data-inv-edit]'); if (invEdit) { location.href = 'invoice/index.html?edit=' + encodeURIComponent(invEdit.dataset.invEdit); return; }
+  const invSend = e.target.closest('[data-inv-send]'); if (invSend) { const r = (STATE.invoices || []).find((x) => x.id === invSend.dataset.invSend); if (r) sendStoredDoc('invoices', r); return; }
+  const invDel = e.target.closest('[data-inv-del]'); if (invDel) { deleteLog('invoices', 'invoices', CONFIG.STORAGE.invoices, invDel.dataset.invDel); return; }
+  // Inspection log actions
+  const inspView = e.target.closest('[data-insp-view]'); if (inspView) { const u = inspView.dataset.inspView; u ? window.open(u, '_blank') : toast('PDF not available'); return; }
+  const inspEdit = e.target.closest('[data-insp-edit]'); if (inspEdit) { location.href = 'inspection/index.html?edit=' + encodeURIComponent(inspEdit.dataset.inspEdit); return; }
+  const inspSend = e.target.closest('[data-insp-send]'); if (inspSend) { const r = (STATE.inspections || []).find((x) => x.id === inspSend.dataset.inspSend); if (r) sendStoredDoc('inspections', r); return; }
+  const inspDel = e.target.closest('[data-insp-del]'); if (inspDel) { deleteLog('inspections', 'inspection_reports', CONFIG.STORAGE.inspections, inspDel.dataset.inspDel); return; }
   const row = e.target.closest('.row[data-id]'); if (row) return openDetail(row.dataset.id);
   const mvUp = e.target.closest('[data-move-up]'); if (mvUp) { e.stopPropagation(); moveEvent(mvUp.dataset.moveUp, -1); return; }
   const mvDn = e.target.closest('[data-move-down]'); if (mvDn) { e.stopPropagation(); moveEvent(mvDn.dataset.moveDown, 1); return; }

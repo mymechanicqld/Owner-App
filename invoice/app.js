@@ -113,6 +113,9 @@ let state = blankState();
 /* URL-param prefill — populated in init() from query string. email is kept
    here because it is not a form field but is needed for the send step. */
 let PREFILL = { email: '', phone: '', rego: '', name: '' };
+/* When editing an existing saved invoice, its row id. Export then updates that
+   record instead of creating a new one. */
+let EDIT_ID = null;
 
 /* ────────────────────────────────────────────────────────────────────
    Money + date helpers — Australian formats
@@ -638,9 +641,12 @@ async function saveInvoiceRecord(b64) {
       signer_name:    (state.signature && state.signature.name) || state.customer.name || null,
       notes:          state.notes || null,
       submission_id:  isUuid(PREFILL.id) ? PREFILL.id : null,
+      // Full state so the invoice can be reopened and edited losslessly.
+      state:          JSON.parse(JSON.stringify(state)),
     };
-    await MMQLD_STORE.saveInvoice(meta, b64);
-    toast('Saved to records', 'success');
+    if (EDIT_ID) await MMQLD_STORE.updateInvoice(EDIT_ID, meta, b64);
+    else await MMQLD_STORE.saveInvoice(meta, b64);
+    toast(EDIT_ID ? 'Invoice updated' : 'Saved to records', 'success');
   } catch (err) {
     console.error(err);
     toast('Could not save: ' + String((err && err.message) || err).slice(0, 200));
@@ -1333,19 +1339,60 @@ function setupSignature() {
   });
 }
 
+// Load an existing saved invoice into state for editing.
+async function loadForEdit(id) {
+  try {
+    const url = CONFIG.SUPABASE_URL.replace(/\/+$/, '') + '/rest/v1/invoices?id=eq.' + encodeURIComponent(id) + '&select=*';
+    const r = await fetch(url, { headers: { apikey: CONFIG.SUPABASE_KEY } });
+    const rows = await r.json();
+    const row = rows && rows[0];
+    if (!row) { toast('Invoice not found'); return; }
+    if (row.state && typeof row.state === 'object') {
+      state = row.state;
+    } else {
+      // Older invoice saved before the full-state column existed: rebuild what
+      // we can from the individual columns.
+      state = blankState();
+      state.customer.name = row.customer_name || '';
+      state.customer.business = row.business_name || '';
+      state.customer.billTo = row.business_name ? 'business' : 'person';
+      state.vehicle.rego = row.vehicle_rego || '';
+      state.vehicle.makeModel = row.vehicle || '';
+      state.vehicle.odometer = row.odometer || '';
+      state.invoice.number = row.invoice_number || state.invoice.number;
+      state.invoice.date = row.issue_date || state.invoice.date;
+      state.invoice.due = row.due_date || state.invoice.due;
+      state.invoice.status = row.status || state.invoice.status;
+      if (Array.isArray(row.items)) state.items = row.items;
+      state.notes = row.notes || '';
+    }
+    if (!state.signature) state.signature = { name: '', dataUrl: '' };
+    if (!state.customer) state.customer = { name: '', address: '', business: '', billTo: 'person' };
+    EDIT_ID = id;
+    PREFILL = { email: row.customer_email || '', phone: '', rego: (state.vehicle && state.vehicle.rego) || '', name: (state.customer && state.customer.name) || '', id: row.submission_id || '' };
+    const hero = document.querySelector('.hero h1'); if (hero) hero.textContent = 'Edit invoice';
+  } catch (e) {
+    toast('Could not load invoice for editing');
+  }
+}
+
 function init() {
   if (!window.MMQLD_ASSETS) {
     // assets.js may load slightly after app.js — wait a tick.
     setTimeout(init, 30);
     return;
   }
-  applyPrefill();
-  // Default the "Signed by" name to the customer when not already set.
-  if (state.signature && !state.signature.name) {
-    state.signature.name = state.customer.name || PREFILL.name || '';
-  }
-  renderAll();
-  setupSignature();
+  const editId = new URLSearchParams(location.search).get('edit');
+  (async () => {
+    if (editId) await loadForEdit(editId);
+    else applyPrefill();
+    // Default the "Signed by" name to the customer when not already set.
+    if (state.signature && !state.signature.name) {
+      state.signature.name = state.customer.name || PREFILL.name || '';
+    }
+    renderAll();
+    setupSignature();
+  })();
 }
 
 init();

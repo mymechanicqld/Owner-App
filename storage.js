@@ -152,6 +152,30 @@
     throw new Error('log-row: too many unknown columns');
   }
 
+  // Update an existing row by id via PostgREST PATCH. Same forward-compatible
+  // unknown-column handling as logRow.
+  async function patchRow(table, id, row) {
+    const body = { ...row };
+    for (let attempt = 0; attempt < 8; attempt++) {
+      let r;
+      try {
+        r = await fetch(base() + '/rest/v1/' + table + '?id=eq.' + encodeURIComponent(id), {
+          method: 'PATCH',
+          headers: { ...authHeaders(), 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+          body: JSON.stringify(body),
+        });
+      } catch (e) {
+        throw tag('update-row', e);
+      }
+      if (r.ok) return;
+      const t = await r.text().catch(() => '');
+      const m = t.match(/Could not find the '([^']+)' column/i);
+      if (r.status === 400 && m && Object.prototype.hasOwnProperty.call(body, m[1])) { delete body[m[1]]; continue; }
+      throw new Error('update-row ' + r.status + ' ' + t.slice(0, 100));
+    }
+    throw new Error('update-row: too many unknown columns');
+  }
+
   async function saveInvoice(meta, pdfBase64) {
     const name = fileName(meta.vehicle_rego, meta.invoice_number ? String(meta.invoice_number).replace(/[^A-Za-z0-9]/g, '') : '');
     const up = await uploadPdf(CONFIG.STORAGE.invoices, name, pdfBase64);
@@ -166,5 +190,19 @@
     return up;
   }
 
-  window.MMQLD_STORE = { fileName, uploadPdf, saveInvoice, saveInspection, objectExists, _tag: tag };
+  // Edit an existing invoice/report: upload a fresh PDF and patch the row.
+  async function updateInvoice(id, meta, pdfBase64) {
+    const name = fileName(meta.vehicle_rego, meta.invoice_number ? String(meta.invoice_number).replace(/[^A-Za-z0-9]/g, '') : '');
+    const up = await uploadPdf(CONFIG.STORAGE.invoices, name, pdfBase64);
+    await patchRow('invoices', id, { ...meta, pdf_path: up.path });
+    return up;
+  }
+  async function updateInspection(id, meta, pdfBase64) {
+    const name = fileName(meta.vehicle_rego);
+    const up = await uploadPdf(CONFIG.STORAGE.inspections, name, pdfBase64);
+    await patchRow('inspection_reports', id, { ...meta, pdf_path: up.path });
+    return up;
+  }
+
+  window.MMQLD_STORE = { fileName, uploadPdf, saveInvoice, saveInspection, updateInvoice, updateInspection, objectExists, _tag: tag };
 })();
