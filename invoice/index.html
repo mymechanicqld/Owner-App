@@ -25,7 +25,7 @@
 <link rel="stylesheet"
   href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" />
 
-<link rel="stylesheet" href="styles.css" />
+<link rel="stylesheet" href="styles.css?v=25" />
 
 <!-- pdfmake — real client-side PDF generator. Produces selectable text,
      not screenshots. Total bundle ~1.3 MB but cached after first load. -->
@@ -137,14 +137,6 @@
           <input id="invDue" type="date" data-bind="invoice.due" />
         </label>
       </div>
-      <fieldset class="field">
-        <legend class="field__label">Status</legend>
-        <div class="seg" id="statusSeg" role="radiogroup">
-          <button type="button" class="seg__opt seg__opt--paid"        data-status="paid">Paid</button>
-          <button type="button" class="seg__opt seg__opt--partial"     data-status="partial">Partial</button>
-          <button type="button" class="seg__opt seg__opt--outstanding" data-status="outstanding">Outstanding</button>
-        </div>
-      </fieldset>
     </div>
   </section>
 
@@ -198,6 +190,16 @@
       <span class="card__hint" id="receiptsCountHint">0 payments</span>
     </header>
     <div class="card__body card__body--flush">
+      <div style="padding: 14px 14px 4px">
+        <fieldset class="field" style="margin:0">
+          <legend class="field__label">Status</legend>
+          <div class="seg" id="statusSeg" role="radiogroup">
+            <button type="button" class="seg__opt seg__opt--paid"        data-status="paid">Paid</button>
+            <button type="button" class="seg__opt seg__opt--partial"     data-status="partial">Partial</button>
+            <button type="button" class="seg__opt seg__opt--outstanding" data-status="outstanding">Outstanding</button>
+          </div>
+        </fieldset>
+      </div>
       <div id="receiptsList" class="items items--receipts"></div>
       <button class="add-btn" id="addReceipt" type="button">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
@@ -291,12 +293,12 @@
 <div class="toasts" id="toastWrap"></div>
 
 <script src="https://accounts.google.com/gsi/client" async defer></script>
-<script src="../config.js?v=24"></script>
+<script src="../config.js?v=25"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="../storage.js?v=24" defer></script>
-<script src="../gmail-send.js?v=24" defer></script>
-<script src="assets.js?v=24" defer></script>
-<script src="app.js?v=24" defer></script>
+<script src="../storage.js?v=25" defer></script>
+<script src="../gmail-send.js?v=25" defer></script>
+<script src="assets.js?v=25" defer></script>
+<script src="app.js?v=25" defer></script>
 
 </body>
 </html>

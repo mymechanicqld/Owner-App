@@ -427,12 +427,20 @@ input, textarea, select { width: 100%; }
 
 /* ───── Receipts (similar to items) ───── */
 .items--receipts .item { padding: 12px; }
-.items--receipts .item__row {
+/* Row 1: date + method + remove. Row 2: amount on its own line. */
+.items--receipts .item__row--rc1 {
   grid-template-columns: 1fr 1fr 32px;
 }
+.items--receipts .item__row--rc2 {
+  grid-template-columns: 1fr;
+  margin-top: 10px;
+}
 @media (min-width: 480px) {
-  .items--receipts .item__row {
-    grid-template-columns: 130px 1fr 110px 32px;
+  .items--receipts .item__row--rc1 {
+    grid-template-columns: 150px 1fr 32px;
+  }
+  .items--receipts .item__row--rc2 {
+    grid-template-columns: 220px;
   }
 }
 

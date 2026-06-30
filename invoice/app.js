@@ -238,7 +238,7 @@ function renderReceipts() {
   } else {
     list.innerHTML = state.receipts.map(r => `
       <div class="item" data-rid="${r.id}">
-        <div class="item__row">
+        <div class="item__row item__row--rc1">
           <label class="item__cell">
             <span class="item__cell-label">Date</span>
             <input class="item__num" type="date" data-rfield="date" value="${r.date}" />
@@ -250,13 +250,15 @@ function renderReceipts() {
               ${PAY_METHODS.map(m => `<option value="${escA(m)}" ${r.method === m ? 'selected' : ''}>${escA(m)}</option>`).join('')}
             </select>
           </label>
+          <button type="button" class="item__remove" data-rremove="${r.id}" aria-label="Remove payment">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+        <div class="item__row item__row--rc2">
           <label class="item__cell">
             <span class="item__cell-label">Amount</span>
             <input class="item__num" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0.00" data-rfield="amount" value="${r.amount || ''}" />
           </label>
-          <button type="button" class="item__remove" data-rremove="${r.id}" aria-label="Remove payment">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-          </button>
         </div>
       </div>
     `).join('');
@@ -357,6 +359,16 @@ document.addEventListener('click', (e) => {
     $$('#statusSeg .seg__opt').forEach(b =>
       b.setAttribute('aria-pressed', String(b.dataset.status === state.invoice.status))
     );
+    // Marking Paid auto-records a payment for the outstanding balance so the
+    // invoice reads as paid in full.
+    if (state.invoice.status === 'paid') {
+      const t = compute();
+      if (t.outstanding > 0.005) {
+        state.receipts.push({ id: uid(), date: today(), method: '', amount: Math.round(t.outstanding * 100) / 100 });
+        renderReceipts();
+        renderTotals();
+      }
+    }
     return;
   }
 
