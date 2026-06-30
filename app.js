@@ -338,6 +338,7 @@ function openDetail(id) {
     ${field('phone', 'Phone', s.phone ? `<a href="tel:${esc(tel)}">${esc(s.phone)}</a>` : '')}
     ${field('mail', 'Email', s.email ? `<a href="mailto:${esc(s.email)}">${esc(s.email)}</a>` : '')}
     ${field('map-pin', 'Suburb', esc(s.suburb))}
+    ${field('home', 'Address', esc(s.address))}
     ${field('car-front', 'Vehicle', [esc(carDesc(s)), s.vehicle_rego ? `<span class="rego">${esc(s.vehicle_rego)}</span>` : ''].filter(Boolean).join(' '))}
     ${field('wrench', 'Service', esc(sv.label))}
     <div class="field"><div class="fic"><i data-lucide="calendar-days"></i></div>
@@ -373,6 +374,7 @@ function openDetail(id) {
     email: s.email || '',
     phone: s.phone || '',
     suburb: s.suburb || '',
+    address: s.address || '',
     rego: s.vehicle_rego || '',
     make: carDesc(s) || s.vehicle_make || '',
     year: s.vehicle_year || '',
@@ -541,6 +543,7 @@ function openEvent(ev) {
     <label class="form-field"><span>Duration</span><select id="ev-dur" class="form-sel">${durOpts}</select></label>
     <div class="row-2">${fld('Customer', 'ev-cust', 'text', ev && ev.customer_name)}${fld('Phone', 'ev-phone', 'tel', ev && ev.customer_phone)}</div>
     <div class="row-2">${fld('Rego', 'ev-rego', 'text', ev && ev.vehicle_rego)}${fld('Suburb', 'ev-suburb', 'text', ev && ev.suburb)}</div>
+    <label class="form-field"><span>Address</span><input id="ev-address" type="text" value="${esc((ev && ev.address) || '')}" placeholder="12 Smith St, Sunnybank" /></label>
     <label class="form-field"><span>Notes</span><textarea id="ev-notes" rows="2">${esc((ev && ev.notes) || '')}</textarea></label>
     ${isEdit && (ev.customer_phone || ev.customer_name || ev.vehicle_rego) ? `
     <div style="font-size:12px;font-weight:600;color:var(--subtle);margin:8px 2px 2px">Quick actions for this customer</div>
@@ -565,7 +568,7 @@ function openEvent(ev) {
   if (isEdit) {
     $('#ev-del').addEventListener('click', () => deleteEvent(ev.id));
     // Quick actions reuse the booking's own customer data.
-    const evParams = () => new URLSearchParams({ name: ev.customer_name || '', phone: ev.customer_phone || '', suburb: ev.suburb || '', rego: ev.vehicle_rego || '' }).toString();
+    const evParams = () => new URLSearchParams({ name: ev.customer_name || '', phone: ev.customer_phone || '', suburb: ev.suburb || '', address: ev.address || '', rego: ev.vehicle_rego || '' }).toString();
     const eMsg = $('#ev-msg'); if (eMsg) eMsg.addEventListener('click', () => openMessageFor(ev.customer_name, ev.customer_phone, () => openEvent(ev)));
     const eInv = $('#ev-invoice'); if (eInv) eInv.addEventListener('click', () => { location.href = 'invoice/index.html?' + evParams(); });
     const eIns = $('#ev-inspection'); if (eIns) eIns.addEventListener('click', () => { location.href = 'inspection/index.html?' + evParams(); });
@@ -587,13 +590,23 @@ async function saveEvent() {
     customer_phone: $('#ev-phone').value.trim() || null,
     vehicle_rego: $('#ev-rego').value.trim() || null,
     suburb: $('#ev-suburb').value.trim() || null,
+    address: $('#ev-address').value.trim() || null,
     notes: $('#ev-notes').value.trim() || null,
     updated_at: new Date().toISOString(),
   };
   const btn = $('#ev-save'); btn.disabled = true; btn.innerHTML = '<span class="spin"></span>Saving...';
   try {
-    if (STATE.editEventId) { const { error } = await sb.from('calendar_events').update(row).eq('id', STATE.editEventId); if (error) throw error; }
-    else { const { error } = await sb.from('calendar_events').insert(row); if (error) throw error; }
+    const save = (r) => STATE.editEventId
+      ? sb.from('calendar_events').update(r).eq('id', STATE.editEventId)
+      : sb.from('calendar_events').insert(r);
+    let { error } = await save(row);
+    // Forward-compatible: drop the address column and retry if it is not in the
+    // DB yet (before the schema migration is applied).
+    if (error && /address/i.test(error.message) && /column/i.test(error.message)) {
+      delete row.address;
+      ({ error } = await save(row));
+    }
+    if (error) throw error;
     await loadEvents(); toast('Booking saved', 'ok'); closeSheet(); STATE.view = 'calendar'; setView('calendar');
   } catch (e) { toast('Save failed: ' + String(e.message || e).slice(0, 50), 'err'); btn.disabled = false; btn.innerHTML = 'Save'; icons(); }
 }
@@ -636,6 +649,7 @@ function eventFromSubmission(s) {
     title: sv.label + ' - ' + (s.full_name || 'Customer'),
     starts_at: start.toISOString(), ends_at: new Date(start.getTime() + 3600000).toISOString(),
     customer_name: s.full_name, customer_phone: s.phone, vehicle_rego: s.vehicle_rego, suburb: s.suburb,
+    address: s.address || null,
     service: s.service_needed || null, notes: s.symptoms || '',
   };
 }

@@ -20,12 +20,15 @@ create table if not exists public.calendar_events (
   customer_phone text,
   vehicle_rego  text,
   suburb        text,
+  address       text,
   service       text,
   notes         text,
   status        text not null default 'scheduled',
   submission_id uuid
 );
 create index if not exists calendar_events_starts_idx on public.calendar_events (starts_at);
+-- For calendar_events tables created before the address column existed:
+alter table public.calendar_events add column if not exists address text;
 
 alter table public.calendar_events enable row level security;
 drop policy if exists "cal_all" on public.calendar_events;

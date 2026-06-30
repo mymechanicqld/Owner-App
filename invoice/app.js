@@ -1182,17 +1182,20 @@ function applyPrefill() {
 
   const name   = get('name');
   const email  = get('email');
-  const phone  = get('phone');
-  const suburb = get('suburb');
-  const rego   = get('rego');
-  const make   = get('make');
-  const year   = get('year');
+  const phone   = get('phone');
+  const suburb  = get('suburb');
+  const address = get('address');
+  const rego    = get('rego');
+  const make    = get('make');
+  const year    = get('year');
 
   // Stash for the send step (email is not a form field)
   PREFILL = { email, phone, rego, name, id: get('id') };
 
-  if (name)   setByPath(state, 'customer.name', name);
-  if (suburb) setByPath(state, 'customer.address', suburb);
+  if (name) setByPath(state, 'customer.name', name);
+  // Prefer the full street address; fall back to suburb when not provided.
+  if (address) setByPath(state, 'customer.address', address);
+  else if (suburb) setByPath(state, 'customer.address', suburb);
   if (rego)   setByPath(state, 'vehicle.rego', rego);
   if (make)   setByPath(state, 'vehicle.makeModel', make);
   if (year)   setByPath(state, 'vehicle.year', year);
