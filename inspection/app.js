@@ -444,7 +444,7 @@ document.addEventListener('click', (e) => {
 
 /* ─── Image upload (with client-side compression) ─── */
 document.addEventListener('change', async (e) => {
-  if (e.target.id !== 'imgInput') return;
+  if (e.target.id !== 'imgInput' && e.target.id !== 'imgInputGallery') return;
   const files = Array.from(e.target.files || []);
   if (!files.length) return;
   toast(`Processing ${files.length} image${files.length > 1 ? 's' : ''}…`);

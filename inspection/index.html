@@ -25,7 +25,7 @@
 <link rel="stylesheet"
   href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" />
 
-<link rel="stylesheet" href="styles.css" />
+<link rel="stylesheet" href="styles.css?v=26" />
 
 <!-- pdfmake — real client-side PDF generator (selectable text, small files). -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.10/pdfmake.min.js" defer></script>
@@ -180,12 +180,17 @@
         <div class="dropzone__icon">
           <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
         </div>
-        <div class="dropzone__title">Tap to add photos</div>
+        <div class="dropzone__title">Tap to take a photo</div>
         <div class="dropzone__hint">
-          Choose from your gallery or take a new photo. <strong>Landscape</strong> orientation
-          renders two per row in the PDF.
+          Opens the camera. <strong>Landscape</strong> orientation renders two per row in the PDF.
         </div>
-        <input type="file" accept="image/*" multiple id="imgInput" />
+        <input type="file" accept="image/*" capture="environment" multiple id="imgInput" />
+      </label>
+
+      <label class="gallery-btn" id="galleryBtn">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+        Choose from gallery
+        <input type="file" accept="image/*" multiple id="imgInputGallery" />
       </label>
 
       <div id="imageGrid" class="imgs"></div>
@@ -297,12 +302,12 @@
 <div class="toasts" id="toastWrap"></div>
 
 <script src="https://accounts.google.com/gsi/client" async defer></script>
-<script src="../config.js?v=24"></script>
+<script src="../config.js?v=26"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="../storage.js?v=24" defer></script>
-<script src="../gmail-send.js?v=24" defer></script>
-<script src="assets.js?v=24" defer></script>
-<script src="app.js?v=24" defer></script>
+<script src="../storage.js?v=26" defer></script>
+<script src="../gmail-send.js?v=26" defer></script>
+<script src="assets.js?v=26" defer></script>
+<script src="app.js?v=26" defer></script>
 
 </body>
 </html>
