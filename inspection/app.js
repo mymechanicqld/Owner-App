@@ -1454,6 +1454,37 @@ async function loadForEdit(id) {
   }
 }
 
+/* ────────────────────────────────────────────────────────────────────
+   Customer type-ahead — picking a past customer fills the client and
+   vehicle details in one tap.
+   ─────────────────────────────────────────────────────────────────── */
+function fillFromCustomer(c) {
+  const addr = MMQLD_CUSTOMERS.fullAddress(c);
+  state.client.contact = c.name || c.business || '';
+  if (c.phone) state.client.phone = c.phone;
+  if (c.email) state.client.email = c.email;
+  if (addr) state.client.address = addr;
+  if (c.rego) state.inspection.registration = c.rego;
+  if (c.make) state.inspection.makeModel = c.make;
+  if (c.year) state.inspection.year = c.year;
+  if (addr && !state.inspection.location) state.inspection.location = addr;
+
+  PREFILL = {
+    email: c.email || '',
+    phone: c.phone || '',
+    rego: c.rego || '',
+    name: state.client.contact,
+    id: c.submissionId || '',
+  };
+  renderForm();
+  toast('Filled from ' + state.client.contact, 'success');
+}
+
+function setupCustomerLookup() {
+  if (!window.MMQLD_CUSTOMERS) return;
+  MMQLD_CUSTOMERS.attach($('[data-bind="client.contact"]'), { mode: 'person', onPick: fillFromCustomer });
+}
+
 function init() {
   if (!window.MMQLD_ASSETS) {
     setTimeout(init, 30);
@@ -1465,6 +1496,7 @@ function init() {
     else applyPrefill();
     renderForm();
     setupSignature();
+    setupCustomerLookup();
   })();
 }
 init();

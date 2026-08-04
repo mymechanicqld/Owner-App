@@ -1392,6 +1392,47 @@ async function loadForEdit(id) {
   }
 }
 
+/* ────────────────────────────────────────────────────────────────────
+   Customer type-ahead — picking a past customer fills the whole invoice.
+   ─────────────────────────────────────────────────────────────────── */
+function fillFromCustomer(c, mode, picked) {
+  const addr = MMQLD_CUSTOMERS.fullAddress(c);
+  if (mode === 'business' || c.business) {
+    // Chosen from the business field (or the record already has a business):
+    // the picked label is the company, any separate person is the contact.
+    state.customer.billTo = 'business';
+    state.customer.business = c.business || picked || c.name || '';
+    state.customer.name = (c.business && c.name) ? c.name : '';
+  } else {
+    state.customer.name = c.name || '';
+  }
+  if (c.email) state.customer.email = c.email;
+  if (addr) state.customer.address = addr;
+  if (c.rego) state.vehicle.rego = c.rego;
+  if (c.make) state.vehicle.makeModel = c.make;
+  if (c.year) state.vehicle.year = c.year;
+
+  // Keep the send step + record link in sync with the picked customer.
+  PREFILL = {
+    email: c.email || '',
+    phone: c.phone || '',
+    rego: c.rego || '',
+    name: c.name || '',
+    id: c.submissionId || '',
+  };
+  if (state.signature && !state.signature.name) {
+    state.signature.name = state.customer.name || '';
+  }
+  renderAll();
+  toast('Filled from ' + (c.business || c.name), 'success');
+}
+
+function setupCustomerLookup() {
+  if (!window.MMQLD_CUSTOMERS) return;
+  MMQLD_CUSTOMERS.attach($('#custName'), { mode: 'person', onPick: fillFromCustomer });
+  MMQLD_CUSTOMERS.attach($('#bizName'), { mode: 'business', onPick: fillFromCustomer });
+}
+
 function init() {
   if (!window.MMQLD_ASSETS) {
     // assets.js may load slightly after app.js — wait a tick.
@@ -1408,6 +1449,7 @@ function init() {
     }
     renderAll();
     setupSignature();
+    setupCustomerLookup();
   })();
 }
 

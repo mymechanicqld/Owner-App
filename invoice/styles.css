@@ -188,6 +188,8 @@ input, textarea, select { width: 100%; }
 .card__body--flush { padding: 4px 12px 12px; gap: 8px; }
 
 /* ───── Fields ───── */
+/* display:flex below beats the browser's [hidden] rule, so restate it. */
+.field[hidden] { display: none; }
 .field {
   display: flex;
   flex-direction: column;
