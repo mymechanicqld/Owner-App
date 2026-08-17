@@ -124,32 +124,35 @@
     throw e;
   }
 
-  // Insert a row into a table via PostgREST. Step-tagged on failure.
+  // Insert a row into a table via PostgREST, returning the created record.
   // Forward-compatible: if the DB does not have a column yet (a schema migration
   // has not been applied), drop that field and retry so saving still works.
   async function logRow(table, row) {
     const body = { ...row };
-    for (let attempt = 0; attempt < 6; attempt++) {
+    for (let attempt = 0; attempt < 8; attempt++) {
       let r;
       try {
         r = await fetch(base() + '/rest/v1/' + table, {
           method: 'POST',
-          headers: { ...authHeaders(), 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+          headers: { ...authHeaders(), 'Content-Type': 'application/json', Prefer: 'return=representation' },
           body: JSON.stringify(body),
         });
       } catch (e) {
-        throw tag('log-row', e);
+        throw tag('save-record', e);
       }
-      if (r.ok) return;
+      if (r.ok) {
+        const j = await r.json().catch(() => null);
+        return Array.isArray(j) ? j[0] : j;
+      }
       const t = await r.text().catch(() => '');
       const m = t.match(/Could not find the '([^']+)' column/i);
       if (r.status === 400 && m && Object.prototype.hasOwnProperty.call(body, m[1])) {
         delete body[m[1]];
         continue;
       }
-      throw new Error('log-row ' + r.status + ' ' + t.slice(0, 100));
+      throw new Error('save-record ' + r.status + ' ' + t.slice(0, 100));
     }
-    throw new Error('log-row: too many unknown columns');
+    throw new Error('save-record: too many unknown columns');
   }
 
   // Update an existing row by id via PostgREST PATCH. Same forward-compatible
@@ -176,33 +179,45 @@
     throw new Error('update-row: too many unknown columns');
   }
 
-  async function saveInvoice(meta, pdfBase64) {
-    const name = fileName(meta.vehicle_rego, meta.invoice_number ? String(meta.invoice_number).replace(/[^A-Za-z0-9]/g, '') : '');
-    const up = await uploadPdf(CONFIG.STORAGE.invoices, name, pdfBase64);
-    await logRow('invoices', { ...meta, pdf_path: up.path });
-    return up;
+  /* Write the record FIRST, then attach the PDF.
+
+     The record is what the owner actually needs (it drives the Invoices /
+     Reports lists, and it carries the full generator state so the document can
+     be re-opened, edited and re-sent). Uploading binary to Storage is the
+     fragile step on mobile Safari, so it must never be able to lose the
+     invoice. A blocked upload leaves a complete record with no pdf_path, and
+     is reported back via `uploaded:false` rather than thrown. */
+  async function saveDoc(table, bucket, name, meta, pdfBase64) {
+    const row = await logRow(table, { ...meta, pdf_path: null });
+    const id = row && row.id;
+    let up = null, uploadError = null;
+    try {
+      up = await uploadPdf(bucket, name, pdfBase64);
+    } catch (e) { uploadError = e; }
+    if (up && id) { try { await patchRow(table, id, { pdf_path: up.path }); } catch (_) {} }
+    return { id, path: up ? up.path : '', url: up ? up.url : '', uploaded: !!up, uploadError };
   }
 
-  async function saveInspection(meta, pdfBase64) {
-    const name = fileName(meta.vehicle_rego);
-    const up = await uploadPdf(CONFIG.STORAGE.inspections, name, pdfBase64);
-    await logRow('inspection_reports', { ...meta, pdf_path: up.path });
-    return up;
+  async function updateDoc(table, bucket, id, name, meta, pdfBase64) {
+    await patchRow(table, id, meta);
+    let up = null, uploadError = null;
+    try {
+      up = await uploadPdf(bucket, name, pdfBase64);
+    } catch (e) { uploadError = e; }
+    if (up) { try { await patchRow(table, id, { pdf_path: up.path }); } catch (_) {} }
+    return { id, path: up ? up.path : '', url: up ? up.url : '', uploaded: !!up, uploadError };
   }
 
-  // Edit an existing invoice/report: upload a fresh PDF and patch the row.
-  async function updateInvoice(id, meta, pdfBase64) {
-    const name = fileName(meta.vehicle_rego, meta.invoice_number ? String(meta.invoice_number).replace(/[^A-Za-z0-9]/g, '') : '');
-    const up = await uploadPdf(CONFIG.STORAGE.invoices, name, pdfBase64);
-    await patchRow('invoices', id, { ...meta, pdf_path: up.path });
-    return up;
-  }
-  async function updateInspection(id, meta, pdfBase64) {
-    const name = fileName(meta.vehicle_rego);
-    const up = await uploadPdf(CONFIG.STORAGE.inspections, name, pdfBase64);
-    await patchRow('inspection_reports', id, { ...meta, pdf_path: up.path });
-    return up;
-  }
+  const invoiceFile = (meta) => fileName(meta.vehicle_rego, meta.invoice_number ? String(meta.invoice_number).replace(/[^A-Za-z0-9]/g, '') : '');
+
+  const saveInvoice = (meta, b64) =>
+    saveDoc('invoices', CONFIG.STORAGE.invoices, invoiceFile(meta), meta, b64);
+  const saveInspection = (meta, b64) =>
+    saveDoc('inspection_reports', CONFIG.STORAGE.inspections, fileName(meta.vehicle_rego), meta, b64);
+  const updateInvoice = (id, meta, b64) =>
+    updateDoc('invoices', CONFIG.STORAGE.invoices, id, invoiceFile(meta), meta, b64);
+  const updateInspection = (id, meta, b64) =>
+    updateDoc('inspection_reports', CONFIG.STORAGE.inspections, id, fileName(meta.vehicle_rego), meta, b64);
 
   window.MMQLD_STORE = { fileName, uploadPdf, saveInvoice, saveInspection, updateInvoice, updateInspection, objectExists, _tag: tag };
 })();

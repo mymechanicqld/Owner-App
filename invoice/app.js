@@ -467,23 +467,38 @@ $('#addSelectedBtn').addEventListener('click', () => {
   toast(added + (added > 1 ? ' items' : ' item') + ' added');
 });
 
-// Save draft
-$('#saveBtn').addEventListener('click', () => {
-  saveDraft();
-});
-
-// Export PDF
-$('#pdfBtn').addEventListener('click', async (e) => {
+/* Save — writes the invoice to the records so it shows in the Invoices list.
+   (A local draft is kept too, so an unsent invoice survives a page reload.) */
+$('#saveBtn').addEventListener('click', async (e) => {
   const btn = e.currentTarget;
   if (btn.classList.contains('fab__btn--loading')) return;
+  if (typeof pdfMake === 'undefined') { toast('Still loading, try again in a second', 'error'); return; }
   btn.classList.add('fab__btn--loading');
+  saveDraft({ quiet: true });
   try {
-    await exportPdf();
+    const docDef = buildInvoiceDoc(compute(), window.MMQLD_ASSETS);
+    const b64 = await new Promise((res, rej) => {
+      try { pdfMake.createPdf(docDef).getBase64(res); } catch (err) { rej(err); }
+    });
+    await saveInvoiceRecord(b64);
+    bumpInvoiceCounter();
   } catch (err) {
     console.error(err);
-    toast('PDF export failed: ' + (err.message || err), 'error');
+    toast('Could not save: ' + String((err && err.message) || err).slice(0, 120), 'error');
   } finally {
     btn.classList.remove('fab__btn--loading');
+  }
+});
+
+/* Open — shows the invoice PDF. Called synchronously so iOS does not treat the
+   new tab as a blocked pop-up (pdfmake opens the window before it renders). */
+$('#pdfBtn').addEventListener('click', () => {
+  if (typeof pdfMake === 'undefined') { toast('PDF library still loading. Try again in a second.', 'error'); return; }
+  try {
+    pdfMake.createPdf(buildInvoiceDoc(compute(), window.MMQLD_ASSETS)).open();
+  } catch (err) {
+    console.error(err);
+    toast('Could not open: ' + (err.message || err), 'error');
   }
 });
 
@@ -497,7 +512,7 @@ function loadDrafts() {
   catch { return []; }
 }
 
-function saveDraft() {
+function saveDraft(opts) {
   const drafts = loadDrafts();
   const t = compute();
   const id = state.invoice.number || uid();
@@ -513,7 +528,7 @@ function saveDraft() {
   if (i >= 0) drafts[i] = draft;
   else drafts.unshift(draft);
   localStorage.setItem(DRAFTS_KEY, JSON.stringify(drafts.slice(0, 30)));
-  toast('Draft saved.', 'success');
+  if (!(opts && opts.quiet)) toast('Draft saved.', 'success');
 }
 
 function renderDrafts() {
@@ -596,31 +611,6 @@ const COLOR = {
   dangerBg:    '#FEE2E2',
 };
 
-async function exportPdf() {
-  if (typeof pdfMake === 'undefined') {
-    throw new Error('PDF library still loading. Try again in a second.');
-  }
-  toast('Generating PDF…');
-
-  const t = compute();
-  const A = window.MMQLD_ASSETS;
-  const filename = (state.invoice.number || 'invoice') + '.pdf';
-
-  const docDef = buildInvoiceDoc(t, A);
-
-  await new Promise((resolve, reject) => {
-    try {
-      pdfMake.createPdf(docDef).download(filename, () => resolve());
-    } catch (err) { reject(err); }
-  });
-
-  // Also log the record to Supabase (does not block the download).
-  pdfMake.createPdf(docDef).getBase64(b64 => saveInvoiceRecord(b64));
-
-  bumpInvoiceCounter();
-  toast('PDF downloaded.', 'success');
-}
-
 /* ────────────────────────────────────────────────────────────────────
    Save record to Supabase — logs the computed invoice + uploads the PDF.
    Never blocks export/send; failure just shows a soft toast.
@@ -656,12 +646,21 @@ async function saveInvoiceRecord(b64) {
       // Full state so the invoice can be reopened and edited losslessly.
       state:          JSON.parse(JSON.stringify(state)),
     };
-    if (EDIT_ID) await MMQLD_STORE.updateInvoice(EDIT_ID, meta, b64);
-    else await MMQLD_STORE.saveInvoice(meta, b64);
-    toast(EDIT_ID ? 'Invoice updated' : 'Saved to records', 'success');
+    const res = EDIT_ID
+      ? await MMQLD_STORE.updateInvoice(EDIT_ID, meta, b64)
+      : await MMQLD_STORE.saveInvoice(meta, b64);
+    if (res && res.id) EDIT_ID = res.id;   // further saves update the same record
+    if (res && !res.uploaded) {
+      // The record is safe; only the PDF copy did not upload.
+      toast('Invoice saved (PDF copy could not upload)', 'success');
+    } else {
+      toast('This invoice has been saved', 'success');
+    }
+    return true;
   } catch (err) {
     console.error(err);
-    toast('Could not save: ' + String((err && err.message) || err).slice(0, 200));
+    toast('Could not save: ' + String((err && err.message) || err).slice(0, 200), 'error');
+    return false;
   }
 }
 
@@ -1238,7 +1237,8 @@ async function sendToClient(btn) {
   const t = compute();
   const A = window.MMQLD_ASSETS;
   const docDef = buildInvoiceDoc(t, A);
-  const firstName = (PREFILL.name || '').split(/\s+/)[0] || 'there';
+  // Greet the contact person; fall back to the business name, then a neutral hello.
+  const firstName = (state.customer.name || PREFILL.name || state.customer.business || '').split(/\s+/)[0] || 'there';
   const filename = 'invoice-' + (state.invoice.number || 'mmqld') + '.pdf';
   const subject = 'Invoice from ' + CONFIG.BUSINESS_NAME;
   const bodyText =

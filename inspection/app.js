@@ -567,19 +567,35 @@ $('#newBtn').addEventListener('click', () => {
   toast('New report started.');
 });
 
-$('#saveBtn').addEventListener('click', saveDraft);
-
-$('#pdfBtn').addEventListener('click', async (e) => {
+/* Save — writes the report to the records so it shows in the Reports list. */
+$('#saveBtn').addEventListener('click', async (e) => {
   const btn = e.currentTarget;
   if (btn.classList.contains('fab__btn--loading')) return;
+  if (typeof pdfMake === 'undefined') { toast('Still loading, try again in a second', 'error'); return; }
   btn.classList.add('fab__btn--loading');
+  saveDraft({ quiet: true });
   try {
-    await exportPdf();
+    const b64 = await new Promise((res, rej) => {
+      try { pdfMake.createPdf(buildReportDoc()).getBase64(res); } catch (err) { rej(err); }
+    });
+    await saveInspectionRecord(b64);
+    bumpReportCounter();
   } catch (err) {
     console.error(err);
-    toast('PDF export failed: ' + (err.message || err), 'error');
+    toast('Could not save: ' + String((err && err.message) || err).slice(0, 120), 'error');
   } finally {
     btn.classList.remove('fab__btn--loading');
+  }
+});
+
+/* Open — shows the report PDF. Synchronous so iOS does not block the new tab. */
+$('#pdfBtn').addEventListener('click', () => {
+  if (typeof pdfMake === 'undefined') { toast('PDF library still loading. Try again in a second.', 'error'); return; }
+  try {
+    pdfMake.createPdf(buildReportDoc()).open();
+  } catch (err) {
+    console.error(err);
+    toast('Could not open: ' + (err.message || err), 'error');
   }
 });
 
@@ -589,7 +605,7 @@ function loadDrafts() {
   try { return JSON.parse(localStorage.getItem(DRAFTS_KEY) || '[]'); }
   catch { return []; }
 }
-function saveDraft() {
+function saveDraft(opts) {
   try {
     const drafts = loadDrafts();
     const id = state.reportNumber || uid();
@@ -605,7 +621,7 @@ function saveDraft() {
     if (i >= 0) drafts[i] = draft;
     else drafts.unshift(draft);
     localStorage.setItem(DRAFTS_KEY, JSON.stringify(drafts.slice(0, 5)));
-    toast('Draft saved.', 'success');
+    if (!(opts && opts.quiet)) toast('Draft saved.', 'success');
   } catch (err) {
     toast('Could not save (storage full — too many images). Export the PDF instead.', 'error');
   }
@@ -734,29 +750,19 @@ async function saveInspectionRecord(b64) {
       // Full state so the report can be reopened and edited losslessly.
       state:           JSON.parse(JSON.stringify(state)),
     };
-    if (EDIT_ID) await MMQLD_STORE.updateInspection(EDIT_ID, meta, b64);
-    else await MMQLD_STORE.saveInspection(meta, b64);
-    toast(EDIT_ID ? 'Report updated' : 'Saved to records', 'success');
+    const res = EDIT_ID
+      ? await MMQLD_STORE.updateInspection(EDIT_ID, meta, b64)
+      : await MMQLD_STORE.saveInspection(meta, b64);
+    if (res && res.id) EDIT_ID = res.id;   // further saves update the same record
+    toast(res && !res.uploaded
+      ? 'Report saved (PDF copy could not upload)'
+      : 'This report has been saved', 'success');
+    return true;
   } catch (err) {
     console.error(err);
-    toast('Could not save: ' + String((err && err.message) || err).slice(0, 200));
+    toast('Could not save: ' + String((err && err.message) || err).slice(0, 200), 'error');
+    return false;
   }
-}
-
-async function exportPdf() {
-  if (typeof pdfMake === 'undefined') throw new Error('PDF library still loading');
-  toast('Generating PDF…');
-  const filename = (state.reportNumber || 'inspection') + '.pdf';
-  const doc = buildReportDoc();
-  await new Promise((resolve, reject) => {
-    try {
-      pdfMake.createPdf(doc).download(filename, () => resolve());
-    } catch (err) { reject(err); }
-  });
-  // Log the record to Supabase (non-blocking — must not break the download)
-  pdfMake.createPdf(doc).getBase64(b64 => saveInspectionRecord(b64));
-  bumpReportCounter();
-  toast('PDF downloaded.', 'success');
 }
 
 function buildReportDoc() {
