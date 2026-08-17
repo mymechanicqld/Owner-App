@@ -825,29 +825,65 @@ async function deleteLog(kind, table, bucket, id) {
 
 /* ------------------------------------------------------------ gmail (GIS) -- */
 let tokenClient = null, tokenResolver = null;
-// Shared token cache (same key as gmail-send.js) so a consent granted on a
-// generator page is reused here and vice-versa, for the token's lifetime.
+/* Shared token cache (same key as gmail-send.js) so a consent granted on a
+   generator page is reused here and vice-versa. localStorage, not
+   sessionStorage, so closing the app does not force re-authorising. */
 const TOK_KEY = 'mmqld_gtok';
-function cachedGToken() { try { const o = JSON.parse(sessionStorage.getItem(TOK_KEY) || 'null'); if (o && o.t && Date.now() < o.e) return o; } catch (_) {} return null; }
-function getToken() {
-  return new Promise((resolve, reject) => {
-    if (STATE.gtoken && Date.now() < STATE.gexp) return resolve(STATE.gtoken);
-    const c = cachedGToken(); if (c) { STATE.gtoken = c.t; STATE.gexp = c.e; return resolve(STATE.gtoken); }
-    if (!window.google || !google.accounts || !google.accounts.oauth2) return reject(new Error('Google sign-in still loading, try again'));
-    if (CONFIG.GOOGLE_CLIENT_ID.startsWith('PASTE_')) return reject(new Error('Set GOOGLE_CLIENT_ID in config.js'));
-    if (!tokenClient) {
-      tokenClient = google.accounts.oauth2.initTokenClient({
-        client_id: CONFIG.GOOGLE_CLIENT_ID,
-        scope: 'https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/gmail.send',
-        callback: (resp) => {
-          if (resp.error) return tokenResolver && tokenResolver.reject(new Error(resp.error));
-          STATE.gtoken = resp.access_token;
-          STATE.gexp = Date.now() + ((resp.expires_in || 3600) - 60) * 1000;
-          try { sessionStorage.setItem(TOK_KEY, JSON.stringify({ t: STATE.gtoken, e: STATE.gexp })); } catch (_) {}
-          tokenResolver && tokenResolver.resolve(STATE.gtoken);
-        },
-      });
+function cachedGToken() { try { const o = JSON.parse(localStorage.getItem(TOK_KEY) || 'null'); if (o && o.t && Date.now() < o.e) return o; } catch (_) {} return null; }
+/* Google Identity Services loads async from Google's CDN and is often not ready
+   when the owner first taps Send. Wait for it (re-injecting the script if the
+   tag never loaded) rather than failing immediately. */
+const GIS_SRC = 'https://accounts.google.com/gsi/client';
+const gisReady = () => !!(window.google && google.accounts && google.accounts.oauth2);
+let gisWait = null;
+function ensureGis(timeoutMs) {
+  if (gisReady()) return Promise.resolve();
+  if (gisWait) return gisWait;
+  gisWait = new Promise((resolve, reject) => {
+    if (!document.querySelector('script[src^="' + GIS_SRC + '"]')) {
+      const s = document.createElement('script');
+      s.src = GIS_SRC; s.async = true; s.defer = true;
+      document.head.appendChild(s);
     }
+    const deadline = Date.now() + (timeoutMs || 15000);
+    (function poll() {
+      if (gisReady()) return resolve();
+      if (Date.now() > deadline) {
+        gisWait = null;
+        return reject(new Error('Google sign-in could not load. Check your connection and try again.'));
+      }
+      setTimeout(poll, 150);
+    })();
+  });
+  return gisWait;
+}
+async function getToken() {
+  if (STATE.gtoken && Date.now() < STATE.gexp) return STATE.gtoken;
+  const c = cachedGToken();
+  if (c) { STATE.gtoken = c.t; STATE.gexp = c.e; return STATE.gtoken; }
+  await ensureGis();
+  if (CONFIG.GOOGLE_CLIENT_ID.startsWith('PASTE_')) throw new Error('Set GOOGLE_CLIENT_ID in config.js');
+  if (!tokenClient) {
+    tokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: CONFIG.GOOGLE_CLIENT_ID,
+      scope: 'https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/gmail.send',
+      callback: (resp) => {
+        if (resp.error) return tokenResolver && tokenResolver.reject(new Error(resp.error === 'popup_closed_by_user'
+          ? 'Google sign-in was closed before finishing' : resp.error));
+        STATE.gtoken = resp.access_token;
+        STATE.gexp = Date.now() + ((resp.expires_in || 3600) - 60) * 1000;
+        try { localStorage.setItem(TOK_KEY, JSON.stringify({ t: STATE.gtoken, e: STATE.gexp })); } catch (_) {}
+        tokenResolver && tokenResolver.resolve(STATE.gtoken);
+      },
+      error_callback: (e) => {
+        const t = (e && e.type) || '';
+        tokenResolver && tokenResolver.reject(new Error(t === 'popup_failed_to_open'
+          ? 'Google sign-in was blocked. Allow pop-ups for this site, then tap Send again.'
+          : 'Google sign-in did not complete. Please try again.'));
+      },
+    });
+  }
+  return new Promise((resolve, reject) => {
     tokenResolver = { resolve, reject };
     // Empty prompt: consent screen only if not already granted, then silent.
     tokenClient.requestAccessToken({ prompt: '' });
@@ -989,6 +1025,8 @@ function boot() {
   icons();
   loadData();
   setInterval(() => loadData(false), 60000);
+  // Warm Google's sign-in script so the first Send does not wait on it.
+  ensureGis(20000).catch(() => {});
   // NOTE: we deliberately do NOT register a service worker. A controlling SW
   // triggers an iOS WebKit bug where cross-origin POSTs (PDF uploads) fail with
   // "Load failed". The kill-switch in each page's <head> removes any old one.

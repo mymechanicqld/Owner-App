@@ -7,30 +7,72 @@
 (function () {
   let tokenClient = null, pending = null, token = null, exp = 0;
 
-  // Shared across the app + generator pages so a consent granted anywhere is
-  // reused everywhere for the life of the access token (no repeat prompts).
+  /* Shared across the app + generator pages so a consent granted anywhere is
+     reused everywhere. localStorage (not sessionStorage) so closing the app
+     does not force the owner to authorise again — Google access tokens last
+     about an hour, and once the grant exists Google reissues them without
+     showing the consent screen again. */
   const TOK_KEY = 'mmqld_gtok';
-  function cachedToken() { try { const o = JSON.parse(sessionStorage.getItem(TOK_KEY) || 'null'); if (o && o.t && Date.now() < o.e) return o; } catch (_) {} return null; }
-  function storeToken(t, e) { try { sessionStorage.setItem(TOK_KEY, JSON.stringify({ t: t, e: e })); } catch (_) {} }
+  function cachedToken() { try { const o = JSON.parse(localStorage.getItem(TOK_KEY) || 'null'); if (o && o.t && Date.now() < o.e) return o; } catch (_) {} return null; }
+  function storeToken(t, e) { try { localStorage.setItem(TOK_KEY, JSON.stringify({ t: t, e: e })); } catch (_) {} }
 
-  function getToken() {
-    return new Promise((resolve, reject) => {
-      if (token && Date.now() < exp) return resolve(token);
-      const c = cachedToken(); if (c) { token = c.t; exp = c.e; return resolve(token); }
-      if (!window.google || !google.accounts || !google.accounts.oauth2) return reject(new Error('Google sign-in still loading, try again'));
-      if (!window.CONFIG || String(CONFIG.GOOGLE_CLIENT_ID).indexOf('PASTE_') === 0) return reject(new Error('Google client id not set in config.js'));
-      if (!tokenClient) {
-        tokenClient = google.accounts.oauth2.initTokenClient({
-          client_id: CONFIG.GOOGLE_CLIENT_ID,
-          scope: 'https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/gmail.send',
-          callback: (r) => {
-            if (r.error) return pending && pending.reject(new Error(r.error));
-            token = r.access_token; exp = Date.now() + ((r.expires_in || 3600) - 60) * 1000;
-            storeToken(token, exp);
-            pending && pending.resolve(token);
-          },
-        });
+  /* Google Identity Services is loaded async from Google's CDN. On a phone it
+     is often not ready by the time the owner taps Send, and the tag can fail
+     outright on a flaky connection. Wait for it (re-injecting the script if it
+     never arrived) instead of giving up on the first try. */
+  const GIS_SRC = 'https://accounts.google.com/gsi/client';
+  const gisReady = () => !!(window.google && google.accounts && google.accounts.oauth2);
+  let gisWait = null;
+  function ensureGis(timeoutMs) {
+    if (gisReady()) return Promise.resolve();
+    if (gisWait) return gisWait;
+    gisWait = new Promise((resolve, reject) => {
+      if (!document.querySelector('script[src^="' + GIS_SRC + '"]')) {
+        const s = document.createElement('script');
+        s.src = GIS_SRC; s.async = true; s.defer = true;
+        document.head.appendChild(s);
       }
+      const deadline = Date.now() + (timeoutMs || 15000);
+      (function poll() {
+        if (gisReady()) return resolve();
+        if (Date.now() > deadline) {
+          gisWait = null;
+          return reject(new Error('Google sign-in could not load. Check your connection and try again.'));
+        }
+        setTimeout(poll, 150);
+      })();
+    });
+    return gisWait;
+  }
+
+  async function getToken() {
+    if (token && Date.now() < exp) return token;
+    const c = cachedToken();
+    if (c) { token = c.t; exp = c.e; return token; }
+    await ensureGis();
+    if (!window.CONFIG || String(CONFIG.GOOGLE_CLIENT_ID).indexOf('PASTE_') === 0) {
+      throw new Error('Google client id not set in config.js');
+    }
+    if (!tokenClient) {
+      tokenClient = google.accounts.oauth2.initTokenClient({
+        client_id: CONFIG.GOOGLE_CLIENT_ID,
+        scope: 'https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/gmail.send',
+        callback: (r) => {
+          if (r.error) return pending && pending.reject(new Error(r.error === 'popup_closed_by_user'
+            ? 'Google sign-in was closed before finishing' : r.error));
+          token = r.access_token; exp = Date.now() + ((r.expires_in || 3600) - 60) * 1000;
+          storeToken(token, exp);
+          pending && pending.resolve(token);
+        },
+        error_callback: (e) => {
+          const t = (e && e.type) || '';
+          pending && pending.reject(new Error(t === 'popup_failed_to_open'
+            ? 'Google sign-in was blocked. Allow pop-ups for this site, then tap Send again.'
+            : 'Google sign-in did not complete. Please try again.'));
+        },
+      });
+    }
+    return new Promise((resolve, reject) => {
       pending = { resolve, reject };
       // Empty prompt: Google shows the consent screen only if not already
       // granted, then issues tokens silently. (Was 'consent', which forced the
@@ -94,5 +136,9 @@
     return gFetch('/users/me/messages/send', { method: 'POST', body: JSON.stringify(payload) });
   }
 
-  window.MMQLD_GMAIL = { findThread, sendWithAttachment };
+  // Warm the Google script as soon as the page is up, so the first Send does
+  // not have to wait for it.
+  if (!gisReady()) ensureGis(20000).catch(() => {});
+
+  window.MMQLD_GMAIL = { findThread, sendWithAttachment, getToken, ensureGis };
 })();

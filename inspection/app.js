@@ -1392,6 +1392,18 @@ My Mechanic QLD
   const original = btn.innerHTML;
   btn.disabled = true;
   btn.classList.add('fab__btn--loading');
+
+  // Sign in FIRST, while the tap is still fresh: Google opens a pop-up and
+  // mobile browsers block one that appears long after the user's gesture.
+  try {
+    toast('Checking Google sign-in…');
+    await MMQLD_GMAIL.getToken();
+  } catch (err) {
+    console.error(err);
+    toast(err.message || String(err), 'error');
+    btn.disabled = false; btn.classList.remove('fab__btn--loading'); btn.innerHTML = original;
+    return;
+  }
   toast('Sending to client…');
 
   pdfMake.createPdf(docDef).getBase64(async (b64) => {
