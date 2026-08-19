@@ -341,3 +341,147 @@ input, textarea, select { font-family: inherit; font-size: 16px; } /* 16px stops
 .paypill.pp-paid { background: #D1FAE5; color: #047857; }
 .paypill.pp-partial { background: #FEF3C7; color: #B45309; }
 .paypill.pp-out { background: #FEE2E2; color: #B91C1C; }
+
+/* ============================================================================
+   Ashley - the assistant screen
+   The chat owns the whole area under the header: its own scroller for the
+   conversation and an input bar pinned just above the bottom nav.
+   ========================================================================== */
+/* The bottom nav is fixed, so reserve its height here: otherwise the chat's
+   input bar sits underneath it. */
+body.ash-mode .main { padding: 0 0 calc(var(--nav-h) + var(--safe-b)); overflow: hidden; }
+#view-ashley.active { display: flex; flex-direction: column; height: 100%; animation: none; }
+
+.ash { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+.ash__log {
+  flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch;
+  padding: 16px 16px 8px; display: flex; flex-direction: column; gap: 12px;
+}
+
+/* welcome state */
+.ash-hello { margin: auto 0; text-align: center; padding: 8px 6px 20px; }
+.ash-face {
+  width: 58px; height: 58px; border-radius: 18px; margin: 0 auto 14px;
+  background: linear-gradient(150deg, var(--accent) 0%, var(--accent-bright) 100%);
+  color: #fff; display: grid; place-items: center; box-shadow: var(--shadow);
+}
+.ash-face svg { width: 27px; height: 27px; }
+.ash-hello h3 { font-size: 21px; font-weight: 800; letter-spacing: -0.02em; }
+.ash-hello p { font-size: 14px; color: var(--muted); margin: 8px auto 0; max-width: 320px; line-height: 1.55; }
+.ash-starters { display: flex; flex-direction: column; gap: 8px; margin-top: 20px; }
+.ash-starter {
+  padding: 13px 16px; border-radius: 13px; background: var(--surface);
+  border: 1px solid var(--hairline); box-shadow: var(--shadow-sm);
+  font-size: 14.5px; font-weight: 600; color: var(--ink); text-align: left;
+}
+.ash-starter:active { background: var(--accent-soft); border-color: var(--accent-tint); }
+
+/* messages */
+.ash-msg { max-width: 88%; padding: 12px 15px; border-radius: 17px; font-size: 15px; line-height: 1.55; }
+.ash-msg.me {
+  align-self: flex-end; background: var(--accent); color: #fff;
+  border-bottom-right-radius: 6px; white-space: pre-wrap; word-break: break-word;
+}
+.ash-msg.her {
+  align-self: flex-start; background: var(--surface); border: 1px solid var(--hairline);
+  border-bottom-left-radius: 6px; box-shadow: var(--shadow-sm);
+}
+.ash-msg.her p { margin: 0 0 8px; }
+.ash-msg.her p:last-child { margin-bottom: 0; }
+.ash-msg.her b { font-weight: 700; }
+.ash-msg.her ul { margin: 4px 0 8px; padding-left: 18px; }
+.ash-msg.her ul:last-child { margin-bottom: 0; }
+.ash-msg.her li { margin: 3px 0; }
+.ash-msg.her code { font-family: var(--mono); font-size: 13px; background: var(--soft); padding: 1px 5px; border-radius: 5px; }
+
+.ash-note { align-self: center; font-size: 12px; font-weight: 600; color: var(--faint); }
+.ash-err {
+  align-self: flex-start; max-width: 88%; display: flex; gap: 9px; align-items: flex-start;
+  background: var(--st-lost-bg); color: #7F1D2D; border-radius: 14px; padding: 11px 14px; font-size: 14px;
+}
+.ash-err svg { width: 17px; height: 17px; flex: 0 0 auto; margin-top: 1px; }
+
+/* shortcut / Messages buttons Ashley can offer */
+.ash-link {
+  align-self: flex-start; display: inline-flex; align-items: center; gap: 8px;
+  padding: 11px 15px; border-radius: 12px; background: var(--accent-soft);
+  border: 1px solid var(--accent-tint); color: var(--accent); font-size: 14px; font-weight: 700;
+}
+.ash-link svg { width: 16px; height: 16px; }
+.ash-link:active { background: var(--accent-tint); }
+
+.ash-clear {
+  align-self: center; display: inline-flex; align-items: center; gap: 7px;
+  margin: 6px 0 2px; padding: 8px 14px; border-radius: 999px;
+  font-size: 12.5px; font-weight: 600; color: var(--subtle); border: 1px solid var(--hairline);
+}
+.ash-clear svg { width: 14px; height: 14px; }
+
+/* thinking strip */
+.ash-tmp { display: contents; }
+.ash-think {
+  align-self: flex-start; display: flex; align-items: center; gap: 10px;
+  background: var(--surface); border: 1px solid var(--hairline); border-radius: 14px;
+  padding: 11px 15px; box-shadow: var(--shadow-sm); max-width: 88%;
+}
+.ash-think__t { font-size: 13.5px; font-weight: 600; color: var(--muted); }
+.ash-dots { display: inline-flex; gap: 4px; }
+.ash-dots i { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); animation: ashb 1.1s infinite ease-in-out; }
+.ash-dots i:nth-child(2) { animation-delay: 0.16s; }
+.ash-dots i:nth-child(3) { animation-delay: 0.32s; }
+@keyframes ashb { 0%, 70%, 100% { opacity: 0.25; transform: translateY(0); } 35% { opacity: 1; transform: translateY(-3px); } }
+
+/* confirmation card */
+.ash-conf {
+  align-self: stretch; background: var(--surface); border: 1px solid var(--accent-tint);
+  border-radius: 16px; overflow: hidden; box-shadow: var(--shadow);
+}
+.ash-conf.danger { border-color: var(--st-lost-bg); }
+.ash-conf__head {
+  display: flex; align-items: center; gap: 9px; padding: 13px 16px;
+  background: var(--accent-soft); color: var(--accent); font-size: 14.5px; font-weight: 800;
+}
+.ash-conf.danger .ash-conf__head { background: var(--st-lost-bg); color: #7F1D2D; }
+.ash-conf__head svg { width: 18px; height: 18px; }
+.ash-conf__rows { padding: 4px 16px; }
+.ash-conf__row {
+  display: flex; gap: 12px; justify-content: space-between; align-items: baseline;
+  padding: 9px 0; border-bottom: 1px solid var(--hairline); font-size: 14px;
+}
+.ash-conf__row:last-child { border-bottom: none; }
+.ash-conf__row span { color: var(--subtle); flex: 0 0 auto; font-weight: 600; }
+.ash-conf__row b { text-align: right; word-break: break-word; }
+.ash-conf__body {
+  margin: 6px 16px 0; padding: 12px 14px; background: var(--soft); border-radius: 11px;
+  font-size: 13.5px; line-height: 1.55; white-space: pre-wrap; max-height: 240px; overflow-y: auto; color: var(--muted);
+}
+.ash-conf__acts { display: grid; grid-template-columns: 1fr 1.3fr; gap: 10px; padding: 14px 16px 16px; }
+
+/* input bar */
+.ash__bar {
+  flex: 0 0 auto; display: flex; gap: 9px; align-items: flex-end;
+  padding: 10px 12px;
+  background: rgba(255,255,255,0.94); backdrop-filter: saturate(160%) blur(14px);
+  border-top: 1px solid var(--hairline);
+}
+.ash__bar textarea {
+  flex: 1; resize: none; max-height: 132px; padding: 12px 15px; line-height: 1.45;
+  border: 1px solid var(--hairline); border-radius: 21px; background: var(--surface); color: var(--ink);
+}
+.ash__bar textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(30,58,138,0.11); }
+.ash__send {
+  flex: 0 0 auto; width: 43px; height: 43px; border-radius: 50%;
+  background: var(--accent); color: #fff; display: grid; place-items: center;
+}
+.ash__send svg { width: 20px; height: 20px; stroke-width: 2.4; }
+.ash__send:active { background: var(--accent-hover); }
+.ash__send.stop { background: var(--rose); }
+
+/* Ashley's slot in the bottom nav gets a touch more presence than the rest. */
+.nav button[data-view="ashley"] svg { stroke-width: 2.1; }
+.nav button[data-view="ashley"].active svg { stroke-width: 2.4; }
+/* The message list and the transient strip are separate children of the
+   scroller, so a background data refresh can rebuild the messages without
+   destroying an open confirmation card. */
+.ash__msgs, .ash__tmp { display: flex; flex-direction: column; gap: 12px; }
+.ash__tmp:empty { display: none; }

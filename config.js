@@ -17,6 +17,7 @@ const _RAMBLED = {
   url: '117.129.129.125.128.71.60.60.113.114.125.113.130.131.119.112.121.114.121.134.120.126.112.123.117.121.128.122.59.128.130.125.110.111.110.128.114.59.112.124',
   key: '128.111.108.125.130.111.121.118.128.117.110.111.121.114.108.112.116.88.62.88.102.95.121.89.127.102.127.123.62.102.119.117.94.97.99.112.116.108.117.96.87.135.112.92.133.127',
   cid: '69.69.68.67.68.65.62.61.62.67.66.68.58.130.70.110.123.121.131.114.70.122.115.62.125.62.120.123.64.61.123.126.114.128.115.126.115.121.113.121.68.130.122.113.63.59.110.125.125.128.59.116.124.124.116.121.114.130.128.114.127.112.124.123.129.114.123.129.59.112.124.122',
+  ash: '122.122.126.108.110.103.118.96.110.121.124.68.111.133.122.119.132.110.111.125.130.103.94.128.67.81.111.134.108.61.127.96.102.93.103.85',
 };
 
 const CONFIG = {
@@ -26,6 +27,23 @@ const CONFIG = {
 
   // --- Google Web OAuth client id (send threaded Gmail replies) -----------
   GOOGLE_CLIENT_ID: _unramble(_RAMBLED.cid),
+
+  // --- Ashley, the assistant ----------------------------------------------
+  // This app is a PUBLIC repo, so the OpenRouter key is NOT here. It lives in
+  // the website's Vercel environment variables and the app calls the website's
+  // /api/ashley/ endpoint instead. APP_KEY is only a shared handshake so the
+  // endpoint ignores random traffic; it is obscurity, not a secret. If the
+  // endpoint ever gets abused, change ASHLEY_APP_KEY in Vercel and re-ramble
+  // it here. Trailing slash matters: the site uses trailing-slash URLs and a
+  // redirect would break the browser's CORS preflight.
+  ASHLEY: {
+    ENDPOINT: (function () {
+      try { const o = localStorage.getItem('mmqld_ashley_endpoint'); if (o) return o; } catch (_) {}
+      const local = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+      return local ? 'http://localhost:3000/api/ashley/' : 'https://mymechanicqld.com.au/api/ashley/';
+    })(),
+    APP_KEY: _unramble(_RAMBLED.ash),
+  },
 
   // --- Optional passcode gate ---------------------------------------------
   // Leave empty for no gate (current choice). Set a PIN (e.g. '4821') later to

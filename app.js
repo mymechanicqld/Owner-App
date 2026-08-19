@@ -147,6 +147,8 @@ function setView(v) {
   document.querySelectorAll('.nav button').forEach((b) => b.classList.toggle('active', b.dataset.view === v));
   document.querySelectorAll('#sidebar-nav button[data-view]').forEach((b) => b.classList.toggle('active', b.dataset.view === v));
   closeSidebar();
+  // Ashley manages her own scrolling, so the outer scroller stands down.
+  document.body.classList.toggle('ash-mode', v === 'ashley');
   $('.main').scrollTop = 0;
   render();
   icons();
@@ -157,6 +159,7 @@ function render() {
   else if (STATE.view === 'calendar') renderCalendar();
   else if (STATE.view === 'search') renderSearch();
   else if (STATE.view === 'analytics') renderAnalytics();
+  else if (STATE.view === 'ashley') { if (typeof renderAshley === 'function') renderAshley(); }
   else if (STATE.view === 'invoices') renderInvoices();
   else if (STATE.view === 'inspections') renderInspections();
   icons();

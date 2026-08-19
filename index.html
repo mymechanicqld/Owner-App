@@ -29,7 +29,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="My Mechanic QLD" />
   <title>My Mechanic QLD</title>
-  <link rel="stylesheet" href="styles.css?v=30" />
+  <link rel="stylesheet" href="styles.css?v=31" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
@@ -52,6 +52,7 @@
     <section class="view" id="view-calendar"></section>
     <section class="view" id="view-search"></section>
     <section class="view" id="view-analytics"></section>
+    <section class="view" id="view-ashley"></section>
     <section class="view" id="view-invoices"></section>
     <section class="view" id="view-inspections"></section>
   </main>
@@ -61,7 +62,7 @@
     <button data-view="inquiries"><i data-lucide="inbox"></i>Inquiries</button>
     <button data-view="calendar"><i data-lucide="calendar"></i>Calendar</button>
     <button data-view="search"><i data-lucide="search"></i>Search</button>
-    <button data-view="analytics"><i data-lucide="bar-chart-3"></i>Analytics</button>
+    <button data-view="ashley"><i data-lucide="sparkles"></i>Ashley</button>
   </nav>
 </div>
 
@@ -77,8 +78,9 @@
     <button data-view="inquiries"><i data-lucide="inbox"></i>Inquiries</button>
     <button data-view="calendar"><i data-lucide="calendar"></i>Calendar</button>
     <button data-view="search"><i data-lucide="search"></i>Search</button>
-    <button data-view="analytics"><i data-lucide="bar-chart-3"></i>Analytics</button>
+    <button data-view="ashley"><i data-lucide="sparkles"></i>Ashley</button>
     <div class="sidebar__divider"></div>
+    <button data-view="analytics"><i data-lucide="bar-chart-3"></i>Analytics</button>
     <button data-view="invoices"><i data-lucide="file-text"></i>Invoices</button>
     <button data-view="inspections"><i data-lucide="clipboard-check"></i>Inspection reports</button>
     <div class="sidebar__divider"></div>
@@ -104,7 +106,10 @@
 
 <div class="toasts" id="toasts" aria-live="polite"></div>
 
-<script src="config.js?v=30"></script>
-<script src="app.js?v=30"></script>
+<script src="config.js?v=31"></script>
+<script src="app.js?v=31"></script>
+<script src="ashley-tools.js?v=31"></script>
+<script src="ashley-agent.js?v=31"></script>
+<script src="ashley-ui.js?v=31"></script>
 </body>
 </html>
