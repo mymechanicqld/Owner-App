@@ -30,17 +30,22 @@ const CONFIG = {
 
   // --- Ashley, the assistant ----------------------------------------------
   // This app is a PUBLIC repo, so the OpenRouter key is NOT here. It lives in
-  // the website's Vercel environment variables and the app calls the website's
-  // /api/ashley/ endpoint instead. APP_KEY is only a shared handshake so the
-  // endpoint ignores random traffic; it is obscurity, not a secret. If the
-  // endpoint ever gets abused, change ASHLEY_APP_KEY in Vercel and re-ramble
-  // it here. Trailing slash matters: the site uses trailing-slash URLs and a
-  // redirect would break the browser's CORS preflight.
+  // this app's own Vercel environment variables, behind api/ashley.js, which
+  // deploys alongside these files. Normal case: the app calls /api/ashley on
+  // its own origin, so there is no cross-site request at all.
+  //
+  // APP_KEY is only a shared handshake so the endpoint ignores random traffic.
+  // It is obscurity, not a secret. If the endpoint is ever abused, change
+  // ASHLEY_APP_KEY in Vercel and re-ramble the new value into _RAMBLED.ash.
   ASHLEY: {
     ENDPOINT: (function () {
       try { const o = localStorage.getItem('mmqld_ashley_endpoint'); if (o) return o; } catch (_) {}
-      const local = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
-      return local ? 'http://localhost:3000/api/ashley/' : 'https://mymechanicqld.com.au/api/ashley/';
+      const h = location.hostname;
+      // The old GitHub Pages copy has no server of its own, so it reaches
+      // across to the Vercel app. Kept working on purpose: the owner may still
+      // have that URL on his home screen.
+      if (h.endsWith('github.io')) return 'https://mmqld-app.vercel.app/api/ashley';
+      return '/api/ashley';
     })(),
     APP_KEY: _unramble(_RAMBLED.ash),
   },
