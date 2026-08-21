@@ -860,6 +860,20 @@ function ensureGis(timeoutMs) {
   });
   return gisWait;
 }
+/* Google rejects a sign-in outright when the address the app is served from is
+   not on the OAuth client's "Authorized JavaScript origins" list. From the
+   browser that looks identical to the owner closing the pop-up, which sent us
+   chasing pop-up blockers when the app moved to a new URL. Name the real cause
+   and print the address that has to be registered. */
+function gErr(type) {
+  if (type === 'popup_failed_to_open') return 'Google sign-in was blocked. Allow pop-ups for this site, then try again.';
+  if (type === 'popup_closed_by_user') {
+    return 'Google sign-in did not finish. If a Google error page appeared, this app\'s address (' +
+      location.origin + ') still has to be added to the Google sign-in settings.';
+  }
+  return 'Google sign-in did not complete (' + (type || 'unknown') + '). If this keeps happening, check that ' +
+    location.origin + ' is listed in the Google sign-in settings.';
+}
 async function getToken() {
   if (STATE.gtoken && Date.now() < STATE.gexp) return STATE.gtoken;
   const c = cachedGToken();
@@ -871,19 +885,13 @@ async function getToken() {
       client_id: CONFIG.GOOGLE_CLIENT_ID,
       scope: 'https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/gmail.send',
       callback: (resp) => {
-        if (resp.error) return tokenResolver && tokenResolver.reject(new Error(resp.error === 'popup_closed_by_user'
-          ? 'Google sign-in was closed before finishing' : resp.error));
+        if (resp.error) return tokenResolver && tokenResolver.reject(new Error(gErr(resp.error)));
         STATE.gtoken = resp.access_token;
         STATE.gexp = Date.now() + ((resp.expires_in || 3600) - 60) * 1000;
         try { localStorage.setItem(TOK_KEY, JSON.stringify({ t: STATE.gtoken, e: STATE.gexp })); } catch (_) {}
         tokenResolver && tokenResolver.resolve(STATE.gtoken);
       },
-      error_callback: (e) => {
-        const t = (e && e.type) || '';
-        tokenResolver && tokenResolver.reject(new Error(t === 'popup_failed_to_open'
-          ? 'Google sign-in was blocked. Allow pop-ups for this site, then tap Send again.'
-          : 'Google sign-in did not complete. Please try again.'));
-      },
+      error_callback: (e) => { tokenResolver && tokenResolver.reject(new Error(gErr((e && e.type) || ''))); },
     });
   }
   return new Promise((resolve, reject) => {

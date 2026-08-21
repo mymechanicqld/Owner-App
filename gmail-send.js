@@ -45,6 +45,21 @@
     return gisWait;
   }
 
+  /* Google rejects a sign-in outright when the address the app is served from is
+     not on the OAuth client's "Authorized JavaScript origins" list. From the
+     browser that looks identical to the owner closing the pop-up, which sent us
+     chasing pop-up blockers when the app moved to a new URL. Name the real cause
+     and print the address that has to be registered. */
+  function gErr(type) {
+    if (type === 'popup_failed_to_open') return 'Google sign-in was blocked. Allow pop-ups for this site, then try again.';
+    if (type === 'popup_closed_by_user') {
+      return 'Google sign-in did not finish. If a Google error page appeared, this app\'s address (' +
+        location.origin + ') still has to be added to the Google sign-in settings.';
+    }
+    return 'Google sign-in did not complete (' + (type || 'unknown') + '). If this keeps happening, check that ' +
+      location.origin + ' is listed in the Google sign-in settings.';
+  }
+
   async function getToken() {
     if (token && Date.now() < exp) return token;
     const c = cachedToken();
@@ -58,18 +73,12 @@
         client_id: CONFIG.GOOGLE_CLIENT_ID,
         scope: 'https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/gmail.send',
         callback: (r) => {
-          if (r.error) return pending && pending.reject(new Error(r.error === 'popup_closed_by_user'
-            ? 'Google sign-in was closed before finishing' : r.error));
+          if (r.error) return pending && pending.reject(new Error(gErr(r.error)));
           token = r.access_token; exp = Date.now() + ((r.expires_in || 3600) - 60) * 1000;
           storeToken(token, exp);
           pending && pending.resolve(token);
         },
-        error_callback: (e) => {
-          const t = (e && e.type) || '';
-          pending && pending.reject(new Error(t === 'popup_failed_to_open'
-            ? 'Google sign-in was blocked. Allow pop-ups for this site, then tap Send again.'
-            : 'Google sign-in did not complete. Please try again.'));
-        },
+        error_callback: (e) => { pending && pending.reject(new Error(gErr((e && e.type) || ''))); },
       });
     }
     return new Promise((resolve, reject) => {
