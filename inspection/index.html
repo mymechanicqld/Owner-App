@@ -3,6 +3,19 @@
 <head>
 <meta charset="utf-8" />
 <script>
+/* Vercel serves this app on several addresses: the clean one, plus per-branch
+   and per-deployment aliases that sit behind Vercel's own login wall. Google
+   ties Gmail sign-in to the exact address, so landing on one of the others
+   breaks sending with "Error 400: origin_mismatch". Only one address is right. */
+(function () {
+  var CANON = 'mmqld-app.vercel.app';
+  var h = location.hostname;
+  if (h !== CANON && /\.vercel\.app$/.test(h)) {
+    location.replace('https://' + CANON + location.pathname + location.search + location.hash);
+  }
+})();
+</script>
+<script>
 /* Remove any previously-installed service worker (iOS WebKit fails cross-origin
    POST uploads with "Load failed" when a SW controls the page). */
 (function(){
@@ -25,7 +38,7 @@
 <link rel="stylesheet"
   href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" />
 
-<link rel="stylesheet" href="styles.css?v=30" />
+<link rel="stylesheet" href="styles.css?v=34" />
 
 <!-- pdfmake — real client-side PDF generator (selectable text, small files). -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.10/pdfmake.min.js" defer></script>
@@ -306,13 +319,13 @@
 <div class="toasts" id="toastWrap"></div>
 
 <script src="https://accounts.google.com/gsi/client" async defer></script>
-<script src="../config.js?v=30"></script>
+<script src="../config.js?v=34"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="../storage.js?v=30" defer></script>
-<script src="../customers.js?v=30" defer></script>
-<script src="../gmail-send.js?v=30" defer></script>
-<script src="assets.js?v=30" defer></script>
-<script src="app.js?v=30" defer></script>
+<script src="../storage.js?v=34" defer></script>
+<script src="../customers.js?v=34" defer></script>
+<script src="../gmail-send.js?v=34" defer></script>
+<script src="assets.js?v=34" defer></script>
+<script src="app.js?v=34" defer></script>
 
 </body>
 </html>

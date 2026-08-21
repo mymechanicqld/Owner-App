@@ -3,6 +3,21 @@
 <head>
   <meta charset="utf-8" />
   <script>
+  /* Vercel serves this app on several addresses: the clean one, plus a
+     per-branch and a per-deployment alias that both sit behind Vercel's own
+     login wall. Google ties Gmail sign-in to the exact address, so landing on
+     one of the others breaks sending with "Error 400: origin_mismatch", and
+     the app would also show a Vercel login screen once that session expires.
+     There is only ever one right address, so go there. */
+  (function () {
+    var CANON = 'mmqld-app.vercel.app';
+    var h = location.hostname;
+    if (h !== CANON && /\.vercel\.app$/.test(h)) {
+      location.replace('https://' + CANON + location.pathname + location.search + location.hash);
+    }
+  })();
+  </script>
+  <script>
   /* Remove any previously-installed service worker. A controlling SW triggers an
      iOS WebKit bug where cross-origin POST uploads fail with "Load failed". We
      no longer register one; this evicts old ones and reloads once so the page
@@ -30,7 +45,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="My Mechanic QLD" />
   <title>My Mechanic QLD</title>
-  <link rel="stylesheet" href="styles.css?v=33" />
+  <link rel="stylesheet" href="styles.css?v=34" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
@@ -107,10 +122,10 @@
 
 <div class="toasts" id="toasts" aria-live="polite"></div>
 
-<script src="config.js?v=33"></script>
-<script src="app.js?v=33"></script>
-<script src="ashley-tools.js?v=33"></script>
-<script src="ashley-agent.js?v=33"></script>
-<script src="ashley-ui.js?v=33"></script>
+<script src="config.js?v=34"></script>
+<script src="app.js?v=34"></script>
+<script src="ashley-tools.js?v=34"></script>
+<script src="ashley-agent.js?v=34"></script>
+<script src="ashley-ui.js?v=34"></script>
 </body>
 </html>
