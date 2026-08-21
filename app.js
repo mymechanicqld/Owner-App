@@ -1034,6 +1034,12 @@ $('#btn-refresh').addEventListener('click', () => { loadData(false); toast('Refr
 /* gate (optional) + boot */
 function boot() {
   icons();
+  /* Show which address the app is actually running on. Google ties Gmail
+     sign-in to the exact origin, so when it refuses, the first question is
+     always "served from where?", and a home-screen app has no address bar to
+     check. */
+  const foot = $('#side-foot');
+  if (foot) foot.textContent = location.host;
   loadData();
   setInterval(() => loadData(false), 60000);
   // Warm Google's sign-in script so the first Send does not wait on it.
