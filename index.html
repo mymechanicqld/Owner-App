@@ -45,7 +45,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="My Mechanic QLD" />
   <title>My Mechanic QLD</title>
-  <link rel="stylesheet" href="styles.css?v=35" />
+  <link rel="stylesheet" href="styles.css?v=36" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
@@ -90,20 +90,25 @@
     <div><div class="sidebar__name">My Mechanic QLD</div><div class="sidebar__sub">Owner console</div></div>
   </div>
   <nav class="sidebar__nav" id="sidebar-nav">
+    <div class="sidebar__group">Day to day</div>
     <button data-view="dashboard"><i data-lucide="layout-dashboard"></i>Dashboard</button>
+    <button data-view="ashley"><i data-lucide="sparkles"></i>Ashley</button>
     <button data-view="inquiries"><i data-lucide="inbox"></i>Inquiries</button>
     <button data-view="calendar"><i data-lucide="calendar"></i>Calendar</button>
     <button data-view="search"><i data-lucide="search"></i>Search</button>
-    <button data-view="ashley"><i data-lucide="sparkles"></i>Ashley</button>
-    <div class="sidebar__divider"></div>
-    <button data-view="analytics"><i data-lucide="bar-chart-3"></i>Analytics</button>
-    <button data-view="invoices"><i data-lucide="file-text"></i>Invoices</button>
-    <button data-view="inspections"><i data-lucide="clipboard-check"></i>Inspection reports</button>
-    <div class="sidebar__divider"></div>
+
+    <div class="sidebar__group">Create</div>
     <a href="invoice/index.html"><i data-lucide="file-plus"></i>New invoice</a>
     <a href="inspection/index.html"><i data-lucide="clipboard-plus"></i>New inspection</a>
-    <div class="sidebar__divider"></div>
+
+    <div class="sidebar__group">Records</div>
+    <button data-view="invoices"><i data-lucide="file-text"></i>Invoices</button>
+    <button data-view="inspections"><i data-lucide="clipboard-check"></i>Inspection reports</button>
+
+    <div class="sidebar__group">Business</div>
+    <button data-view="analytics"><i data-lucide="bar-chart-3"></i>Analytics</button>
     <a href="prices/index.html"><i data-lucide="tag"></i>Price list</a>
+    <a href="settings/index.html"><i data-lucide="settings"></i>Settings</a>
   </nav>
   <div class="sidebar__foot" id="side-foot">More tools coming soon</div>
 </aside>
@@ -124,10 +129,11 @@
 
 <div class="toasts" id="toasts" aria-live="polite"></div>
 
-<script src="config.js?v=35"></script>
-<script src="app.js?v=35"></script>
-<script src="ashley-tools.js?v=35"></script>
-<script src="ashley-agent.js?v=35"></script>
-<script src="ashley-ui.js?v=35"></script>
+<script src="config.js?v=36"></script>
+<script src="settings.js?v=36"></script>
+<script src="app.js?v=36"></script>
+<script src="ashley-tools.js?v=36"></script>
+<script src="ashley-agent.js?v=36"></script>
+<script src="ashley-ui.js?v=36"></script>
 </body>
 </html>

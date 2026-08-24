@@ -271,6 +271,13 @@ input, textarea, select { font-family: inherit; font-size: 16px; } /* 16px stops
 .sidebar__nav button.active svg { color: var(--accent); }
 .sidebar__nav button:active, .sidebar__nav a:active { background: var(--soft); }
 .sidebar__divider { height: 1px; background: var(--hairline); margin: 8px 6px; }
+/* Section headings replace the old bare dividers: the sidebar carries twelve
+   destinations now, and unlabelled gaps do not tell you why they are grouped. */
+.sidebar__group {
+  font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--faint); padding: 6px 14px 4px; margin-top: 10px;
+}
+.sidebar__group:first-child { margin-top: 2px; }
 .sidebar__foot { padding: 16px; font-size: 12px; color: var(--faint); border-top: 1px solid var(--hairline); }
 
 /* ---------------------------------------------------------------- calendar -- */

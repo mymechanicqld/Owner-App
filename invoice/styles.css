@@ -683,3 +683,8 @@ input, textarea, select { width: 100%; }
 .saved-item__price { font-weight: 800; color: var(--navy); font-variant-numeric: tabular-nums; }
 .saved__foot { position: sticky; bottom: 0; background: var(--surface); padding: 12px 16px; border-top: 1px solid var(--hairline); }
 .saved__foot .fab__btn { width: 100%; justify-content: center; }
+
+/* A price-list item can carry the owner's own description; show it quietly
+   under the name so he can tell two similar items apart. */
+.saved-item__desc small { display: block; font-size: 12px; color: #78716C; font-weight: 500; margin-top: 2px; }
+.saved-item__price em { font-style: normal; color: #B45309; font-size: 12px; font-weight: 700; }

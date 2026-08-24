@@ -591,6 +591,18 @@
       },
       run: save_booking,
       busy: (a) => (a.id ? 'Updating the booking' : 'Adding it to the calendar'),
+      preview: (a) => ({
+        title: a.id ? 'Update this booking?' : 'Add this booking?',
+        icon: 'calendar-plus',
+        rows: [
+          ['Job', a.title || svcLabel(a.job_type) || 'Booking'],
+          a.customer_name ? ['Customer', a.customer_name] : null,
+          a.date ? ['When', a.date + (a.time ? ' at ' + a.time : '')] : null,
+          a.duration_minutes ? ['For', a.duration_minutes + ' minutes'] : null,
+          a.address || a.suburb ? ['Where', a.address || a.suburb] : null,
+        ].filter(Boolean),
+        confirmLabel: a.id ? 'Update it' : 'Add it',
+      }),
     },
     {
       name: 'update_inquiry',
@@ -740,7 +752,12 @@
     defs,
     run,
     get: (n) => BY_NAME[n],
-    needsConfirm: (n) => !!(BY_NAME[n] && BY_NAME[n].confirm),
+    /* save_booking is the one tool whose confirmation is the owner's choice
+       (Settings > Ashley). Sending and deleting are never optional. */
+    needsConfirm: (n) => {
+      if (n === 'save_booking') return !!(window.MMQLD_SETTINGS && MMQLD_SETTINGS.bool('ashley_confirm_bookings'));
+      return !!(BY_NAME[n] && BY_NAME[n].confirm);
+    },
     preview: (n, a) => (BY_NAME[n] && BY_NAME[n].preview ? BY_NAME[n].preview(a || {}) : null),
     busy: (n, a) => { const t = BY_NAME[n]; return t && t.busy ? t.busy(a || {}) : 'Working on it'; },
     signature,

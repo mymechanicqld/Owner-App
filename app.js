@@ -533,7 +533,8 @@ function openEvent(ev) {
   const p2 = (n) => String(n).padStart(2, '0');
   const dateVal = start.getFullYear() + '-' + p2(start.getMonth() + 1) + '-' + p2(start.getDate());
   const timeVal = p2(start.getHours()) + ':' + p2(start.getMinutes());
-  const durMin = (ev && ev.starts_at && ev.ends_at) ? Math.max(15, Math.round((new Date(ev.ends_at) - new Date(ev.starts_at)) / 60000)) : 60;
+  const defaultMin = (window.MMQLD_SETTINGS && MMQLD_SETTINGS.num('calendar_default_minutes')) || 60;
+  const durMin = (ev && ev.starts_at && ev.ends_at) ? Math.max(15, Math.round((new Date(ev.ends_at) - new Date(ev.starts_at)) / 60000)) : defaultMin;
   const DURS = [[30, '30 min'], [45, '45 min'], [60, '1 hour'], [90, '1.5 hours'], [120, '2 hours'], [150, '2.5 hours'], [180, '3 hours'], [240, '4 hours'], [300, '5 hours'], [360, '6 hours'], [480, 'Full day (8h)']];
   const durOpts = DURS.map(([v, l]) => `<option value="${v}" ${v === durMin ? 'selected' : ''}>${l}</option>`).join('')
     + (DURS.some(([v]) => v === durMin) ? '' : `<option value="${durMin}" selected>${durMin} min</option>`);
@@ -1032,8 +1033,18 @@ $('#btn-menu').addEventListener('click', openSidebar);
 $('#btn-refresh').addEventListener('click', () => { loadData(false); toast('Refreshed'); });
 
 /* gate (optional) + boot */
+/* Settings can switch Ashley off entirely. Hide her tab and sidebar entry, and
+   bounce back to the dashboard if that is where the owner happens to be. */
+function applyAshleyVisibility() {
+  const on = !window.MMQLD_SETTINGS || MMQLD_SETTINGS.bool('ashley_enabled');
+  document.querySelectorAll('[data-view="ashley"]').forEach((b) => { b.style.display = on ? '' : 'none'; });
+  if (!on && STATE.view === 'ashley') setView('dashboard');
+}
+
 function boot() {
   icons();
+  applyAshleyVisibility();
+  document.addEventListener('mmqld:settings', applyAshleyVisibility);
   /* Show which address the app is actually running on. Google ties Gmail
      sign-in to the exact origin, so when it refuses, the first question is
      always "served from where?", and a home-screen app has no address bar to

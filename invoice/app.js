@@ -54,8 +54,11 @@ const uid   = () => crypto.randomUUID();
 
 const blankItem    = () => ({ id: uid(), desc: '', qty: 1, price: 0 });
 
-/* Pre-saved common line items, for the "Saved items" quick-add picker. */
-const SAVED_ITEMS = [
+/* The quick-add picker is fed by the owner's own price list, edited at
+   /prices/ and stored in Supabase. Whatever he saves there shows up here on the
+   next invoice, with no step in between. FALLBACK_ITEMS only ever appears if
+   the price list is empty or unreachable, so the picker is never blank. */
+const FALLBACK_ITEMS = [
   { desc: 'Standard (regular) service', price: 369 },
   { desc: 'Mobile diagnostic (inspect and test)', price: 189 },
   { desc: 'Front brake pads supplied and fitted', price: 359 },
@@ -63,6 +66,33 @@ const SAVED_ITEMS = [
   { desc: 'Battery replacement (supplied and fitted)', price: 260 },
   { desc: 'Mobile service fee', price: 55 },
 ];
+const PRODUCTS_CACHE = 'mmqld_products_cache';
+let SAVED_ITEMS = FALLBACK_ITEMS.slice();
+let savedFilter = '';
+
+/* Cache-first so the picker opens instantly and still works with no signal,
+   then refresh in the background. */
+(function loadPriceList() {
+  try {
+    const c = JSON.parse(localStorage.getItem(PRODUCTS_CACHE) || 'null');
+    if (Array.isArray(c) && c.length) SAVED_ITEMS = c;
+  } catch (_) {}
+
+  fetch(CONFIG.SUPABASE_URL.replace(/\/+$/, '') + '/rest/v1/products?select=name,description,price&active=eq.true&order=name.asc',
+    { headers: { apikey: CONFIG.SUPABASE_KEY } })
+    .then((r) => (r.ok ? r.json() : null))
+    .then((rows) => {
+      if (!rows || !rows.length) return;
+      SAVED_ITEMS = rows.map((r) => ({
+        desc: r.name,
+        price: r.price == null ? 0 : Number(r.price),
+        note: r.description || '',
+      }));
+      try { localStorage.setItem(PRODUCTS_CACHE, JSON.stringify(SAVED_ITEMS)); } catch (_) {}
+      if (savedPanel && !savedPanel.hidden) renderSaved();
+    })
+    .catch(() => {});
+})();
 const PAY_METHODS = ['Cash', 'Bank transfer', 'Card', 'EFTPOS', 'Cheque', 'Other'];
 const blankReceipt = () => ({ id: uid(), date: today(), method: '', amount: 0 });
 
@@ -443,22 +473,33 @@ const scrim = $('#scrim');
 function closeOverlays() { draftsPanel.hidden = true; savedPanel.hidden = true; scrim.hidden = true; }
 function openDrafts() { renderDrafts(); draftsPanel.hidden = false; scrim.hidden = false; }
 function closeDrafts() { closeOverlays(); }
-function openSaved() { renderSaved(); savedPanel.hidden = false; scrim.hidden = false; }
+function openSaved() { savedFilter = ''; const sf = $('#savedFilter'); if (sf) sf.value = ''; renderSaved(); savedPanel.hidden = false; scrim.hidden = false; }
 function renderSaved() {
-  $('#savedList').innerHTML = SAVED_ITEMS.map((it, i) =>
-    `<label class="saved-item"><input type="checkbox" data-i="${i}"><span class="saved-item__desc">${escA(it.desc)}</span><span class="saved-item__price">$${it.price}</span></label>`
-  ).join('');
+  const q = savedFilter.trim().toLowerCase();
+  const rows = SAVED_ITEMS
+    .map((it, i) => ({ it, i }))
+    .filter(({ it }) => !q || (it.desc + ' ' + (it.note || '')).toLowerCase().includes(q));
+  $('#savedCount').textContent = SAVED_ITEMS.length + (SAVED_ITEMS.length === 1 ? ' item' : ' items');
+  $('#savedList').innerHTML = rows.length
+    ? rows.map(({ it, i }) =>
+        `<label class="saved-item"><input type="checkbox" data-i="${i}">` +
+        `<span class="saved-item__desc">${escA(it.desc)}` +
+        (it.note ? `<small>${escA(it.note)}</small>` : '') + `</span>` +
+        `<span class="saved-item__price">${it.price ? '$' + it.price : '<em>no price</em>'}</span></label>`
+      ).join('')
+    : '<div class="drafts__empty">Nothing matches that.</div>';
 }
 $('#loadBtn').addEventListener('click', openDrafts);
 $('#closeDraftsBtn').addEventListener('click', closeDrafts);
 $('#savedItemsBtn').addEventListener('click', openSaved);
+$('#savedFilter').addEventListener('input', (e) => { savedFilter = e.target.value; renderSaved(); });
 $('#closeSavedBtn').addEventListener('click', closeOverlays);
 $('#scrim').addEventListener('click', closeOverlays);
 $('#addSelectedBtn').addEventListener('click', () => {
   const checks = $$('#savedList input[type="checkbox"]');
   let added = 0;
   checks.forEach((c) => {
-    if (c.checked) { const it = SAVED_ITEMS[+c.dataset.i]; state.items.push({ id: uid(), desc: it.desc, qty: 1, price: it.price }); added++; }
+    if (c.checked) { const it = SAVED_ITEMS[+c.dataset.i]; state.items.push({ id: uid(), desc: it.desc, qty: 1, price: it.price || 0 }); added++; }
   });
   if (!added) { toast('Select at least one item'); return; }
   renderItems();

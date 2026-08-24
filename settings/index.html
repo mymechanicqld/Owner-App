@@ -1,0 +1,457 @@
+<!doctype html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8" />
+<script>
+(function () {
+  var CANON = 'mmqld-app.vercel.app';
+  var h = location.hostname;
+  if (h !== CANON && /\.vercel\.app$/.test(h)) {
+    location.replace('https://' + CANON + location.pathname + location.search + location.hash);
+  }
+})();
+(function () {
+  if (!('serviceWorker' in navigator)) return;
+  navigator.serviceWorker.getRegistrations().then(function (rs) {
+    rs.forEach(function (r) { r.unregister(); });
+  }).catch(function () {});
+})();
+</script>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="robots" content="noindex,nofollow" />
+<meta name="theme-color" content="#1E3A8A" />
+<link rel="apple-touch-icon" sizes="180x180" href="../apple-touch-icon.png" />
+<link rel="icon" type="image/png" sizes="32x32" href="../favicon-32x32.png" />
+<title>Settings · My Mechanic QLD</title>
+<style>
+  :root {
+    --navy: #1E3A8A; --navy-deep: #1A2E6E; --navy-bright: #2563EB; --navy-tint: #E8EEFB;
+    --bg: #FAFAF8; --surface: #FFFFFF; --soft: #F5F5F4;
+    --ink: #0C0A09; --muted: #44403C; --subtle: #78716C; --faint: #A8A29E;
+    --hairline: #E7E5E0; --strong: #D6D3CB;
+    --green: #15803D; --green-tint: #DCFCE7;
+    --amber: #B45309; --amber-tint: #FEF3C7;
+    --red: #B91C1C; --red-tint: #FEE2E2;
+    --safe-b: env(safe-area-inset-bottom, 0px);
+    --safe-t: env(safe-area-inset-top, 0px);
+    --bar-h: 76px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  body {
+    background: var(--bg); color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Helvetica, Arial, sans-serif;
+    font-size: 15px; line-height: 1.5; -webkit-font-smoothing: antialiased;
+    padding-bottom: calc(var(--bar-h) + var(--safe-b) + 16px);
+  }
+  input, select, button, textarea { font-family: inherit; font-size: 16px; color: inherit; }
+  button { border: none; background: none; cursor: pointer; }
+
+  .top {
+    background: linear-gradient(180deg, var(--navy) 0%, var(--navy-deep) 100%);
+    color: #fff; padding: calc(var(--safe-t) + 18px) 18px 20px;
+  }
+  .top a.back { color: rgba(255,255,255,.75); font-size: 13px; font-weight: 600; text-decoration: none; display: inline-block; margin-bottom: 10px; }
+  .top h1 { font-size: 22px; font-weight: 800; letter-spacing: -0.02em; }
+  .top p { font-size: 13.5px; color: rgba(255,255,255,.8); margin-top: 6px; max-width: 46ch; }
+
+  .wrap { padding: 16px 14px 0; max-width: 720px; margin: 0 auto; }
+
+  .note {
+    background: var(--amber-tint); border: 1px solid #F3D9A4; border-radius: 14px;
+    padding: 14px 16px; margin-bottom: 16px; font-size: 13.5px; color: #7A4A08;
+  }
+  .note b { display: block; margin-bottom: 4px; color: var(--amber); }
+
+  .group { margin-bottom: 22px; }
+  .group__h { font-size: 11.5px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--subtle); margin: 0 4px 8px; }
+  .group__note { font-size: 12.5px; color: var(--subtle); margin: 0 4px 10px; }
+  .card { background: var(--surface); border: 1px solid var(--hairline); border-radius: 14px; overflow: hidden; box-shadow: 0 1px 2px rgba(12,10,9,.05); }
+
+  .field { padding: 12px 14px; border-bottom: 1px solid var(--hairline); }
+  .field:last-child { border-bottom: none; }
+  .field label { display: block; font-size: 12.5px; font-weight: 700; color: var(--subtle); margin-bottom: 5px; }
+  .field input, .field select {
+    width: 100%; padding: 10px 12px; border: 1px solid var(--hairline); border-radius: 10px;
+    background: var(--surface); font-weight: 600;
+  }
+  .field input:focus, .field select:focus { outline: none; border-color: var(--navy); box-shadow: 0 0 0 3px rgba(30,58,138,.12); }
+  .field .hint { font-size: 12px; color: var(--subtle); margin-top: 6px; font-weight: 500; }
+  .field.money input { text-align: right; font-weight: 700; }
+
+  /* toggle rows */
+  .toggle { display: flex; align-items: center; gap: 12px; padding: 13px 14px; border-bottom: 1px solid var(--hairline); }
+  .toggle:last-child { border-bottom: none; }
+  .toggle__t { flex: 1; min-width: 0; }
+  .toggle__t b { display: block; font-size: 14.5px; font-weight: 700; }
+  .toggle__t span { display: block; font-size: 12.5px; color: var(--subtle); margin-top: 2px; }
+  .sw { flex: 0 0 auto; width: 50px; height: 30px; border-radius: 999px; background: var(--strong); position: relative; transition: background .18s; }
+  .sw::after { content: ''; position: absolute; top: 3px; left: 3px; width: 24px; height: 24px; border-radius: 50%; background: #fff; transition: transform .18s; box-shadow: 0 1px 3px rgba(0,0,0,.25); }
+  .sw[aria-pressed="true"] { background: var(--green); }
+  .sw[aria-pressed="true"]::after { transform: translateX(20px); }
+  .sw[disabled] { opacity: .5; }
+
+  /* action rows */
+  .act { display: flex; align-items: center; gap: 12px; width: 100%; padding: 14px; border-bottom: 1px solid var(--hairline); text-align: left; }
+  .act:last-child { border-bottom: none; }
+  .act__t { flex: 1; min-width: 0; }
+  .act__t b { display: block; font-size: 14.5px; font-weight: 700; }
+  .act__t span { display: block; font-size: 12.5px; color: var(--subtle); margin-top: 2px; }
+  .act .chev { color: var(--faint); font-size: 20px; line-height: 1; }
+  .act.danger b { color: var(--red); }
+  .pill { flex: 0 0 auto; font-size: 11.5px; font-weight: 700; padding: 4px 10px; border-radius: 999px; }
+  .pill.on { background: var(--green-tint); color: var(--green); }
+  .pill.off { background: var(--red-tint); color: var(--red); }
+
+  .bar {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 30;
+    padding: 12px 14px calc(12px + var(--safe-b));
+    background: rgba(255,255,255,.95); backdrop-filter: saturate(160%) blur(14px);
+    border-top: 1px solid var(--hairline);
+    display: flex; gap: 12px; align-items: center;
+  }
+  .bar__info { flex: 1; min-width: 0; font-size: 13px; font-weight: 600; color: var(--subtle); }
+  .bar__info b { color: var(--ink); display: block; font-size: 14px; }
+  .save { flex: 0 0 auto; padding: 14px 24px; border-radius: 12px; background: var(--navy); color: #fff; font-weight: 700; font-size: 15px; }
+  .save:disabled { opacity: .45; }
+  .save.ok { background: var(--green); }
+
+  .foot { text-align: center; font-size: 12px; color: var(--faint); padding: 8px 0 20px; }
+
+  .toast {
+    position: fixed; left: 50%; transform: translateX(-50%);
+    bottom: calc(var(--bar-h) + var(--safe-b) + 18px); z-index: 60;
+    background: var(--ink); color: #fff; padding: 11px 18px; border-radius: 999px;
+    font-size: 13.5px; font-weight: 600; box-shadow: 0 6px 24px rgba(0,0,0,.2);
+    opacity: 0; pointer-events: none; transition: opacity .25s; max-width: 90vw; text-align: center;
+  }
+  .toast.show { opacity: 1; }
+  .toast.err { background: var(--red); }
+  .toast.ok { background: var(--green); }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <a class="back" href="../index.html">‹ Back to the app</a>
+  <h1>Settings</h1>
+  <p>Your business details, default prices and how the app behaves. These flow through to your
+     invoices, reports and anything Ashley sends out.</p>
+</header>
+
+<div class="wrap">
+  <div id="sync-note" class="note" hidden>
+    <b>Settings are saved on this phone only</b>
+    The settings table has not been created in the database yet, so these will not follow you to
+    another device. Everything still works here.
+  </div>
+
+  <div class="group">
+    <div class="group__h">Business details</div>
+    <div class="group__note">Printed on every invoice and inspection report, and used to sign off emails.</div>
+    <div class="card">
+      <div class="field"><label for="business_name">Business name</label><input id="business_name" data-s="business_name" type="text" /></div>
+      <div class="field"><label for="business_phone">Phone</label><input id="business_phone" data-s="business_phone" type="tel" inputmode="tel" /></div>
+      <div class="field"><label for="business_email">Email</label><input id="business_email" data-s="business_email" type="email" inputmode="email" autocapitalize="off" /></div>
+      <div class="field"><label for="business_abn">ABN</label><input id="business_abn" data-s="business_abn" type="text" inputmode="numeric" /></div>
+      <div class="field"><label for="business_website">Website</label><input id="business_website" data-s="business_website" type="text" autocapitalize="off" /></div>
+    </div>
+  </div>
+
+  <div class="group">
+    <div class="group__h">Default prices</div>
+    <div class="group__note">Used to fill in quick quotes and text messages. You can always change the price on the day.</div>
+    <div class="card">
+      <div class="field money"><label for="price_service">Standard service</label><input id="price_service" data-s="price_service" inputmode="decimal" /><div class="hint">Inc GST</div></div>
+      <div class="field money"><label for="price_diagnostic">Diagnostic</label><input id="price_diagnostic" data-s="price_diagnostic" inputmode="decimal" /><div class="hint">Inc GST</div></div>
+      <div class="field money"><label for="price_callout">Call-out fee</label><input id="price_callout" data-s="price_callout" inputmode="decimal" /><div class="hint">Inc GST</div></div>
+    </div>
+  </div>
+
+  <div class="group">
+    <div class="group__h">Invoices</div>
+    <div class="card">
+      <div class="toggle">
+        <div class="toggle__t"><b>Prices include GST</b><span>How new invoices start. GST is worked out as one eleventh of the total.</span></div>
+        <button class="sw" data-s="invoice_gst_inclusive" role="switch" aria-pressed="false" aria-label="Prices include GST"></button>
+      </div>
+      <div class="field">
+        <label for="invoice_terms_days">Payment due after</label>
+        <select id="invoice_terms_days" data-s="invoice_terms_days">
+          <option value="0">On the day</option>
+          <option value="7">7 days</option>
+          <option value="14">14 days</option>
+          <option value="30">30 days</option>
+        </select>
+      </div>
+      <a class="act" href="../prices/index.html">
+        <div class="act__t"><b>Price list</b><span id="price-count">Your saved parts and jobs</span></div>
+        <span class="chev">›</span>
+      </a>
+    </div>
+  </div>
+
+  <div class="group">
+    <div class="group__h">Calendar</div>
+    <div class="card">
+      <div class="field">
+        <label for="calendar_default_minutes">Default job length</label>
+        <select id="calendar_default_minutes" data-s="calendar_default_minutes">
+          <option value="30">30 minutes</option>
+          <option value="45">45 minutes</option>
+          <option value="60">1 hour</option>
+          <option value="90">1.5 hours</option>
+          <option value="120">2 hours</option>
+          <option value="180">3 hours</option>
+        </select>
+        <div class="hint">What a new booking starts at. You can still change it per job.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="group">
+    <div class="group__h">Ashley</div>
+    <div class="card">
+      <div class="toggle">
+        <div class="toggle__t"><b>Ashley is switched on</b><span>Turn off to hide the assistant tab.</span></div>
+        <button class="sw" data-s="ashley_enabled" role="switch" aria-pressed="false" aria-label="Ashley is switched on"></button>
+      </div>
+      <div class="toggle">
+        <div class="toggle__t"><b>Ask before changing the calendar</b><span>On: she shows you a card before adding or moving a booking. Off: she just does it and tells you.</span></div>
+        <button class="sw" data-s="ashley_confirm_bookings" role="switch" aria-pressed="false" aria-label="Ask before changing the calendar"></button>
+      </div>
+      <div class="toggle">
+        <div class="toggle__t"><b>Always ask before sending</b><span>Emails, texts and deletions always need your say-so. This cannot be turned off.</span></div>
+        <button class="sw" aria-pressed="true" disabled aria-label="Always ask before sending"></button>
+      </div>
+    </div>
+  </div>
+
+  <div class="group">
+    <div class="group__h">Security</div>
+    <div class="card">
+      <div class="field">
+        <label for="passcode">Passcode</label>
+        <input id="passcode" data-s="passcode" inputmode="numeric" autocomplete="off" placeholder="Leave empty for no lock" />
+        <div class="hint">Asks for this number before the app opens. Anyone with the web address can see your customers, so a passcode is worth setting.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="group">
+    <div class="group__h">Connections</div>
+    <div class="card">
+      <div class="act">
+        <div class="act__t"><b>Gmail</b><span id="gmail-sub">Used to send invoices and replies</span></div>
+        <span class="pill off" id="gmail-pill">Not connected</span>
+      </div>
+      <button class="act" id="gmail-connect">
+        <div class="act__t"><b id="gmail-btn-label">Connect Gmail</b><span>Opens Google to confirm it is you</span></div>
+        <span class="chev">›</span>
+      </button>
+    </div>
+  </div>
+
+  <div class="group">
+    <div class="group__h">Storage on this phone</div>
+    <div class="group__note">Nothing here touches your saved invoices, reports or bookings.</div>
+    <div class="card">
+      <button class="act" id="clear-drafts"><div class="act__t"><b>Clear invoice drafts</b><span id="drafts-count">Unfinished invoices kept on this phone</span></div><span class="chev">›</span></button>
+      <button class="act" id="clear-chat"><div class="act__t"><b>Clear Ashley's conversation</b><span>Starts her fresh next time</span></div><span class="chev">›</span></button>
+      <button class="act danger" id="reset-all"><div class="act__t"><b>Reset all settings</b><span>Puts everything on this page back to its starting value</span></div><span class="chev">›</span></button>
+    </div>
+  </div>
+
+  <div class="foot" id="foot"></div>
+</div>
+
+<div class="bar">
+  <div class="bar__info"><b id="bar-title">Everything is saved</b><span id="bar-sub">Loading</span></div>
+  <button class="save ok" id="save" disabled>Save</button>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="../config.js?v=36"></script>
+<script src="../settings.js?v=36"></script>
+<script>
+(function () {
+  'use strict';
+  const $ = (s) => document.querySelector(s);
+  const S = window.MMQLD_SETTINGS;
+  let dirty = false;
+
+  let toastTimer;
+  function toast(msg, kind) {
+    const t = $('#toast');
+    t.textContent = msg;
+    t.className = 'toast show ' + (kind || '');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { t.className = 'toast ' + (kind || ''); }, 3200);
+  }
+
+  function fill() {
+    const v = S.all();
+    document.querySelectorAll('[data-s]').forEach((el) => {
+      const k = el.dataset.s;
+      if (el.classList.contains('sw')) el.setAttribute('aria-pressed', String(v[k] === true || v[k] === 'true'));
+      else el.value = v[k] == null ? '' : v[k];
+    });
+  }
+
+  function markDirty() {
+    dirty = true;
+    $('#bar-title').textContent = 'Unsaved changes';
+    $('#save').disabled = false;
+    $('#save').classList.remove('ok');
+  }
+
+  document.addEventListener('input', (e) => { if (e.target.closest('[data-s]')) markDirty(); });
+  document.addEventListener('change', (e) => { if (e.target.closest('[data-s]')) markDirty(); });
+
+  document.addEventListener('click', (e) => {
+    const sw = e.target.closest('.sw[data-s]');
+    if (sw && !sw.disabled) {
+      sw.setAttribute('aria-pressed', sw.getAttribute('aria-pressed') === 'true' ? 'false' : 'true');
+      markDirty();
+    }
+  });
+
+  function collect() {
+    const out = {};
+    document.querySelectorAll('[data-s]').forEach((el) => {
+      const k = el.dataset.s;
+      out[k] = el.classList.contains('sw')
+        ? el.getAttribute('aria-pressed') === 'true'
+        : el.value.trim();
+    });
+    return out;
+  }
+
+  $('#save').addEventListener('click', async () => {
+    const btn = $('#save');
+    btn.disabled = true; btn.textContent = 'Saving...';
+    const res = await S.save(collect());
+    btn.textContent = 'Save';
+    dirty = false;
+    $('#bar-title').textContent = 'Everything is saved';
+    btn.classList.add('ok');
+    if (res.synced) { $('#bar-sub').textContent = 'Synced to all your devices'; toast('Settings saved', 'ok'); }
+    else { $('#sync-note').hidden = false; $('#bar-sub').textContent = 'Saved on this phone only'; toast('Saved on this phone. Not synced yet.', ''); }
+  });
+
+  window.addEventListener('beforeunload', (e) => { if (dirty) { e.preventDefault(); e.returnValue = ''; } });
+
+  /* ------------------------------------------------------------- status -- */
+
+  const TOK_KEY = 'mmqld_gtok';
+  function gmailState() {
+    try { const o = JSON.parse(localStorage.getItem(TOK_KEY) || 'null'); return !!(o && o.t && Date.now() < o.e); }
+    catch (_) { return false; }
+  }
+  function paintGmail() {
+    const on = gmailState();
+    const pill = $('#gmail-pill');
+    pill.textContent = on ? 'Connected' : 'Not connected';
+    pill.className = 'pill ' + (on ? 'on' : 'off');
+    $('#gmail-btn-label').textContent = on ? 'Reconnect Gmail' : 'Connect Gmail';
+    $('#gmail-sub').textContent = on ? 'Ready to send invoices and replies' : 'Used to send invoices and replies';
+  }
+
+  /* The Google window only opens straight off a tap, which is why this lives on
+     a button rather than running on load. */
+  $('#gmail-connect').addEventListener('click', async () => {
+    try {
+      if (typeof google === 'undefined' || !google.accounts) {
+        await new Promise((res, rej) => {
+          const s = document.createElement('script');
+          s.src = 'https://accounts.google.com/gsi/client';
+          s.onload = res; s.onerror = () => rej(new Error('Could not load Google sign-in'));
+          document.head.appendChild(s);
+        });
+      }
+      const client = google.accounts.oauth2.initTokenClient({
+        client_id: CONFIG.GOOGLE_CLIENT_ID,
+        scope: 'https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/gmail.send',
+        callback: (r) => {
+          if (r.error) return toast('Google sign-in did not finish', 'err');
+          const exp = Date.now() + ((r.expires_in || 3600) - 60) * 1000;
+          try { localStorage.setItem(TOK_KEY, JSON.stringify({ t: r.access_token, e: exp })); } catch (_) {}
+          paintGmail();
+          toast('Gmail connected', 'ok');
+        },
+        error_callback: () => toast('Google sign-in was blocked or closed. If a Google error page appeared, ' + location.origin + ' needs adding to the Google sign-in settings.', 'err'),
+      });
+      client.requestAccessToken({ prompt: '' });
+    } catch (e) { toast(String((e && e.message) || e).slice(0, 80), 'err'); }
+  });
+
+  /* ------------------------------------------------------- storage tools -- */
+
+  const DRAFTS_KEY = 'mmqld_invoice_drafts';
+  function draftCount() {
+    try { const d = JSON.parse(localStorage.getItem(DRAFTS_KEY) || '[]'); return Array.isArray(d) ? d.length : 0; }
+    catch (_) { return 0; }
+  }
+  function paintDrafts() {
+    const n = draftCount();
+    $('#drafts-count').textContent = n ? n + (n === 1 ? ' draft kept on this phone' : ' drafts kept on this phone')
+                                       : 'No drafts on this phone';
+  }
+
+  $('#clear-drafts').addEventListener('click', () => {
+    if (!draftCount()) return toast('There are no drafts to clear');
+    if (!confirm('Clear all unfinished invoice drafts on this phone? Saved invoices are not affected.')) return;
+    try { localStorage.removeItem(DRAFTS_KEY); } catch (_) {}
+    paintDrafts(); toast('Drafts cleared', 'ok');
+  });
+
+  $('#clear-chat').addEventListener('click', () => {
+    if (!confirm("Clear Ashley's conversation?")) return;
+    try { localStorage.removeItem('mmqld_ashley_log'); } catch (_) {}
+    toast('Conversation cleared', 'ok');
+  });
+
+  $('#reset-all').addEventListener('click', async () => {
+    if (!confirm('Put every setting on this page back to its starting value?')) return;
+    await S.reset();
+    fill(); dirty = false;
+    $('#bar-title').textContent = 'Everything is saved';
+    $('#save').disabled = true; $('#save').classList.add('ok');
+    toast('Settings reset', 'ok');
+  });
+
+  /* ------------------------------------------------------------- startup -- */
+
+  async function boot() {
+    fill();
+    paintGmail();
+    paintDrafts();
+    $('#foot').textContent = location.host;
+
+    // Does the shared settings table exist?
+    try {
+      const r = await fetch(CONFIG.SUPABASE_URL.replace(/\/+$/, '') + '/rest/v1/app_settings?id=eq.1&select=id',
+        { headers: { apikey: CONFIG.SUPABASE_KEY } });
+      if (r.ok) { $('#bar-sub').textContent = 'Synced to all your devices'; }
+      else { $('#sync-note').hidden = false; $('#bar-sub').textContent = 'Saved on this phone only'; }
+    } catch (_) { $('#bar-sub').textContent = 'Saved on this phone only'; }
+
+    // How many items are in the price list, so the shortcut says something useful.
+    try {
+      const r = await fetch(CONFIG.SUPABASE_URL.replace(/\/+$/, '') + '/rest/v1/products?select=id,price',
+        { headers: { apikey: CONFIG.SUPABASE_KEY } });
+      if (r.ok) {
+        const rows = await r.json();
+        const unpriced = rows.filter((x) => x.price == null || Number(x.price) <= 0).length;
+        $('#price-count').textContent = !rows.length ? 'Not set up yet'
+          : rows.length + ' items' + (unpriced ? ', ' + unpriced + ' still need a price' : ', all priced');
+      } else { $('#price-count').textContent = 'Not set up yet'; }
+    } catch (_) {}
+  }
+
+  document.addEventListener('mmqld:settings', () => { if (!dirty) fill(); });
+  boot();
+})();
+</script>
+</body>
+</html>

@@ -38,7 +38,7 @@
 <link rel="stylesheet"
   href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" />
 
-<link rel="stylesheet" href="styles.css?v=35" />
+<link rel="stylesheet" href="styles.css?v=36" />
 
 <!-- pdfmake — real client-side PDF generator. Produces selectable text,
      not screenshots. Total bundle ~1.3 MB but cached after first load. -->
@@ -293,10 +293,14 @@
 <!-- Saved items picker -->
 <div class="drafts" id="savedPanel" hidden>
   <div class="drafts__head">
-    <h3>Saved items</h3>
+    <h3>Saved items <small id="savedCount" style="font-weight:600;color:#78716C;font-size:12px"></small></h3>
     <button class="iconbtn" id="closeSavedBtn" aria-label="Close">
       <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
     </button>
+  </div>
+  <div style="padding:0 16px 10px">
+    <input id="savedFilter" type="search" placeholder="Search your price list" autocomplete="off"
+      style="width:100%;padding:11px 13px;border:1px solid #E7E5E0;border-radius:11px;font-size:16px;background:#fff" />
   </div>
   <div class="drafts__list" id="savedList"></div>
   <div class="saved__foot">
@@ -310,13 +314,14 @@
 <div class="toasts" id="toastWrap"></div>
 
 <script src="https://accounts.google.com/gsi/client" async defer></script>
-<script src="../config.js?v=35"></script>
+<script src="../config.js?v=36"></script>
+<script src="../settings.js?v=36"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="../storage.js?v=35" defer></script>
-<script src="../customers.js?v=35" defer></script>
-<script src="../gmail-send.js?v=35" defer></script>
-<script src="assets.js?v=35" defer></script>
-<script src="app.js?v=35" defer></script>
+<script src="../storage.js?v=36" defer></script>
+<script src="../customers.js?v=36" defer></script>
+<script src="../gmail-send.js?v=36" defer></script>
+<script src="assets.js?v=36" defer></script>
+<script src="app.js?v=36" defer></script>
 
 </body>
 </html>
