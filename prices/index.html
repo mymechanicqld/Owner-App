@@ -97,6 +97,7 @@
   .item__name {
     flex: 1; min-width: 0; border: none; background: none; font-weight: 700; font-size: 15.5px;
     padding: 4px 2px; border-bottom: 1px dashed transparent; border-radius: 0;
+    resize: none; overflow: hidden; line-height: 1.35; font-family: inherit;
   }
   .item__name:focus { outline: none; border-bottom-color: var(--strong); }
   .kill { flex: 0 0 auto; width: 30px; height: 30px; border-radius: 8px; color: var(--faint); font-size: 18px; line-height: 1; }
@@ -110,7 +111,7 @@
   .price span { color: var(--subtle); font-weight: 700; }
   .price input { width: 92px; border: none; background: none; padding: 10px 2px; font-weight: 700; text-align: right; }
   .price input:focus { outline: none; }
-  .price.empty { background: var(--amber-tint); border-color: #F3D9A4; }
+  .price.noprice { background: var(--amber-tint); border-color: #F3D9A4; }
   .gst { font-size: 11.5px; color: var(--subtle); font-weight: 600; }
 
   .desc {
@@ -127,7 +128,9 @@
     font-weight: 700; color: var(--navy); font-size: 14.5px;
   }
 
-  .empty { text-align: center; padding: 40px 20px; color: var(--subtle); }
+  /* Scoped names on purpose: a bare `.empty` used to collide with the amber
+     price box modifier and silently stretched every unpriced row. */
+  .list-empty { text-align: center; padding: 40px 20px; color: var(--subtle); }
   .setup {
     background: var(--amber-tint); border: 1px solid #F3D9A4; border-radius: 14px;
     padding: 16px; margin-bottom: 16px; font-size: 14px; color: #7A4A08;
@@ -282,7 +285,11 @@
     ['wipers', 'Wipers', null],
   ];
 
-  let rows = [];              // {id?, code, name, description, price, active, sort_order, _dirty, _new}
+  /* _dirty  = still has to be written to the database
+     _touched = the owner has actually edited this one in this session
+     They differ on a first run, where all 46 seeded rows are _dirty but none
+     are _touched, so the "changed" outline stays meaningful. */
+  let rows = [];
   let filter = 'all';
   let query = '';
   let tableMissing = false;
@@ -300,8 +307,20 @@
     toastTimer = setTimeout(() => { t.className = 'toast ' + (kind || ''); }, 3200);
   }
 
+  /* Auto-size a name box to its content, so a long name wraps instead of
+     scrolling out of sight. */
+  function grow(el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; }
+
   const priced = (r) => r.price != null && r.price !== '' && Number(r.price) > 0;
   const dirtyCount = () => rows.filter((r) => r._dirty).length;
+  const touchedCount = () => rows.filter((r) => r._touched).length;
+  /* On a first run nothing has been "changed", the whole list is simply
+     waiting to be stored. Say that instead of claiming 46 edits. */
+  function barLabel(d) {
+    const t = touchedCount();
+    if (!t) return d + (d === 1 ? ' item ready to save' : ' items ready to save');
+    return t + (t === 1 ? ' change to save' : ' changes to save');
+  }
 
   /* ------------------------------------------------------------- loading -- */
 
@@ -356,7 +375,7 @@
     return rows.filter((r) => {
       if (filter === 'needs' && priced(r)) return false;
       if (filter === 'priced' && !priced(r)) return false;
-      if (filter === 'changed' && !r._dirty) return false;
+      if (filter === 'changed' && !r._touched) return false;
       if (q && !((r.name || '') + ' ' + (r.description || '')).toLowerCase().includes(q)) return false;
       return true;
     });
@@ -370,10 +389,12 @@
 
     const list = visible();
     $('#list').innerHTML = list.length ? list.map(card).join('')
-      : '<div class="empty">Nothing matches that.</div>';
+      : '<div class="list-empty">Nothing matches that.</div>';
+
+    document.querySelectorAll('.item__name').forEach(grow);
 
     const d = dirtyCount();
-    $('#bar-title').textContent = d ? d + (d === 1 ? ' change to save' : ' changes to save') : 'Everything is saved';
+    $('#bar-title').textContent = d ? barLabel(d) : 'Everything is saved';
     $('#bar-sub').textContent = needs ? needs + ' still need a price' : 'All items have a price';
     const btn = $('#save');
     btn.disabled = !d || tableMissing;
@@ -386,13 +407,13 @@
     const i = rows.indexOf(r);
     const hasDesc = !!(r.description && r.description.trim());
     return `
-    <div class="item ${priced(r) ? '' : 'needs'} ${r._dirty ? 'dirty' : ''}" data-i="${i}">
+    <div class="item ${priced(r) ? '' : 'needs'} ${r._touched ? 'dirty' : ''}" data-i="${i}">
       <div class="item__top">
-        <input class="item__name" data-k="name" value="${esc(r.name)}" placeholder="Item name" />
+        <textarea class="item__name" data-k="name" rows="1" placeholder="Item name">${esc(r.name)}</textarea>
         <button class="kill" data-kill aria-label="Remove">&times;</button>
       </div>
       <div class="item__row">
-        <label class="price ${priced(r) ? '' : 'empty'}">
+        <label class="price ${priced(r) ? '' : 'noprice'}">
           <span>$</span>
           <input data-k="price" inputmode="decimal" value="${r.price == null ? '' : r.price}" placeholder="0.00" />
         </label>
@@ -419,16 +440,18 @@
       r.price = raw === '' ? null : Number(raw);
     } else {
       r[k] = field.value;
+      if (k === 'name') grow(field);
     }
     r._dirty = true;
+    r._touched = true;
     holder.classList.add('dirty');
     holder.classList.toggle('needs', !priced(r));
-    holder.querySelector('.price').classList.toggle('empty', !priced(r));
+    holder.querySelector('.price').classList.toggle('noprice', !priced(r));
     // Update the counters without a full repaint, so focus is never stolen.
     const needs = rows.filter((x) => !priced(x)).length;
     $('#s-needs').textContent = needs;
     const d = dirtyCount();
-    $('#bar-title').textContent = d + (d === 1 ? ' change to save' : ' changes to save');
+    $('#bar-title').textContent = barLabel(d);
     $('#save').disabled = !d || tableMissing;
     $('#save').classList.remove('ok');
     saveDraft();
