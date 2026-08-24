@@ -14,7 +14,7 @@ const BUSINESS = {
   trading: 'Mobile Mechanics',
   tagline: 'WE COME TO YOU',
   phone:   '0451 159 954',
-  email:   'contact@mymechanicqld.com.au',
+  email:   'mymechanicqld@gmail.com',
   website: 'www.mymechanicqld.com.au',
   abn:     '85 829 529 258',
 };

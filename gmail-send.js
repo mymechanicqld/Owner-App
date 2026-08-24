@@ -65,8 +65,15 @@
     const c = cachedToken();
     if (c) { token = c.t; exp = c.e; return token; }
     await ensureGis();
-    if (!window.CONFIG || String(CONFIG.GOOGLE_CLIENT_ID).indexOf('PASTE_') === 0) {
-      throw new Error('Google client id not set in config.js');
+    /* NOTE: config.js declares `const CONFIG`, and a top-level const lives in
+       the global lexical scope, NOT on window. This guard used to read
+       `!window.CONFIG`, which is always true, so it threw "Google client id not
+       set in config.js" on every send where a cached token did not already
+       short-circuit above. The id was always present and correct. Reference
+       CONFIG directly. */
+    if (typeof CONFIG === 'undefined' || !CONFIG.GOOGLE_CLIENT_ID ||
+        String(CONFIG.GOOGLE_CLIENT_ID).indexOf('PASTE_') === 0) {
+      throw new Error('Google sign-in is not set up yet: GOOGLE_CLIENT_ID is missing from config.js');
     }
     if (!tokenClient) {
       tokenClient = google.accounts.oauth2.initTokenClient({
