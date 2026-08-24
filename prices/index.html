@@ -1,0 +1,533 @@
+<!doctype html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8" />
+<script>
+/* Vercel serves this app on several addresses; only one is registered and
+   public. Keep everything on it. */
+(function () {
+  var CANON = 'mmqld-app.vercel.app';
+  var h = location.hostname;
+  if (h !== CANON && /\.vercel\.app$/.test(h)) {
+    location.replace('https://' + CANON + location.pathname + location.search + location.hash);
+  }
+})();
+/* A controlling service worker breaks cross-origin POSTs on iOS. Evict any. */
+(function () {
+  if (!('serviceWorker' in navigator)) return;
+  navigator.serviceWorker.getRegistrations().then(function (rs) {
+    rs.forEach(function (r) { r.unregister(); });
+  }).catch(function () {});
+})();
+</script>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="robots" content="noindex,nofollow" />
+<meta name="theme-color" content="#1E3A8A" />
+<link rel="apple-touch-icon" sizes="180x180" href="../apple-touch-icon.png" />
+<link rel="icon" type="image/png" sizes="32x32" href="../favicon-32x32.png" />
+<title>Price list · My Mechanic QLD</title>
+<style>
+  :root {
+    --navy: #1E3A8A; --navy-deep: #1A2E6E; --navy-bright: #2563EB; --navy-tint: #E8EEFB;
+    --bg: #FAFAF8; --surface: #FFFFFF; --soft: #F5F5F4;
+    --ink: #0C0A09; --muted: #44403C; --subtle: #78716C; --faint: #A8A29E;
+    --hairline: #E7E5E0; --strong: #D6D3CB;
+    --green: #15803D; --green-tint: #DCFCE7;
+    --amber: #B45309; --amber-tint: #FEF3C7;
+    --red: #B91C1C; --red-tint: #FEE2E2;
+    --safe-b: env(safe-area-inset-bottom, 0px);
+    --safe-t: env(safe-area-inset-top, 0px);
+    --bar-h: 76px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  body {
+    background: var(--bg); color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Helvetica, Arial, sans-serif;
+    font-size: 15px; line-height: 1.5; -webkit-font-smoothing: antialiased;
+    padding-bottom: calc(var(--bar-h) + var(--safe-b) + 16px);
+  }
+  input, textarea, button { font-family: inherit; font-size: 16px; color: inherit; }
+  button { border: none; background: none; cursor: pointer; }
+
+  /* ------------------------------------------------------------- header -- */
+  .top {
+    background: linear-gradient(180deg, var(--navy) 0%, var(--navy-deep) 100%);
+    color: #fff; padding: calc(var(--safe-t) + 18px) 18px 20px;
+  }
+  .top a.back { color: rgba(255,255,255,.75); font-size: 13px; font-weight: 600; text-decoration: none; display: inline-block; margin-bottom: 10px; }
+  .top h1 { font-size: 22px; font-weight: 800; letter-spacing: -0.02em; }
+  .top p { font-size: 13.5px; color: rgba(255,255,255,.8); margin-top: 6px; max-width: 46ch; }
+
+  .wrap { padding: 16px 14px 0; max-width: 720px; margin: 0 auto; }
+
+  /* -------------------------------------------------------------- stats -- */
+  .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+  .stat { background: var(--surface); border: 1px solid var(--hairline); border-radius: 14px; padding: 12px 14px; }
+  .stat.warn { background: var(--amber-tint); border-color: #F3D9A4; }
+  .stat .k { font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--subtle); }
+  .stat.warn .k { color: var(--amber); }
+  .stat .v { font-size: 26px; font-weight: 800; letter-spacing: -.02em; margin-top: 3px; line-height: 1.1; }
+  .stat.warn .v { color: var(--amber); }
+
+  /* ------------------------------------------------------------ toolbar -- */
+  .search { position: relative; margin-bottom: 10px; }
+  .search input {
+    width: 100%; padding: 13px 14px; border: 1px solid var(--hairline); border-radius: 12px;
+    background: var(--surface);
+  }
+  .search input:focus { outline: none; border-color: var(--navy); box-shadow: 0 0 0 3px rgba(30,58,138,.12); }
+  .chips { display: flex; gap: 8px; margin-bottom: 16px; overflow-x: auto; scrollbar-width: none; }
+  .chips::-webkit-scrollbar { display: none; }
+  .chip {
+    flex: 0 0 auto; padding: 8px 14px; border-radius: 999px; background: var(--surface);
+    border: 1px solid var(--hairline); font-size: 13px; font-weight: 600; color: var(--muted);
+  }
+  .chip.on { background: var(--navy); border-color: var(--navy); color: #fff; }
+
+  /* --------------------------------------------------------------- rows -- */
+  .list { display: flex; flex-direction: column; gap: 10px; }
+  .item {
+    background: var(--surface); border: 1px solid var(--hairline); border-radius: 14px;
+    padding: 12px 13px; box-shadow: 0 1px 2px rgba(12,10,9,.05);
+  }
+  .item.needs { border-left: 3px solid var(--amber); }
+  .item.dirty { border-color: var(--navy-bright); box-shadow: 0 0 0 3px rgba(37,99,235,.10); }
+
+  .item__top { display: flex; gap: 10px; align-items: flex-start; }
+  .item__name {
+    flex: 1; min-width: 0; border: none; background: none; font-weight: 700; font-size: 15.5px;
+    padding: 4px 2px; border-bottom: 1px dashed transparent; border-radius: 0;
+  }
+  .item__name:focus { outline: none; border-bottom-color: var(--strong); }
+  .kill { flex: 0 0 auto; width: 30px; height: 30px; border-radius: 8px; color: var(--faint); font-size: 18px; line-height: 1; }
+  .kill:active { background: var(--red-tint); color: var(--red); }
+
+  .item__row { display: flex; gap: 10px; align-items: center; margin-top: 8px; }
+  .price {
+    display: flex; align-items: center; gap: 2px; flex: 0 0 auto;
+    background: var(--soft); border: 1px solid var(--hairline); border-radius: 10px; padding: 0 10px;
+  }
+  .price span { color: var(--subtle); font-weight: 700; }
+  .price input { width: 92px; border: none; background: none; padding: 10px 2px; font-weight: 700; text-align: right; }
+  .price input:focus { outline: none; }
+  .price.empty { background: var(--amber-tint); border-color: #F3D9A4; }
+  .gst { font-size: 11.5px; color: var(--subtle); font-weight: 600; }
+
+  .desc {
+    width: 100%; margin-top: 9px; border: 1px solid var(--hairline); border-radius: 10px;
+    padding: 10px 12px; background: var(--surface); font-size: 14px; resize: vertical; min-height: 44px;
+  }
+  .desc:focus { outline: none; border-color: var(--navy); box-shadow: 0 0 0 3px rgba(30,58,138,.10); }
+  .desc[hidden] { display: none; }
+  .addnote { margin-top: 8px; font-size: 13px; font-weight: 600; color: var(--navy-bright); }
+
+  .addnew {
+    width: 100%; margin: 14px 0 4px; padding: 14px; border-radius: 13px;
+    border: 1px dashed var(--strong); background: var(--surface);
+    font-weight: 700; color: var(--navy); font-size: 14.5px;
+  }
+
+  .empty { text-align: center; padding: 40px 20px; color: var(--subtle); }
+  .setup {
+    background: var(--amber-tint); border: 1px solid #F3D9A4; border-radius: 14px;
+    padding: 16px; margin-bottom: 16px; font-size: 14px; color: #7A4A08;
+  }
+  .setup b { display: block; margin-bottom: 6px; color: var(--amber); }
+
+  /* ---------------------------------------------------------- save bar -- */
+  .bar {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 30;
+    padding: 12px 14px calc(12px + var(--safe-b));
+    background: rgba(255,255,255,.95); backdrop-filter: saturate(160%) blur(14px);
+    border-top: 1px solid var(--hairline);
+    display: flex; gap: 12px; align-items: center;
+  }
+  .bar__info { flex: 1; min-width: 0; font-size: 13px; font-weight: 600; color: var(--subtle); }
+  .bar__info b { color: var(--ink); display: block; font-size: 14px; }
+  .save {
+    flex: 0 0 auto; padding: 14px 22px; border-radius: 12px; background: var(--navy); color: #fff;
+    font-weight: 700; font-size: 15px;
+  }
+  .save:disabled { opacity: .45; }
+  .save.ok { background: var(--green); }
+
+  .toast {
+    position: fixed; left: 50%; transform: translateX(-50%);
+    bottom: calc(var(--bar-h) + var(--safe-b) + 18px); z-index: 60;
+    background: var(--ink); color: #fff; padding: 11px 18px; border-radius: 999px;
+    font-size: 13.5px; font-weight: 600; box-shadow: 0 6px 24px rgba(0,0,0,.2);
+    opacity: 0; pointer-events: none; transition: opacity .25s;
+    max-width: 90vw; text-align: center;
+  }
+  .toast.show { opacity: 1; }
+  .toast.err { background: var(--red); }
+  .toast.ok { background: var(--green); }
+
+  @media (min-width: 640px) {
+    .stats { grid-template-columns: repeat(4, 1fr); }
+    .price input { width: 110px; }
+  }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <a class="back" href="../index.html">‹ Back to the app</a>
+  <h1>Price list</h1>
+  <p>These are the parts and jobs carried over from your old inventory app. Check each price, add a
+     description where it helps, then save. This is what will fill in your invoices.</p>
+</header>
+
+<div class="wrap">
+  <div id="setup" class="setup" hidden>
+    <b>One setup step is still outstanding</b>
+    The price list table has not been created in the database yet, so nothing can be saved. Ask
+    Gursahib to run the migration, then reload this page.
+  </div>
+
+  <div class="stats">
+    <div class="stat"><div class="k">Items</div><div class="v" id="s-total">0</div></div>
+    <div class="stat warn" id="s-needs-card"><div class="k">Need a price</div><div class="v" id="s-needs">0</div></div>
+  </div>
+
+  <div class="search"><input id="q" type="search" placeholder="Search the list" autocomplete="off" /></div>
+  <div class="chips">
+    <button class="chip on" data-f="all">All</button>
+    <button class="chip" data-f="needs">Need a price</button>
+    <button class="chip" data-f="priced">Priced</button>
+    <button class="chip" data-f="changed">Changed</button>
+  </div>
+
+  <div class="list" id="list"></div>
+  <button class="addnew" id="add">+ Add another item</button>
+</div>
+
+<div class="bar">
+  <div class="bar__info"><b id="bar-title">Nothing to save yet</b><span id="bar-sub">Loading your list</span></div>
+  <button class="save" id="save" disabled>Save</button>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="../config.js?v=35"></script>
+<script>
+/* ============================================================================
+   Price list editor
+   ----------------------------------------------------------------------------
+   Reads and writes public.products in Supabase using the same direct REST calls
+   the rest of the owner app uses. Note the apikey-only headers: the project uses
+   a `sb_publishable_` key, which is NOT a JWT, so sending it as
+   `Authorization: Bearer` is unsupported and fails on iOS.
+
+   First run seeds the 46 items taken from the owner's previous inventory app.
+   They are held in memory and only reach the database when he presses Save, so
+   nothing is written behind his back.
+   ========================================================================== */
+(function () {
+  'use strict';
+
+  const BASE = CONFIG.SUPABASE_URL.replace(/\/+$/, '') + '/rest/v1/products';
+  const H = { apikey: CONFIG.SUPABASE_KEY, 'Content-Type': 'application/json' };
+  const DRAFT_KEY = 'mmqld_prices_draft';
+
+  /* --- The 46 items, read off the screenshots of the old inventory app. ----
+     `code` is a stable slug used as the upsert key, so renaming an item here
+     never creates a duplicate row. price null = never priced. ------------- */
+  const SEED = [
+    ['airfilter', 'Air filter', 63],
+    ['alternator', 'Alternator', null],
+    ['alternator-labour', 'Alternator and Labour', null],
+    ['automatic-transmission-service', 'Automatic Transmission Service', null],
+    ['battery', 'Battery', null],
+    ['brake-calipers', 'Brake calipers', null],
+    ['brake-fluid-flush', 'Brake fluid flush', 120],
+    ['bulb', 'Bulb', 15],
+    ['clutch-kit-transmission-fluid', 'Clutch kit, Transmission fluid, Labour and call out', 1750],
+    ['clutch-master-cylinder', 'Clutch master cylinder', 238],
+    ['clutch-system-air-bleeding', 'Clutch system air bleeding', 99],
+    ['call-out-fee', 'Call Out Fee', null],
+    ['coolant-flush-bleeding', 'Coolant Flush/Bleeding', 149],
+    ['diagnosis', 'Diagnosis', 169],
+    ['differential-service', 'Differential Service', null],
+    ['drive-belt-labour', 'Drive belt and Labour', null],
+    ['drive-belt-tensioner', 'Drive belt tensioner', null],
+    ['engine-mount', 'Engine mount', 326],
+    ['engine-oil', 'Engine oil', 30],
+    ['front-brake-pads-labour', 'Front Brake Pads and Labour', null],
+    ['fuel-filter', 'Fuel Filter', null],
+    ['fuel-filter-labour', 'Fuel Filter and Labour', null],
+    ['fuel-injectors', 'Fuel injectors', 296],
+    ['fuel-pressure-sensor', 'Fuel pressure sensor', 628],
+    ['hose-clamps', 'Hose clamps', null],
+    ['ignition-coil', 'Ignition coil', 164],
+    ['labour', 'Labour', null],
+    ['lower-radiator-hose', 'Lower Radiator Hose', null],
+    ['o2-sensor', 'O2 sensor', null],
+    ['pollen-filter', 'Pollen Filter', 78],
+    ['pre-purchase-inspection', 'Pre-Purchase Inspection', 329],
+    ['general-service', 'General Service', null, 'General Service Item (Unassigned)'],
+    ['radiator', 'Radiator', null],
+    ['rear-brake-pads-labour', 'Rear Brake Pads and Labour', null],
+    ['rear-shockies', 'Rear shockies', null],
+    ['rh-cv-shaft', 'RH CV shaft', null],
+    ['roadworthy', 'Roadworthy', 149],
+    ['rocker-cover-gasket-kit-labour', 'Rocker cover gasket kit and Labour', 396],
+    ['spark-plugs', 'Spark Plugs', null],
+    ['standard-regular-service', 'Standard/Regular Service', 369],
+    ['starter-motor', 'Starter Motor', null],
+    ['starter-motor-labour', 'Starter Motor and Labour', null],
+    ['thermostat-housing', 'Thermostat Housing', null],
+    ['upper-radiator-hose', 'Upper Radiator Hose', null],
+    ['water-pump', 'Water Pump', null],
+    ['wipers', 'Wipers', null],
+  ];
+
+  let rows = [];              // {id?, code, name, description, price, active, sort_order, _dirty, _new}
+  let filter = 'all';
+  let query = '';
+  let tableMissing = false;
+
+  const $ = (s) => document.querySelector(s);
+  const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+  let toastTimer;
+  function toast(msg, kind) {
+    const t = $('#toast');
+    t.textContent = msg;
+    t.className = 'toast show ' + (kind || '');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { t.className = 'toast ' + (kind || ''); }, 3200);
+  }
+
+  const priced = (r) => r.price != null && r.price !== '' && Number(r.price) > 0;
+  const dirtyCount = () => rows.filter((r) => r._dirty).length;
+
+  /* ------------------------------------------------------------- loading -- */
+
+  async function load() {
+    try {
+      const res = await fetch(BASE + '?select=*&order=sort_order.asc,name.asc', { headers: H });
+      if (res.status === 404) { tableMissing = true; $('#setup').hidden = false; seed(); return; }
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const data = await res.json();
+      if (!data.length) { seed(); toast('Starting you off with the 46 items from your old app'); return; }
+      rows = data.map((r) => ({ ...r, _dirty: false }));
+      restoreDraft();
+      paint();
+    } catch (e) {
+      toast('Could not load the list: ' + String(e.message || e).slice(0, 60), 'err');
+      seed();
+    }
+  }
+
+  function seed() {
+    rows = SEED.map((s, i) => ({
+      code: s[0], name: s[1], price: s[2], description: s[3] || '',
+      active: true, sort_order: i, _dirty: true, _new: true,
+    }));
+    restoreDraft();
+    paint();
+  }
+
+  /* A draft is kept on the phone so a half-finished review survives the app
+     being closed, the screen locking, or a flat battery. */
+  function saveDraft() {
+    try { localStorage.setItem(DRAFT_KEY, JSON.stringify(rows)); } catch (_) {}
+  }
+  function restoreDraft() {
+    try {
+      const d = JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null');
+      if (!d || !Array.isArray(d) || !d.length) return;
+      const byCode = {};
+      rows.forEach((r) => (byCode[r.code] = r));
+      d.forEach((x) => {
+        if (byCode[x.code]) Object.assign(byCode[x.code], x);
+        else rows.push(x);
+      });
+      if (dirtyCount()) toast('Picked up where you left off');
+    } catch (_) {}
+  }
+
+  /* -------------------------------------------------------------- render -- */
+
+  function visible() {
+    const q = query.trim().toLowerCase();
+    return rows.filter((r) => {
+      if (filter === 'needs' && priced(r)) return false;
+      if (filter === 'priced' && !priced(r)) return false;
+      if (filter === 'changed' && !r._dirty) return false;
+      if (q && !((r.name || '') + ' ' + (r.description || '')).toLowerCase().includes(q)) return false;
+      return true;
+    });
+  }
+
+  function paint() {
+    const needs = rows.filter((r) => !priced(r)).length;
+    $('#s-total').textContent = rows.length;
+    $('#s-needs').textContent = needs;
+    $('#s-needs-card').style.display = needs ? '' : 'none';
+
+    const list = visible();
+    $('#list').innerHTML = list.length ? list.map(card).join('')
+      : '<div class="empty">Nothing matches that.</div>';
+
+    const d = dirtyCount();
+    $('#bar-title').textContent = d ? d + (d === 1 ? ' change to save' : ' changes to save') : 'Everything is saved';
+    $('#bar-sub').textContent = needs ? needs + ' still need a price' : 'All items have a price';
+    const btn = $('#save');
+    btn.disabled = !d || tableMissing;
+    btn.textContent = 'Save';
+    btn.classList.toggle('ok', !d);
+    saveDraft();
+  }
+
+  function card(r) {
+    const i = rows.indexOf(r);
+    const hasDesc = !!(r.description && r.description.trim());
+    return `
+    <div class="item ${priced(r) ? '' : 'needs'} ${r._dirty ? 'dirty' : ''}" data-i="${i}">
+      <div class="item__top">
+        <input class="item__name" data-k="name" value="${esc(r.name)}" placeholder="Item name" />
+        <button class="kill" data-kill aria-label="Remove">&times;</button>
+      </div>
+      <div class="item__row">
+        <label class="price ${priced(r) ? '' : 'empty'}">
+          <span>$</span>
+          <input data-k="price" inputmode="decimal" value="${r.price == null ? '' : r.price}" placeholder="0.00" />
+        </label>
+        <span class="gst">inc GST</span>
+      </div>
+      <textarea class="desc" data-k="description" placeholder="Description (optional)"
+        ${hasDesc ? '' : 'hidden'}>${esc(r.description || '')}</textarea>
+      ${hasDesc ? '' : '<div class="addnote" data-adddesc>+ Add a description</div>'}
+    </div>`;
+  }
+
+  /* --------------------------------------------------------------- edits -- */
+
+  document.addEventListener('input', (e) => {
+    const field = e.target.closest('[data-k]');
+    if (!field) return;
+    const holder = field.closest('.item');
+    if (!holder) return;
+    const r = rows[Number(holder.dataset.i)];
+    if (!r) return;
+    const k = field.dataset.k;
+    if (k === 'price') {
+      const raw = field.value.replace(/[^0-9.]/g, '');
+      r.price = raw === '' ? null : Number(raw);
+    } else {
+      r[k] = field.value;
+    }
+    r._dirty = true;
+    holder.classList.add('dirty');
+    holder.classList.toggle('needs', !priced(r));
+    holder.querySelector('.price').classList.toggle('empty', !priced(r));
+    // Update the counters without a full repaint, so focus is never stolen.
+    const needs = rows.filter((x) => !priced(x)).length;
+    $('#s-needs').textContent = needs;
+    const d = dirtyCount();
+    $('#bar-title').textContent = d + (d === 1 ? ' change to save' : ' changes to save');
+    $('#save').disabled = !d || tableMissing;
+    $('#save').classList.remove('ok');
+    saveDraft();
+  });
+
+  document.addEventListener('click', (e) => {
+    const addDesc = e.target.closest('[data-adddesc]');
+    if (addDesc) {
+      const box = addDesc.closest('.item').querySelector('.desc');
+      box.hidden = false; addDesc.remove(); box.focus();
+      return;
+    }
+    const kill = e.target.closest('[data-kill]');
+    if (kill) {
+      const holder = kill.closest('.item');
+      const r = rows[Number(holder.dataset.i)];
+      if (!r) return;
+      if (!confirm('Remove "' + (r.name || 'this item') + '" from the list?')) return;
+      if (r.id) deleteRow(r);
+      rows = rows.filter((x) => x !== r);
+      paint();
+      return;
+    }
+    const chip = e.target.closest('.chip');
+    if (chip) {
+      filter = chip.dataset.f;
+      document.querySelectorAll('.chip').forEach((c) => c.classList.toggle('on', c === chip));
+      paint();
+      return;
+    }
+    if (e.target.closest('#add')) {
+      rows.push({
+        code: 'item-' + Date.now().toString(36), name: '', description: '', price: null,
+        active: true, sort_order: rows.length, _dirty: true, _new: true,
+      });
+      filter = 'all';
+      document.querySelectorAll('.chip').forEach((c) => c.classList.toggle('on', c.dataset.f === 'all'));
+      query = ''; $('#q').value = '';
+      paint();
+      const inputs = document.querySelectorAll('.item__name');
+      const last = inputs[inputs.length - 1];
+      if (last) { last.focus(); last.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
+      return;
+    }
+    if (e.target.closest('#save')) save();
+  });
+
+  $('#q').addEventListener('input', (e) => { query = e.target.value; paint(); });
+
+  async function deleteRow(r) {
+    try { await fetch(BASE + '?id=eq.' + encodeURIComponent(r.id), { method: 'DELETE', headers: H }); }
+    catch (_) { /* it will simply reappear on the next load */ }
+  }
+
+  /* ---------------------------------------------------------------- save -- */
+
+  async function save() {
+    const changed = rows.filter((r) => r._dirty);
+    if (!changed.length) return;
+    const blank = changed.filter((r) => !r.name || !r.name.trim());
+    if (blank.length) { toast('Give every item a name first', 'err'); return; }
+
+    const btn = $('#save');
+    btn.disabled = true; btn.textContent = 'Saving...';
+
+    /* Upsert on `code`, so re-saving updates rather than duplicating. */
+    const payload = changed.map((r, i) => ({
+      code: r.code,
+      name: r.name.trim(),
+      description: (r.description || '').trim() || null,
+      price: r.price == null || r.price === '' ? null : Number(r.price),
+      active: r.active !== false,
+      sort_order: r.sort_order != null ? r.sort_order : i,
+    }));
+
+    try {
+      const res = await fetch(BASE + '?on_conflict=code', {
+        method: 'POST',
+        headers: { ...H, Prefer: 'resolution=merge-duplicates,return=representation' },
+        body: JSON.stringify(payload),
+      });
+      if (res.status === 404) { tableMissing = true; $('#setup').hidden = false; throw new Error('the table has not been created yet'); }
+      if (!res.ok) throw new Error((await res.text()).slice(0, 120) || ('HTTP ' + res.status));
+      const saved = await res.json();
+      // Adopt the ids the database handed back, so later edits update in place.
+      const byCode = {};
+      saved.forEach((s) => (byCode[s.code] = s));
+      rows.forEach((r) => { if (byCode[r.code]) { r.id = byCode[r.code].id; r._dirty = false; r._new = false; } });
+      try { localStorage.removeItem(DRAFT_KEY); } catch (_) {}
+      paint();
+      toast('Saved. ' + saved.length + (saved.length === 1 ? ' item updated' : ' items updated'), 'ok');
+    } catch (e) {
+      toast('Could not save: ' + String(e.message || e).slice(0, 70), 'err');
+      btn.disabled = false; btn.textContent = 'Save';
+    }
+  }
+
+  load();
+})();
+</script>
+</body>
+</html>
