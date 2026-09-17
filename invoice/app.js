@@ -140,10 +140,10 @@ function blankState() {
 
 let state = blankState();
 
-/* URL-param prefill — populated in init() from query string. email is kept
-   here because it is not a form field but is needed for the send step. */
+/* URL-param prefill — populated in init() from query string. Kept separately
+   so the send and inquiry-link paths still work with older saved state. */
 let PREFILL = { email: '', phone: '', rego: '', name: '' };
-/* When editing an existing saved invoice, its row id. Export then updates that
+/* When editing an existing saved invoice, its row id. Save then updates that
    record instead of creating a new one. */
 let EDIT_ID = null;
 
@@ -861,22 +861,21 @@ function buildInvoiceDoc(t, A) {
       /* ─── Line items table ─── */
       itemsTable(),
 
-      /* ─── Totals + notes ─── */
+      /* ─── Totals ─── */
       {
         margin: [0, 10, 0, 0],
+        unbreakable: true,
         columns: [
-          // Notes (left)
-          {
-            width: '*',
-            stack: notesBlock(),
-          },
-          // Totals (right)
+          { width: '*', text: '' },
           {
             width: 230,
             stack: totalsStack(t, status),
           },
         ],
       },
+
+      /* ─── Notes flow at full width so long text can cross pages safely ─── */
+      ...notesSection(),
 
       /* ─── Receipts table + subtle status pill (only when there are receipts) ─── */
       paymentSection(status, t),
@@ -1035,30 +1034,58 @@ function itemsTable() {
   };
 }
 
-function notesBlock() {
-  const out = [];
-  if (state.notes && state.notes.trim()) {
-    out.push({
-      table: {
-        widths: ['*'],
-        body: [[{
-          stack: [
-            { text: 'NOTES', style: 'eyebrow', color: COLOR.navy },
-            { text: state.notes, color: COLOR.muted, margin: [0, 4, 0, 0], lineHeight: 1.55 },
-          ],
-          fillColor: COLOR.soft,
-          border: [true, false, false, false],
-          borderColor: [COLOR.navy, COLOR.navy, COLOR.navy, COLOR.navy],
-          margin: [12, 10, 12, 10],
-        }]],
-      },
-      layout: {
-        defaultBorder: false,
-        vLineWidth: (i) => i === 0 ? 3 : 0,
-        vLineColor: () => COLOR.navy,
-      },
+function notesSection() {
+  const notes = (state.notes || '').trim();
+  if (!notes) return [];
+
+  // pdfmake can let one very long text node resume inside the next page's
+  // header. Keep each entered line small and unbreakable so page breaks happen
+  // only between note blocks, where the normal page margins are respected.
+  const chunks = [];
+  let paragraphGap = false;
+  notes.split(/\r?\n/).forEach((raw) => {
+    const line = raw.trim();
+    if (!line) { paragraphGap = true; return; }
+    const words = line.split(/\s+/);
+    let chunk = '';
+    words.forEach((word) => {
+      const next = chunk ? chunk + ' ' + word : word;
+      if (chunk && next.length > 240) {
+        chunks.push({ text: chunk, gap: paragraphGap });
+        chunk = word;
+        paragraphGap = false;
+      } else {
+        chunk = next;
+      }
     });
-  }
+    if (chunk) chunks.push({ text: chunk, gap: paragraphGap });
+    paragraphGap = false;
+  });
+
+  const first = chunks.shift();
+  const out = [{
+    margin: [0, 18, 0, 0],
+    unbreakable: true,
+    stack: [
+      {
+        canvas: [
+          { type: 'line', x1: 0, y1: 0, x2: 515, y2: 0, lineWidth: 1, lineColor: COLOR.hairline },
+        ],
+      },
+      { text: 'NOTES', style: 'eyebrow', color: COLOR.navy, margin: [0, 10, 0, 0] },
+      { text: first.text, color: COLOR.muted, margin: [0, 6, 0, 0], lineHeight: 1.45 },
+    ],
+  }];
+
+  chunks.forEach((part) => out.push({
+    unbreakable: true,
+    stack: [{
+      text: part.text,
+      color: COLOR.muted,
+      margin: [0, part.gap ? 8 : 2, 0, 0],
+      lineHeight: 1.45,
+    }],
+  }));
   return out;
 }
 
@@ -1247,7 +1274,7 @@ function applyPrefill() {
   const make    = get('make');
   const year    = get('year');
 
-  // Stash for the send step (email is not a form field)
+  // Keep the original inquiry values for sending and record linkage.
   PREFILL = { email, phone, rego, name, id: get('id') };
 
   if (name) setByPath(state, 'customer.name', name);
@@ -1261,7 +1288,7 @@ function applyPrefill() {
 }
 
 /* ────────────────────────────────────────────────────────────────────
-   Send to client — emails the same PDF the Export button builds, threaded
+   Send to client — emails the same PDF the Open button builds, threaded
    into the customer's Gmail conversation when one is found.
    ─────────────────────────────────────────────────────────────────── */
 async function sendToClient(btn) {
