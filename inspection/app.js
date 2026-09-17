@@ -156,6 +156,7 @@ function blankSections() {
 
 function newState() {
   return {
+    assetFolder: uid(),
     reportNumber: autoReportNumber(),
     reportDate: today(),
     appointmentDate: today(),
@@ -171,7 +172,7 @@ function newState() {
       odometer: '',
     },
     sections: blankSections(),
-    images: [], // { id, dataUrl, caption }
+    images: [], // Stored as paths; new unsaved images temporarily include dataUrl fields.
     overall: 'Fair',
     overallComments: '',
     signature: { name: '', date: today(), dataUrl: '' },
@@ -218,11 +219,27 @@ function demoState() {
 
 let state = newState();
 
-/* URL-param prefill — populated in init() from the query string. email is
-   kept here because it is not a form field but is needed for the send step. */
+/* URL-param prefill — populated in init() from the query string. Kept
+   separately so sending and inquiry linkage work with older saved state. */
 let PREFILL = { email: '', phone: '', rego: '', name: '', id: '' };
-/* When editing a saved report, its row id. Export then updates that record. */
+/* When editing a saved report, its row id. Save then updates that record. */
 let EDIT_ID = null;
+let CURRENT_PDF_PATH = '';
+let REMOVED_IMAGE_PATHS = [];
+let imagePage = 0;
+const IMAGE_PAGE_SIZE = 24;
+const INSPECTION_BUCKET = () => CONFIG.STORAGE.inspections;
+
+function publicImageUrl(path) {
+  if (!path) return '';
+  return window.MMQLD_STORE
+    ? MMQLD_STORE.publicUrl(INSPECTION_BUCKET(), path)
+    : CONFIG.SUPABASE_URL.replace(/\/+$/, '') + '/storage/v1/object/public/' + INSPECTION_BUCKET() + '/' + path;
+}
+
+function imagePreviewSrc(img) {
+  return img.thumbDataUrl || (img.thumbPath && publicImageUrl(img.thumbPath)) || img.dataUrl || (img.path && publicImageUrl(img.path)) || '';
+}
 
 /* ────────────────────────────────────────────────────────────────────
    Render — inspection sections (built dynamically)
@@ -287,9 +304,13 @@ function renderOverall() {
 
 function renderImages() {
   $('#imageCount').textContent = state.images.length;
-  $('#imageGrid').innerHTML = state.images.map(img => `
+  const pageCount = Math.max(1, Math.ceil(state.images.length / IMAGE_PAGE_SIZE));
+  imagePage = Math.max(0, Math.min(imagePage, pageCount - 1));
+  const start = imagePage * IMAGE_PAGE_SIZE;
+  const shown = state.images.slice(start, start + IMAGE_PAGE_SIZE);
+  $('#imageGrid').innerHTML = shown.map(img => `
     <div class="img-item" data-img="${img.id}">
-      <img src="${img.dataUrl}" alt="" />
+      <img src="${escA(imagePreviewSrc(img))}" alt="Inspection image" loading="lazy" decoding="async" />
       <input class="img-item__caption" type="text" placeholder="Caption (optional)"
              value="${escA(img.caption)}" data-img-caption="${img.id}" />
       <button type="button" class="img-item__rm" data-img-rm="${img.id}" aria-label="Remove">
@@ -297,6 +318,14 @@ function renderImages() {
       </button>
     </div>
   `).join('');
+  const pager = $('#imagePager');
+  if (pager) {
+    pager.hidden = state.images.length <= IMAGE_PAGE_SIZE;
+    pager.innerHTML = `
+      <button type="button" class="image-pager__btn" data-img-page="prev" ${imagePage === 0 ? 'disabled' : ''}>Previous</button>
+      <span>Images ${state.images.length ? start + 1 : 0}-${Math.min(start + IMAGE_PAGE_SIZE, state.images.length)} of ${state.images.length}</span>
+      <button type="button" class="image-pager__btn" data-img-page="next" ${imagePage >= pageCount - 1 ? 'disabled' : ''}>Next</button>`;
+  }
 }
 
 function renderForm() {
@@ -426,9 +455,18 @@ document.addEventListener('click', (e) => {
   // Image remove
   const rm = e.target.closest('[data-img-rm]');
   if (rm) {
+    const removed = state.images.find(x => x.id === rm.dataset.imgRm);
+    if (removed) REMOVED_IMAGE_PATHS.push(...[removed.path, removed.thumbPath].filter(Boolean));
     state.images = state.images.filter(x => x.id !== rm.dataset.imgRm);
     renderImages();
     updateProgress();
+    return;
+  }
+
+  const page = e.target.closest('[data-img-page]');
+  if (page) {
+    imagePage += page.dataset.imgPage === 'next' ? 1 : -1;
+    renderImages();
     return;
   }
 
@@ -450,8 +488,8 @@ document.addEventListener('change', async (e) => {
   toast(`Processing ${files.length} image${files.length > 1 ? 's' : ''}…`);
   for (const f of files) {
     try {
-      const dataUrl = await compressImage(f, 1600, 0.72);
-      state.images.push({ id: uid(), dataUrl, caption: '' });
+      const prepared = await prepareImage(f);
+      state.images.push({ id: uid(), caption: '', ...prepared });
     } catch (err) {
       console.error(err);
       toast('Failed to load ' + f.name, 'error');
@@ -462,28 +500,49 @@ document.addEventListener('change', async (e) => {
   updateProgress();
 });
 
-function compressImage(file, maxDim, quality) {
+function loadImageFile(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => {
       const img = new Image();
-      img.onload = () => {
-        let { width, height } = img;
-        const ratio = Math.min(1, maxDim / Math.max(width, height));
-        width = Math.round(width * ratio);
-        height = Math.round(height * ratio);
-        const c = document.createElement('canvas');
-        c.width = width;
-        c.height = height;
-        c.getContext('2d').drawImage(img, 0, 0, width, height);
-        resolve(c.toDataURL('image/jpeg', quality));
-      };
+      img.onload = () => resolve(img);
       img.onerror = reject;
       img.src = reader.result;
     };
     reader.onerror = reject;
     reader.readAsDataURL(file);
   });
+}
+
+function renderCompressed(img, maxDim, quality) {
+  let { width, height } = img;
+  const ratio = Math.min(1, maxDim / Math.max(width, height));
+  width = Math.max(1, Math.round(width * ratio));
+  height = Math.max(1, Math.round(height * ratio));
+  const c = document.createElement('canvas');
+  c.width = width;
+  c.height = height;
+  const ctx = c.getContext('2d', { alpha: false });
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0, 0, width, height);
+  ctx.drawImage(img, 0, 0, width, height);
+  const dataUrl = c.toDataURL('image/jpeg', quality);
+  const bytes = Math.max(0, Math.floor((dataUrl.length - dataUrl.indexOf(',') - 1) * 0.75));
+  return { dataUrl, width, height, bytes };
+}
+
+async function prepareImage(file) {
+  const source = await loadImageFile(file);
+  const master = renderCompressed(source, 1024, 0.60);
+  const thumb = renderCompressed(source, 320, 0.55);
+  return {
+    dataUrl: master.dataUrl,
+    thumbDataUrl: thumb.dataUrl,
+    width: master.width,
+    height: master.height,
+    bytes: master.bytes,
+    mime: 'image/jpeg',
+  };
 }
 
 /* ─── Signature pad ─── */
@@ -562,6 +621,10 @@ function setupSignature() {
 $('#newBtn').addEventListener('click', () => {
   if (!confirm('Start a new report? Unsaved changes will be lost.')) return;
   state = newState();
+  EDIT_ID = null;
+  CURRENT_PDF_PATH = '';
+  REMOVED_IMAGE_PATHS = [];
+  imagePage = 0;
   renderForm();
   setupSignature();
   toast('New report started.');
@@ -573,11 +636,11 @@ $('#saveBtn').addEventListener('click', async (e) => {
   if (btn.classList.contains('fab__btn--loading')) return;
   if (typeof pdfMake === 'undefined') { toast('Still loading, try again in a second', 'error'); return; }
   btn.classList.add('fab__btn--loading');
-  saveDraft({ quiet: true });
   try {
-    const b64 = await new Promise((res, rej) => {
-      try { pdfMake.createPdf(buildReportDoc()).getBase64(res); } catch (err) { rej(err); }
-    });
+    await saveDraft({ quiet: true });
+    await uploadPendingImages();
+    await ensurePdfImages();
+    const b64 = await reportPdfBase64();
     await saveInspectionRecord(b64);
     bumpReportCounter();
   } catch (err) {
@@ -588,26 +651,133 @@ $('#saveBtn').addEventListener('click', async (e) => {
   }
 });
 
-/* Open — shows the report PDF. Synchronous so iOS does not block the new tab. */
-$('#pdfBtn').addEventListener('click', () => {
+/* Open a blank tab during the tap, then build the report after stored images load. */
+$('#pdfBtn').addEventListener('click', async () => {
   if (typeof pdfMake === 'undefined') { toast('PDF library still loading. Try again in a second.', 'error'); return; }
+  const win = window.open('', '_blank');
+  if (!win) { toast('Allow pop-ups for this app, then tap Open again.', 'error'); return; }
+  try { win.document.write('<title>Preparing report</title><p style="font:16px system-ui;padding:24px">Preparing inspection report...</p>'); } catch (_) {}
   try {
-    pdfMake.createPdf(buildReportDoc()).open();
+    await ensurePdfImages();
+    pdfMake.createPdf(buildReportDoc()).open({}, win);
   } catch (err) {
+    try { win.close(); } catch (_) {}
     console.error(err);
     toast('Could not open: ' + (err.message || err), 'error');
   }
 });
 
+function reportPdfBase64() {
+  return new Promise((resolve, reject) => {
+    try { pdfMake.createPdf(buildReportDoc()).getBase64(resolve); } catch (err) { reject(err); }
+  });
+}
+
+function cleanStateForStorage() {
+  const copy = JSON.parse(JSON.stringify(state));
+  copy.images = (copy.images || []).map((img) => {
+    delete img.dataUrl;
+    delete img.thumbDataUrl;
+    return img;
+  });
+  return copy;
+}
+
+async function ensureThumbDataUrl(img) {
+  if (img.thumbDataUrl) return img.thumbDataUrl;
+  const sourceUrl = img.dataUrl || (img.path ? await MMQLD_STORE.fetchObjectDataUrl(INSPECTION_BUCKET(), img.path) : '');
+  if (!sourceUrl) throw new Error('An image could not be prepared');
+  const source = await new Promise((resolve, reject) => {
+    const el = new Image();
+    el.onload = () => resolve(el);
+    el.onerror = reject;
+    el.src = sourceUrl;
+  });
+  img.thumbDataUrl = renderCompressed(source, 320, 0.55).dataUrl;
+  return img.thumbDataUrl;
+}
+
+async function uploadPendingImages() {
+  if (!window.MMQLD_STORE) throw new Error('Storage helper not loaded. Refresh and try again.');
+  if (!state.assetFolder) state.assetFolder = uid();
+  const pending = state.images.filter((img) => !img.path && img.dataUrl);
+  for (let i = 0; i < pending.length; i++) {
+    const img = pending[i];
+    const root = 'images/' + state.assetFolder + '/' + img.id;
+    const masterPath = root + '.jpg';
+    const thumbPath = root + '-thumb.jpg';
+    if (pending.length > 2) toast('Saving image ' + (i + 1) + ' of ' + pending.length + '...');
+    await MMQLD_STORE.uploadDataUrl(INSPECTION_BUCKET(), masterPath, img.dataUrl);
+    try {
+      await MMQLD_STORE.uploadDataUrl(INSPECTION_BUCKET(), thumbPath, await ensureThumbDataUrl(img));
+    } catch (err) {
+      await MMQLD_STORE.deleteObject(INSPECTION_BUCKET(), masterPath);
+      throw err;
+    }
+    img.path = masterPath;
+    img.thumbPath = thumbPath;
+    img.mime = 'image/jpeg';
+  }
+}
+
+async function ensurePdfImages() {
+  const missing = state.images.filter((img) => !img.dataUrl && img.path);
+  let next = 0;
+  async function worker() {
+    while (next < missing.length) {
+      const index = next++;
+      const img = missing[index];
+      img.dataUrl = await MMQLD_STORE.fetchObjectDataUrl(INSPECTION_BUCKET(), img.path);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(4, missing.length) }, worker));
+  const unavailable = state.images.find((img) => !img.dataUrl);
+  if (unavailable) throw new Error('One or more inspection images are unavailable');
+}
+
 /* ─── Drafts ─── */
 const DRAFTS_KEY = 'mmqld_inspection_drafts_v2';
-function loadDrafts() {
-  try { return JSON.parse(localStorage.getItem(DRAFTS_KEY) || '[]'); }
-  catch { return []; }
+const DRAFT_DB = 'mmqld-owner';
+const DRAFT_STORE = 'inspection-drafts';
+let draftDbPromise = null;
+function draftDb() {
+  if (draftDbPromise) return draftDbPromise;
+  draftDbPromise = new Promise((resolve, reject) => {
+    const req = indexedDB.open(DRAFT_DB, 1);
+    req.onupgradeneeded = () => {
+      if (!req.result.objectStoreNames.contains(DRAFT_STORE)) req.result.createObjectStore(DRAFT_STORE, { keyPath: 'id' });
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error || new Error('Draft storage could not open'));
+  });
+  return draftDbPromise;
 }
-function saveDraft(opts) {
+async function draftRequest(mode, action) {
+  const db = await draftDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(DRAFT_STORE, mode);
+    const store = tx.objectStore(DRAFT_STORE);
+    let req;
+    try { req = action(store); } catch (e) { reject(e); return; }
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error || new Error('Draft storage failed'));
+  });
+}
+async function loadDrafts() {
+  const rows = await draftRequest('readonly', (store) => store.getAll());
+  return (rows || []).sort((a, b) => b.savedAt - a.savedAt);
+}
+async function migrateLegacyDrafts() {
+  let legacy = [];
+  try { legacy = JSON.parse(localStorage.getItem(DRAFTS_KEY) || '[]'); } catch (_) {}
+  for (const draft of legacy) await draftRequest('readwrite', (store) => store.put(draft));
+  if (legacy.length) localStorage.removeItem(DRAFTS_KEY);
+}
+async function deleteDraft(id) {
+  await draftRequest('readwrite', (store) => store.delete(id));
+}
+async function saveDraft(opts) {
   try {
-    const drafts = loadDrafts();
     const id = state.reportNumber || uid();
     const draft = {
       id,
@@ -617,17 +787,18 @@ function saveDraft(opts) {
       savedAt: Date.now(),
       state: JSON.parse(JSON.stringify(state)),
     };
-    const i = drafts.findIndex(d => d.id === id);
-    if (i >= 0) drafts[i] = draft;
-    else drafts.unshift(draft);
-    localStorage.setItem(DRAFTS_KEY, JSON.stringify(drafts.slice(0, 5)));
+    await draftRequest('readwrite', (store) => store.put(draft));
+    const drafts = await loadDrafts();
+    await Promise.all(drafts.slice(5).map((d) => deleteDraft(d.id)));
+    localStorage.removeItem(DRAFTS_KEY);
     if (!(opts && opts.quiet)) toast('Draft saved.', 'success');
   } catch (err) {
-    toast('Could not save (storage full — too many images). Export the PDF instead.', 'error');
+    toast('Could not save the draft on this device.', 'error');
   }
 }
-function renderDraftsList() {
-  const drafts = loadDrafts();
+async function renderDraftsList() {
+  await migrateLegacyDrafts();
+  const drafts = await loadDrafts();
   const list = $('#draftsList');
   if (drafts.length === 0) {
     list.innerHTML = '<div class="drafts__empty">No saved drafts yet.</div>';
@@ -645,8 +816,8 @@ function renderDraftsList() {
     </div>
   `).join('');
 }
-$('#loadBtn').addEventListener('click', () => {
-  renderDraftsList();
+$('#loadBtn').addEventListener('click', async () => {
+  await renderDraftsList();
   $('#draftsPanel').hidden = false;
   $('#scrim').hidden = false;
 });
@@ -658,20 +829,21 @@ $('#scrim').addEventListener('click', () => {
   $('#draftsPanel').hidden = true;
   $('#scrim').hidden = true;
 });
-$('#draftsList').addEventListener('click', (e) => {
+$('#draftsList').addEventListener('click', async (e) => {
   const del = e.target.closest('[data-del]');
   if (del) {
     e.stopPropagation();
-    const drafts = loadDrafts().filter(d => d.id !== del.dataset.del);
-    localStorage.setItem(DRAFTS_KEY, JSON.stringify(drafts));
-    renderDraftsList();
+    await deleteDraft(del.dataset.del);
+    await renderDraftsList();
     return;
   }
   const ld = e.target.closest('[data-load]');
   if (ld) {
-    const d = loadDrafts().find(x => x.id === ld.dataset.load);
+    const d = (await loadDrafts()).find(x => x.id === ld.dataset.load);
     if (!d) return;
     state = d.state;
+    if (!state.assetFolder) state.assetFolder = uid();
+    imagePage = 0;
     renderForm();
     setupSignature();
     $('#draftsPanel').hidden = true;
@@ -748,12 +920,22 @@ async function saveInspectionRecord(b64) {
       comments:        state.overallComments || null,
       submission_id:   isUuid(PREFILL.id) ? PREFILL.id : null,
       // Full state so the report can be reopened and edited losslessly.
-      state:           JSON.parse(JSON.stringify(state)),
+      state:           cleanStateForStorage(),
     };
     const res = EDIT_ID
       ? await MMQLD_STORE.updateInspection(EDIT_ID, meta, b64)
       : await MMQLD_STORE.saveInspection(meta, b64);
     if (res && res.id) EDIT_ID = res.id;   // further saves update the same record
+    if (res && res.uploaded && res.path) {
+      const oldPdf = CURRENT_PDF_PATH;
+      CURRENT_PDF_PATH = res.path;
+      if (oldPdf && oldPdf !== res.path) await MMQLD_STORE.deleteObject(INSPECTION_BUCKET(), oldPdf);
+    }
+    if (REMOVED_IMAGE_PATHS.length) {
+      const paths = Array.from(new Set(REMOVED_IMAGE_PATHS));
+      REMOVED_IMAGE_PATHS = [];
+      await Promise.all(paths.map((path) => MMQLD_STORE.deleteObject(INSPECTION_BUCKET(), path)));
+    }
     toast(res && !res.uploaded
       ? 'Report saved (PDF copy could not upload)'
       : 'This report has been saved', 'success');
@@ -1344,7 +1526,7 @@ function applyPrefill() {
   const year    = get('year');
   const id      = get('id');
 
-  // Stash for the send step (email is not a form field)
+  // Keep the original inquiry values for sending and record linkage.
   PREFILL = { email, phone, rego, name, id };
 
   if (name)   setByPath(state, 'client.contact', name);
@@ -1360,7 +1542,7 @@ function applyPrefill() {
 }
 
 /* ────────────────────────────────────────────────────────────────────
-   Send to client — emails the same PDF the Export button builds, threaded
+   Send to client — emails the same PDF the Open button builds, threaded
    into the customer's Gmail conversation when one is found.
    ─────────────────────────────────────────────────────────────────── */
 async function sendToClient(btn) {
@@ -1374,7 +1556,6 @@ async function sendToClient(btn) {
     return;
   }
 
-  const docDef = buildReportDoc();
   const firstName = (state.client.contact || PREFILL.name || '').split(/\s+/)[0] || 'there';
   const rego = state.inspection.registration || PREFILL.rego || '';
   const filename = 'inspection-' + (rego || 'mmqld') + '.pdf';
@@ -1406,7 +1587,17 @@ My Mechanic QLD
   }
   toast('Sending to client…');
 
-  pdfMake.createPdf(docDef).getBase64(async (b64) => {
+  try {
+    await uploadPendingImages();
+    await ensurePdfImages();
+  } catch (err) {
+    console.error(err);
+    toast(err.message || String(err), 'error');
+    btn.disabled = false; btn.classList.remove('fab__btn--loading'); btn.innerHTML = original;
+    return;
+  }
+
+  pdfMake.createPdf(buildReportDoc()).getBase64(async (b64) => {
     try {
       const thread = await MMQLD_GMAIL.findThread(email, PREFILL.rego || state.inspection.registration);
       await MMQLD_GMAIL.sendWithAttachment({
@@ -1462,9 +1653,14 @@ async function loadForEdit(id) {
     }
     if (!state.signature) state.signature = { name: '', date: today(), dataUrl: '' };
     if (!state.images) state.images = [];
+    if (!state.assetFolder) state.assetFolder = uid();
+    state.images = state.images.map((img) => ({ id: img.id || uid(), caption: '', ...img }));
     if (!state.client) state.client = { contact: '', address: '', phone: '', email: '' };
     if (!state.client.email && row.customer_email) state.client.email = row.customer_email;
     EDIT_ID = id;
+    CURRENT_PDF_PATH = row.pdf_path || '';
+    REMOVED_IMAGE_PATHS = [];
+    imagePage = 0;
     PREFILL = { email: state.client.email || row.customer_email || '', phone: state.client.phone || '', rego: state.inspection.registration || '', name: state.client.contact || '', id: row.submission_id || '' };
     const hero = document.querySelector('.hero h1'); if (hero) hero.textContent = 'Edit report';
   } catch (e) {

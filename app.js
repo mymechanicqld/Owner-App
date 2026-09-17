@@ -1,7 +1,7 @@
 /* ============================================================================
    My Mechanic QLD - Owner app
-   Vanilla JS. Reads Supabase (publishable key), sends threaded Gmail replies
-   from the browser via Google Identity Services. No backend.
+   Vanilla JS. Reads Supabase (publishable key) and sends threaded Gmail
+   replies from the browser. Ashley alone uses the same-origin serverless proxy.
    ========================================================================== */
 
 const sb = window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_KEY, {
@@ -769,7 +769,8 @@ async function renderInspections() {
   icons();
   $('#insp-search').addEventListener('input', (e) => { STATE.inspSearch = e.target.value; drawInspList(); });
   try {
-    const { data, error } = await sb.from('inspection_reports').select('*').order('created_at', { ascending: false }).limit(1000);
+    const fields = 'id,created_at,report_number,customer_name,customer_phone,customer_email,vehicle_rego,vehicle,overall_rating,inspection_date,pdf_path,submission_id';
+    const { data, error } = await sb.from('inspection_reports').select(fields).order('created_at', { ascending: false }).limit(1000);
     if (error) throw error;
     STATE.inspections = data || [];
     drawInspList();
@@ -816,7 +817,7 @@ async function deleteLog(kind, table, bucket, id) {
       // best effort; needs the storage delete policy to actually remove the file
       try {
         await fetch(CONFIG.SUPABASE_URL.replace(/\/+$/, '') + '/storage/v1/object/' + bucket + '/' + encodeURIComponent(rec.pdf_path),
-          { method: 'DELETE', headers: { apikey: CONFIG.SUPABASE_KEY, Authorization: 'Bearer ' + CONFIG.SUPABASE_KEY } });
+          { method: 'DELETE', headers: { apikey: CONFIG.SUPABASE_KEY } });
       } catch (_) {}
     }
     if (kind === 'invoices') { STATE.invoices = (STATE.invoices || []).filter((r) => r.id !== id); drawInvList(); }

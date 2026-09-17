@@ -1,8 +1,8 @@
 /* ============================================================================
    Shared Supabase storage + logging for saved documents.
    Uses direct REST/Storage fetch calls (no supabase-js dependency), so it works
-   even if the supabase-js CDN does not load on the device. Files are named
-   <YYYY-MM-DD>_<REGO>.pdf for easy lookup by date or rego.
+   even if the supabase-js CDN does not load on the device. File names contain
+   the date, rego, optional document number and a unique save-time suffix.
    Relies on config.js (CONFIG.SUPABASE_URL / SUPABASE_KEY / STORAGE).
 
    iOS note: WebKit (every iPhone browser, incl. Chrome) can report a perfectly
@@ -17,6 +17,9 @@
   // the upload). Supabase accepts the apikey header alone for anon, verified
   // against storage upload + PostgREST read/insert/delete from a real browser.
   const authHeaders = () => ({ apikey: CONFIG.SUPABASE_KEY });
+  const encodeObjectPath = (name) => String(name || '').split('/').map(encodeURIComponent).join('/');
+  const objectUrl = (bucket, name, isPublic) => base() + '/storage/v1/object/' +
+    (isPublic ? 'public/' : '') + encodeURIComponent(bucket) + '/' + encodeObjectPath(name);
 
   // Wrap a thrown error so the surfaced message names the step + whether it was
   // a network/CORS failure (TypeError "Load failed") or a real HTTP response.
@@ -49,13 +52,99 @@
     return u8;
   }
 
+  function dataUrlToPayload(dataUrl) {
+    const match = String(dataUrl || '').match(/^data:([^;,]+)?(?:;charset=[^;,]+)?;base64,(.*)$/s);
+    if (!match) throw new Error('Invalid image data');
+    return { mime: match[1] || 'application/octet-stream', bytes: b64ToBytes(match[2]) };
+  }
+
   // Confirm an object actually exists (public bucket GET is a "simple" request,
   // so it works even on iOS where the upload POST can misreport). Never throws.
   async function objectExists(bucket, name) {
     try {
-      const r = await fetch(base() + '/storage/v1/object/public/' + bucket + '/' + name + '?t=' + Date.now(), { method: 'GET', cache: 'no-store' });
+      const r = await fetch(objectUrl(bucket, name, true) + '?t=' + Date.now(), { method: 'GET', cache: 'no-store' });
       return r.ok;
     } catch (_) { return false; }
+  }
+
+  async function deleteObject(bucket, name) {
+    if (!name) return true;
+    try {
+      const r = await fetch(objectUrl(bucket, name, false), { method: 'DELETE', headers: authHeaders() });
+      return r.ok || r.status === 404;
+    } catch (_) { return false; }
+  }
+
+  async function fetchObjectDataUrl(bucket, name) {
+    let r;
+    try {
+      r = await fetch(objectUrl(bucket, name, true) + '?t=' + Date.now(), { cache: 'no-store' });
+    } catch (e) {
+      throw tag('download-image', e);
+    }
+    if (!r.ok) throw new Error('download-image http ' + r.status);
+    const blob = await r.blob();
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () => reject(new Error('Could not read downloaded image'));
+      reader.readAsDataURL(blob);
+    });
+  }
+
+  async function uploadObject(bucket, name, bytes, mime) {
+    const path = objectUrl(bucket, name, false);
+    const pub = objectUrl(bucket, name, true);
+    const ok = { path: name, url: pub };
+    const errors = [];
+    const type = mime || 'application/octet-stream';
+    const strategies = [
+      async () => {
+        const fd = new FormData();
+        fd.append('cacheControl', '31536000');
+        fd.append('', new Blob([bytes], { type }), String(name).split('/').pop());
+        const r = await fetch(path, { method: 'POST', headers: { ...authHeaders(), 'x-upsert': 'true' }, body: fd });
+        if (!r.ok) throw new Error('http ' + r.status + ' ' + (await r.text().catch(() => '')).slice(0, 60));
+      },
+      async () => {
+        const r = await fetch(path, { method: 'POST', headers: { ...authHeaders(), 'Content-Type': type, 'x-upsert': 'true' }, body: bytes });
+        if (!r.ok) throw new Error('http ' + r.status + ' ' + (await r.text().catch(() => '')).slice(0, 60));
+      },
+      async () => {
+        const r = await fetch(path, { method: 'POST', headers: { ...authHeaders(), 'Content-Type': type, 'x-upsert': 'true' }, body: new Blob([bytes], { type }) });
+        if (!r.ok) throw new Error('http ' + r.status + ' ' + (await r.text().catch(() => '')).slice(0, 60));
+      },
+      async () => {
+        await new Promise((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          xhr.open('POST', path, true);
+          xhr.setRequestHeader('apikey', authHeaders().apikey);
+          xhr.setRequestHeader('Content-Type', type);
+          xhr.setRequestHeader('x-upsert', 'true');
+          xhr.onload = () => (xhr.status >= 200 && xhr.status < 300) ? resolve() : reject(new Error('http ' + xhr.status + ' ' + String(xhr.responseText || '').slice(0, 60)));
+          xhr.onerror = () => reject(new Error('network'));
+          xhr.send(new Blob([bytes], { type }));
+        });
+      },
+    ];
+    for (let i = 0; i < strategies.length; i++) {
+      try {
+        await strategies[i]();
+        return ok;
+      } catch (e) {
+        errors.push('#' + (i + 1) + ' ' + ((e instanceof TypeError) ? 'network' : ((e && e.message) || String(e))));
+        if (await objectExists(bucket, name)) return ok;
+      }
+    }
+    const e = new Error('upload all-blocked ' + bucket + '/' + name + ' [' + errors.join(' | ').slice(0, 220) + ']');
+    e.step = 'upload';
+    e.network = true;
+    throw e;
+  }
+
+  async function uploadDataUrl(bucket, name, dataUrl) {
+    const payload = dataUrlToPayload(dataUrl);
+    return uploadObject(bucket, name, payload.bytes, payload.mime);
   }
 
   // Upload a base64 PDF to a storage bucket. Returns { path, url }.
@@ -65,63 +154,7 @@
   // actually landed via the public GET. Each failure is recorded so a total
   // failure reports exactly which shapes were blocked.
   async function uploadPdf(bucket, name, pdfBase64) {
-    const bytes = b64ToBytes(pdfBase64);
-    const path = base() + '/storage/v1/object/' + bucket + '/' + encodeURIComponent(name);
-    const pub = base() + '/storage/v1/object/public/' + bucket + '/' + name;
-    const ok = { path: name, url: pub };
-    const errors = [];
-
-    const strategies = [
-      // 1. fetch, multipart FormData. The browser sets the multipart content-type
-      //    and the storage-api reads the file part. This is the path supabase-js
-      //    uses on React Native / iOS and the only shape that survives iOS WebKit.
-      async () => {
-        const fd = new FormData();
-        fd.append('cacheControl', '3600');
-        fd.append('', new Blob([bytes], { type: 'application/pdf' }), name);
-        const r = await fetch(path, { method: 'POST', headers: { ...authHeaders(), 'x-upsert': 'true' }, body: fd });
-        if (!r.ok) throw new Error('http ' + r.status + ' ' + (await r.text().catch(() => '')).slice(0, 60));
-      },
-      // 2. fetch, raw bytes (smallest payload; works on desktop)
-      async () => {
-        const r = await fetch(path, { method: 'POST', headers: { ...authHeaders(), 'Content-Type': 'application/pdf', 'x-upsert': 'true' }, body: bytes });
-        if (!r.ok) throw new Error('http ' + r.status + ' ' + (await r.text().catch(() => '')).slice(0, 60));
-      },
-      // 3. fetch, Blob body (different body machinery than a typed array)
-      async () => {
-        const r = await fetch(path, { method: 'POST', headers: { ...authHeaders(), 'Content-Type': 'application/pdf', 'x-upsert': 'true' }, body: new Blob([bytes], { type: 'application/pdf' }) });
-        if (!r.ok) throw new Error('http ' + r.status + ' ' + (await r.text().catch(() => '')).slice(0, 60));
-      },
-      // 4. XMLHttpRequest, Blob body (entirely separate network stack from fetch)
-      async () => {
-        await new Promise((resolve, reject) => {
-          const xhr = new XMLHttpRequest();
-          xhr.open('POST', path, true);
-          xhr.setRequestHeader('apikey', authHeaders().apikey);
-          xhr.setRequestHeader('Content-Type', 'application/pdf');
-          xhr.setRequestHeader('x-upsert', 'true');
-          xhr.onload = () => (xhr.status >= 200 && xhr.status < 300) ? resolve() : reject(new Error('http ' + xhr.status + ' ' + String(xhr.responseText || '').slice(0, 60)));
-          xhr.onerror = () => reject(new Error('network'));
-          xhr.send(new Blob([bytes], { type: 'application/pdf' }));
-        });
-      },
-    ];
-
-    for (let i = 0; i < strategies.length; i++) {
-      try {
-        await strategies[i]();
-        return ok; // got a 2xx
-      } catch (e) {
-        const m = (e instanceof TypeError) ? 'network' : ((e && e.message) || String(e));
-        errors.push('#' + (i + 1) + ' ' + m);
-        // The request may have landed even if the browser reported an error.
-        if (await objectExists(bucket, name)) return ok;
-      }
-    }
-    const e = new Error('upload all-blocked ' + bucket + '/' + name + ' [' + errors.join(' | ').slice(0, 220) + ']');
-    e.step = 'upload';
-    e.network = true;
-    throw e;
+    return uploadObject(bucket, name, b64ToBytes(pdfBase64), 'application/pdf');
   }
 
   // Insert a row into a table via PostgREST, returning the created record.
@@ -219,5 +252,9 @@
   const updateInspection = (id, meta, b64) =>
     updateDoc('inspection_reports', CONFIG.STORAGE.inspections, id, fileName(meta.vehicle_rego), meta, b64);
 
-  window.MMQLD_STORE = { fileName, uploadPdf, saveInvoice, saveInspection, updateInvoice, updateInspection, objectExists, _tag: tag };
+  window.MMQLD_STORE = {
+    fileName, uploadPdf, uploadDataUrl, fetchObjectDataUrl, deleteObject,
+    publicUrl: (bucket, name) => objectUrl(bucket, name, true),
+    saveInvoice, saveInspection, updateInvoice, updateInspection, objectExists, _tag: tag,
+  };
 })();

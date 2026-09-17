@@ -447,6 +447,29 @@ summary::-webkit-details-marker { display: none; }
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
 }
 .img-item__rm:hover { background: var(--repair-bg); color: var(--repair-fg); }
+.image-pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 12px;
+  color: var(--subtle);
+  font-size: 12px;
+  font-weight: 600;
+}
+.image-pager[hidden] { display: none; }
+.image-pager__btn {
+  min-height: 38px;
+  padding: 8px 13px;
+  border: 1px solid var(--strong);
+  border-radius: 9px;
+  background: var(--surface);
+  color: var(--navy);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+}
+.image-pager__btn:disabled { opacity: 0.4; }
 
 /* ─── Signature ─── */
 .sig {
