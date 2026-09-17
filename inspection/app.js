@@ -641,8 +641,8 @@ $('#saveBtn').addEventListener('click', async (e) => {
     await uploadPendingImages();
     await ensurePdfImages();
     const b64 = await reportPdfBase64();
-    await saveInspectionRecord(b64);
-    bumpReportCounter();
+    const saved = await saveInspectionRecord(b64);
+    if (saved) bumpReportCounter();
   } catch (err) {
     console.error(err);
     toast('Could not save: ' + String((err && err.message) || err).slice(0, 120), 'error');

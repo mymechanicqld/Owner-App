@@ -53,7 +53,7 @@
   }
 
   function dataUrlToPayload(dataUrl) {
-    const match = String(dataUrl || '').match(/^data:([^;,]+)?(?:;charset=[^;,]+)?;base64,(.*)$/s);
+    const match = String(dataUrl || '').match(/^data:([^;,]+)?(?:;charset=[^;,]+)?;base64,(.*)$/);
     if (!match) throw new Error('Invalid image data');
     return { mime: match[1] || 'application/octet-stream', bytes: b64ToBytes(match[2]) };
   }

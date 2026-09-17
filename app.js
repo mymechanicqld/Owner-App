@@ -811,14 +811,23 @@ async function deleteLog(kind, table, bucket, id) {
   const arr = kind === 'invoices' ? STATE.invoices : STATE.inspections;
   const rec = (arr || []).find((r) => r.id === id);
   try {
+    let imagePaths = [];
+    if (kind === 'inspections') {
+      const { data } = await sb.from(table).select('state').eq('id', id).maybeSingle();
+      imagePaths = ((((data || {}).state || {}).images) || [])
+        .flatMap((img) => [img && img.path, img && img.thumbPath]).filter(Boolean);
+    }
     const { error } = await sb.from(table).delete().eq('id', id);
     if (error) throw error;
-    if (rec && rec.pdf_path) {
-      // best effort; needs the storage delete policy to actually remove the file
-      try {
-        await fetch(CONFIG.SUPABASE_URL.replace(/\/+$/, '') + '/storage/v1/object/' + bucket + '/' + encodeURIComponent(rec.pdf_path),
-          { method: 'DELETE', headers: { apikey: CONFIG.SUPABASE_KEY } });
-      } catch (_) {}
+    const paths = [...imagePaths, rec && rec.pdf_path].filter(Boolean);
+    for (let i = 0; i < paths.length; i += 10) {
+      await Promise.all(paths.slice(i, i + 10).map(async (path) => {
+        const encoded = String(path).split('/').map(encodeURIComponent).join('/');
+        try {
+          await fetch(CONFIG.SUPABASE_URL.replace(/\/+$/, '') + '/storage/v1/object/' + encodeURIComponent(bucket) + '/' + encoded,
+            { method: 'DELETE', headers: { apikey: CONFIG.SUPABASE_KEY } });
+        } catch (_) {}
+      }));
     }
     if (kind === 'invoices') { STATE.invoices = (STATE.invoices || []).filter((r) => r.id !== id); drawInvList(); }
     else { STATE.inspections = (STATE.inspections || []).filter((r) => r.id !== id); drawInspList(); }
