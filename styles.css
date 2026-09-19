@@ -15,6 +15,7 @@
   --accent: #1E3A8A;
   --accent-hover: #1E40AF;
   --accent-bright: #2563EB;
+  --strong: #D6D3D1; /* used by the shared customer autocomplete */
   --accent-tint: #DBEAFE;
   --accent-soft: #EFF6FF;
   --emerald: #047857;
@@ -312,9 +313,82 @@ input, textarea, select { font-family: inherit; font-size: 16px; } /* 16px stops
 .fab-new:active { background: var(--accent-hover); }
 .fab-new svg { width: 26px; height: 26px; }
 
+/* -------------------------------------------------------- day timeline -- */
+/* Date, arrows and week strip stay pinned while the hours scroll under them. */
+.cal-top { position: sticky; top: -16px; z-index: 25; background: var(--bg); margin: 0 -16px; padding: 14px 16px 6px; border-bottom: 1px solid var(--hairline); }
+.cal-top .cal-head { margin-bottom: 10px; }
+.cal-top .cal-strip { margin: 0; }
+.cal-date { position: relative; flex: 1; min-width: 0; display: block; cursor: pointer; }
+.cal-date__d { display: block; font-size: 19px; font-weight: 800; letter-spacing: -0.01em; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cal-date__s { display: inline-flex; align-items: center; gap: 3px; font-size: 12.5px; font-weight: 600; color: var(--accent-bright); margin-top: 2px; }
+.cal-date__s svg { width: 14px; height: 14px; }
+/* The real date input sits invisibly over the title, so a tap opens the
+   phone's own date picker. */
+.cal-date input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; border: 0; font-size: 16px; -webkit-appearance: none; appearance: none; }
+.cal-nav .cal-today:disabled { opacity: 0.45; }
+.cal-day__h { width: calc(100% - 4px); text-align: left; }
+.cal-day__h svg { width: 16px; height: 16px; color: var(--faint); margin-left: auto; align-self: center; }
+
+.cal-strip { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin: -4px 0 12px; }
+.cs-day { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 7px 0 6px; border-radius: 12px; color: var(--muted); }
+.cs-day .w { font-size: 11px; font-weight: 700; color: var(--subtle); }
+.cs-day .n { font-size: 16px; font-weight: 800; width: 32px; height: 32px; display: grid; place-items: center; border-radius: 50%; font-variant-numeric: tabular-nums; }
+.cs-day .d { display: flex; gap: 2px; height: 5px; }
+.cs-day .d i { width: 5px; height: 5px; border-radius: 50%; background: var(--accent-bright); }
+.cs-day.today .n { color: var(--accent-bright); }
+.cs-day.on .n { background: var(--accent); color: #fff; }
+.cs-day:active { background: var(--soft); }
+
+.tl-allday { margin-bottom: 8px; }
+.tl-hint { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--subtle); margin: 12px 2px 0; }
+.tl-hint svg { width: 14px; height: 14px; flex: none; }
+
+.tl { position: relative; display: flex; margin: 18px 0 90px; }
+.tl-hours { position: relative; width: 50px; flex: none; }
+.tl-h { position: absolute; left: 0; right: 0; height: 0; }
+.tl-h span { position: absolute; right: 8px; top: -8px; font-size: 11px; font-weight: 600; color: var(--subtle); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.tl-grid {
+  position: relative; flex: 1; min-width: 0; border-left: 1px solid var(--hairline);
+  /* Hour lines solid, half hours faint. */
+  background-image:
+    linear-gradient(to bottom, var(--hairline) 1px, transparent 1px),
+    linear-gradient(to bottom, transparent 31px, #F0EFEC 31px, #F0EFEC 32px, transparent 32px);
+  background-size: 100% 64px, 100% 64px;
+  cursor: pointer;
+}
+.tl-ev {
+  position: absolute; overflow: hidden; border-radius: 8px; padding: 4px 8px 6px;
+  background: color-mix(in srgb, var(--c) 14%, white); border-left: 4px solid var(--c);
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.9);
+  color: var(--ink); cursor: grab;
+  -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
+  transition: box-shadow .15s, transform .15s;
+}
+.tl-ev__t { font-size: 11px; font-weight: 700; color: color-mix(in srgb, var(--c) 70%, black); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.tl-ev__n { font-size: 13px; font-weight: 700; line-height: 1.25; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.tl-ev__m { font-size: 11.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tl-ev.short { display: flex; align-items: center; gap: 6px; padding-top: 2px; padding-bottom: 2px; }
+.tl-ev.short .tl-ev__n { -webkit-line-clamp: 1; font-size: 12px; }
+.tl-ev.short .tl-ev__m, .tl-ev.nometa .tl-ev__m { display: none; }
+.tl-ev.narrow { padding-left: 6px; padding-right: 4px; }
+.tl-ev.narrow .tl-ev__n { font-size: 12px; }
+/* Resize handle: a comfortable touch target along the bottom edge. */
+.tl-rs { position: absolute; left: 0; right: 0; bottom: 0; height: 14px; cursor: ns-resize; }
+.tl-rs::after { content: ""; position: absolute; left: 50%; bottom: 4px; width: 22px; height: 3px; margin-left: -11px; border-radius: 2px; background: color-mix(in srgb, var(--c) 45%, white); opacity: 0; }
+.tl-ev.lifted { z-index: 20; cursor: grabbing; transform: scale(1.02); box-shadow: 0 10px 26px rgba(12,10,9,0.22), 0 0 0 2px var(--c); transition: box-shadow .15s, transform .15s; }
+.tl-ev.lifted .tl-rs::after, .tl-ev:hover .tl-rs::after { opacity: 1; }
+.tl-now { position: absolute; left: -5px; right: 0; height: 2px; background: #DC2626; z-index: 10; pointer-events: none; }
+.tl-now::before { content: ""; position: absolute; left: 0; top: -4px; width: 10px; height: 10px; border-radius: 50%; background: #DC2626; }
+body.cal-dragging, body.cal-dragging * { -webkit-user-select: none; user-select: none; }
+
+.toast.has-act { display: flex; align-items: center; gap: 14px; pointer-events: auto; text-align: left; padding-right: 8px; }
+.toast.has-act button { flex: none; color: #93C5FD; font-weight: 800; font-size: 13.5px; padding: 6px 10px; border-radius: 8px; }
+.toast.has-act button:active { background: rgba(255,255,255,0.12); }
+.form-field .opt { font-style: normal; font-weight: 500; color: var(--faint); }
+
 /* ------------------------------------------------------------- event form -- */
 .form-field { display: block; margin-bottom: 12px; }
-.form-field span { display: block; font-size: 12px; font-weight: 600; color: var(--subtle); margin-bottom: 5px; }
+.form-field > span { display: block; font-size: 12px; font-weight: 600; color: var(--subtle); margin-bottom: 5px; }
 .form-field input, .form-field textarea, .form-field select { width: 100%; min-width: 0; max-width: 100%; padding: 12px; border: 1px solid var(--hairline); border-radius: 11px; background: var(--surface); }
 .form-field input:focus, .form-field textarea:focus, .form-field select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(30,58,138,0.12); }
 .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }

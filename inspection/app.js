@@ -24,7 +24,7 @@ const BUSINESS = {
    Editing this block updates the form, completion tracking, and the
    PDF render in lockstep.
    ─────────────────────────────────────────────────────────────────── */
-const GRADES = ['Good', 'Fair', 'Repair', 'NA'];
+const GRADES = ['Good', 'Fair', 'Poor', 'NA'];
 
 const SECTIONS = [
   {
@@ -174,6 +174,8 @@ function newState() {
     sections: blankSections(),
     images: [], // Stored as paths; new unsaved images temporarily include dataUrl fields.
     overall: 'Fair',
+    score: null,          // 0 to 100 in tens, drawn as the gauge; null = not scored
+    coverImage: null,     // one landscape photo of the whole car for the cover
     overallComments: '',
     signature: { name: '', date: today(), dataUrl: '' },
     terms: JSON.parse(JSON.stringify(DEFAULT_TERMS)),
@@ -195,29 +197,34 @@ function demoState() {
   };
   // Demo grades to mirror the sample PDF
   s.sections.interior.comments = 'Seats have some stains here and there.';
-  s.sections.exterior.grades[5] = 'Repair';
-  s.sections.exterior.grades[6] = 'Repair';
-  s.sections.exterior.grades[7] = 'Repair';
+  s.sections.exterior.grades[5] = 'Poor';
+  s.sections.exterior.grades[6] = 'Poor';
+  s.sections.exterior.grades[7] = 'Poor';
   s.sections.exterior.comments = 'Req. front shockies and bump stop kit. Control arm bushes have some minor cracks. Rear shockies and bump stop are on their way out.';
-  s.sections.engine.grades[2] = 'Repair';
+  s.sections.engine.grades[2] = 'Poor';
   s.sections.engine.comments = 'Signs of minor leaks from multiple seals and gaskets.';
-  s.sections.tyres.grades[0] = 'Repair';
-  s.sections.tyres.grades[1] = 'Repair';
-  s.sections.tyres.grades[4] = 'Repair';
-  s.sections.tyres.grades[5] = 'Repair';
+  s.sections.tyres.grades[0] = 'Poor';
+  s.sections.tyres.grades[1] = 'Poor';
+  s.sections.tyres.grades[4] = 'Poor';
+  s.sections.tyres.grades[5] = 'Poor';
   s.sections.tyres.grades[6] = 'NA';
   s.sections.tyres.grades[7] = 'NA';
   s.sections.tyres.grades[8] = 'NA';
   s.sections.tyres.comments = 'Noisy tyres. Rims have some minor gutter damage.';
-  s.sections.roadtest.grades[2] = 'Repair';
-  s.sections.roadtest.grades[4] = 'Repair';
-  s.sections.roadtest.grades[6] = 'Repair';
-  s.sections.roadtest.grades[7] = 'Repair';
+  s.sections.roadtest.grades[2] = 'Poor';
+  s.sections.roadtest.grades[4] = 'Poor';
+  s.sections.roadtest.grades[6] = 'Poor';
+  s.sections.roadtest.grades[7] = 'Poor';
   s.sections.roadtest.comments = 'Transmission is playing up here and there. Req. front pads and rotors all around soon. Steering and suspension needs attention. Jack is missing.';
   return s;
 }
 
 let state = newState();
+/* The form as last loaded or saved; anything different is unsaved. Photo
+   bodies are left out of the comparison: their ids already change. */
+let CLEAN = '';
+const snapshot = () => JSON.stringify(state, (k, v) => (k === 'dataUrl' || k === 'thumbDataUrl' ? undefined : v));
+function markClean() { CLEAN = snapshot(); }
 
 /* URL-param prefill — populated in init() from the query string. Kept
    separately so sending and inquiry linkage work with older saved state. */
@@ -298,8 +305,32 @@ function renderCriterion(secId, idx, label, currentGrade) {
 function renderOverall() {
   const root = $('#overallGrades');
   root.innerHTML = GRADES.map(g => `
-    <button type="button" class="grade" data-overall="${g}" aria-pressed="${g === state.overall}">${g}</button>
+    <button type="button" class="grade" data-overall="${g}" data-grade="${g}" aria-pressed="${g === state.overall}">${g}</button>
   `).join('');
+}
+
+/* Score slider: 0 to 100 in tens. Untouched means not scored, and the PDF
+   then shows the verdict without a gauge. */
+function renderScore() {
+  const box = $('#scoreBox');
+  if (!box) return;
+  const v = state.score;
+  box.dataset.set = v == null ? 'false' : 'true';
+  $('#scoreRange').value = v == null ? 60 : v;
+  $('#scoreValue').textContent = v == null ? 'Not scored' : v;
+  const g = v == null ? null : window.MMQLD_REPORT.scoreGrade(v);
+  box.dataset.grade = g || '';
+  const pct = (v == null ? 60 : v);
+  $('#scoreRange').style.setProperty('--pct', pct + '%');
+}
+
+function renderCover() {
+  const box = $('#coverBox');
+  if (!box) return;
+  const img = state.coverImage;
+  const src = img ? (img.thumbDataUrl || img.dataUrl || (img.thumbPath && publicImageUrl(img.thumbPath)) || (img.path && publicImageUrl(img.path))) : '';
+  box.dataset.has = src ? 'true' : 'false';
+  $('#coverPreview').innerHTML = src ? `<img src="${escA(src)}" alt="Cover photo" />` : '';
 }
 
 function renderImages() {
@@ -328,7 +359,18 @@ function renderImages() {
   }
 }
 
+/* Reports saved before "Poor" replaced "Repair", or before the score and
+   cover photo existed, are brought up to date whenever one is opened. */
+function normaliseState() {
+  const fix = (g) => (g === 'Repair' ? 'Poor' : g);
+  Object.values(state.sections || {}).forEach((sec) => { sec.grades = (sec.grades || []).map(fix); });
+  state.overall = fix(state.overall || 'Fair');
+  if (state.score === undefined || state.score === '') state.score = null;
+  if (state.coverImage === undefined) state.coverImage = null;
+}
+
 function renderForm() {
+  normaliseState();
   $('#brandLogo').src = window.MMQLD_ASSETS.logoPng;
 
   // Bind all data-bind inputs
@@ -345,13 +387,15 @@ function renderForm() {
 
   buildSections();
   renderOverall();
+  renderScore();
+  renderCover();
   renderImages();
   updateProgress();
 }
 
 /* ─── Completion + progress tracking ─── */
 function countFlags(secId) {
-  return state.sections[secId].grades.filter(g => g === 'Repair' || g === 'NA').length;
+  return state.sections[secId].grades.filter(g => g === 'Poor' || g === 'NA').length;
 }
 function updateProgress() {
   // Progress = fraction of sections that have been touched
@@ -391,6 +435,15 @@ document.addEventListener('input', (e) => {
     if (t.dataset.bind === 'inspection.registration' || t.dataset.bind === 'inspection.makeModel') {
       updateProgress();
     }
+    return;
+  }
+
+  if (t.id === 'scoreRange') {
+    state.score = Math.round(Number(t.value) / 10) * 10;
+    // The score suggests the verdict; he can still tap a different one.
+    state.overall = window.MMQLD_REPORT.scoreGrade(state.score);
+    renderOverall();
+    renderScore();
     return;
   }
 
@@ -452,6 +505,20 @@ document.addEventListener('click', (e) => {
     return;
   }
 
+  if (e.target.closest('#scoreClear')) {
+    state.score = null;
+    renderScore();
+    return;
+  }
+
+  if (e.target.closest('#coverRemove')) {
+    const c = state.coverImage;
+    if (c) REMOVED_IMAGE_PATHS.push(...[c.path, c.thumbPath].filter(Boolean));
+    state.coverImage = null;
+    renderCover();
+    return;
+  }
+
   // Image remove
   const rm = e.target.closest('[data-img-rm]');
   if (rm) {
@@ -482,6 +549,24 @@ document.addEventListener('click', (e) => {
 
 /* ─── Image upload (with client-side compression) ─── */
 document.addEventListener('change', async (e) => {
+  if (e.target.id === 'coverInput' || e.target.id === 'coverInputGallery') {
+    const f = e.target.files && e.target.files[0];
+    e.target.value = '';
+    if (!f) return;
+    try {
+      toast('Preparing cover photo...');
+      const prepared = await prepareImage(f, 1600, 0.7);
+      const old = state.coverImage;
+      if (old) REMOVED_IMAGE_PATHS.push(...[old.path, old.thumbPath].filter(Boolean));
+      state.coverImage = { id: uid(), caption: '', ...prepared };
+      renderCover();
+      if (prepared.height > prepared.width) toast('Tip: turn the phone sideways. Upright photos get cropped on the cover.');
+    } catch (err) {
+      console.error(err);
+      toast('Could not load that photo', 'error');
+    }
+    return;
+  }
   if (e.target.id !== 'imgInput' && e.target.id !== 'imgInputGallery') return;
   const files = Array.from(e.target.files || []);
   if (!files.length) return;
@@ -531,9 +616,9 @@ function renderCompressed(img, maxDim, quality) {
   return { dataUrl, width, height, bytes };
 }
 
-async function prepareImage(file) {
+async function prepareImage(file, maxDim, quality) {
   const source = await loadImageFile(file);
-  const master = renderCompressed(source, 1024, 0.60);
+  const master = renderCompressed(source, maxDim || 1024, quality || 0.60);
   const thumb = renderCompressed(source, 320, 0.55);
   return {
     dataUrl: master.dataUrl,
@@ -627,6 +712,7 @@ $('#newBtn').addEventListener('click', () => {
   imagePage = 0;
   renderForm();
   setupSignature();
+  markClean();
   toast('New report started.');
 });
 
@@ -680,6 +766,7 @@ function cleanStateForStorage() {
     delete img.thumbDataUrl;
     return img;
   });
+  if (copy.coverImage) { delete copy.coverImage.dataUrl; delete copy.coverImage.thumbDataUrl; }
   return copy;
 }
 
@@ -700,7 +787,8 @@ async function ensureThumbDataUrl(img) {
 async function uploadPendingImages() {
   if (!window.MMQLD_STORE) throw new Error('Storage helper not loaded. Refresh and try again.');
   if (!state.assetFolder) state.assetFolder = uid();
-  const pending = state.images.filter((img) => !img.path && img.dataUrl);
+  // The cover photo is stored exactly like the others, just kept apart.
+  const pending = [state.coverImage, ...state.images].filter((img) => img && !img.path && img.dataUrl);
   for (let i = 0; i < pending.length; i++) {
     const img = pending[i];
     const root = 'images/' + state.assetFolder + '/' + img.id;
@@ -721,7 +809,8 @@ async function uploadPendingImages() {
 }
 
 async function ensurePdfImages() {
-  const missing = state.images.filter((img) => !img.dataUrl && img.path);
+  const all = [state.coverImage, ...state.images].filter(Boolean);
+  const missing = all.filter((img) => !img.dataUrl && img.path);
   let next = 0;
   async function worker() {
     while (next < missing.length) {
@@ -731,7 +820,15 @@ async function ensurePdfImages() {
     }
   }
   await Promise.all(Array.from({ length: Math.min(4, missing.length) }, worker));
-  const unavailable = state.images.find((img) => !img.dataUrl);
+  // Photo rows are sized from each photo's proportions, so measure any
+  // older photo saved without them rather than guess.
+  await Promise.all(all.filter((img) => img.dataUrl && !(img.width && img.height)).map((img) => new Promise((resolve) => {
+    const el = new Image();
+    el.onload = () => { img.width = el.naturalWidth; img.height = el.naturalHeight; resolve(); };
+    el.onerror = () => resolve();
+    el.src = img.dataUrl;
+  })));
+  const unavailable = all.find((img) => !img.dataUrl);
   if (unavailable) throw new Error('One or more inspection images are unavailable');
 }
 
@@ -792,8 +889,10 @@ async function saveDraft(opts) {
     await Promise.all(drafts.slice(5).map((d) => deleteDraft(d.id)));
     localStorage.removeItem(DRAFTS_KEY);
     if (!(opts && opts.quiet)) toast('Draft saved.', 'success');
+    return true;
   } catch (err) {
     toast('Could not save the draft on this device.', 'error');
+    return false;
   }
 }
 async function renderDraftsList() {
@@ -848,6 +947,7 @@ $('#draftsList').addEventListener('click', async (e) => {
     setupSignature();
     $('#draftsPanel').hidden = true;
     $('#scrim').hidden = true;
+    markClean();
     toast('Draft loaded.');
   }
 });
@@ -865,31 +965,6 @@ function toast(msg, kind) {
 /* ────────────────────────────────────────────────────────────────────
    PDF Export — pdfmake document definition
    ─────────────────────────────────────────────────────────────────── */
-const COLOR = {
-  navy:        '#1E3A8A',
-  navyDeep:    '#1A2E6E',
-  navyBright:  '#2563EB',
-  navyTint:    '#E8EEFB',
-  ink:         '#0C0A09',
-  muted:       '#44403C',
-  subtle:      '#78716C',
-  hairline:    '#E7E5E0',
-  soft:        '#F5F4EF',
-  strong:      '#D6D3CB',
-  white:       '#FFFFFF',
-  goodBg:      '#D1FAE5',
-  goodFg:      '#047857',
-  fairBg:      '#FEF3C7',
-  fairFg:      '#B45309',
-  repairBg:    '#FEE2E2',
-  repairFg:    '#B91C1C',
-  naBg:        '#F3F4F6',
-  naFg:        '#4B5563',
-};
-
-const GRADE_BG = { Good: COLOR.goodBg, Fair: COLOR.fairBg, Repair: COLOR.repairBg, NA: COLOR.naBg };
-const GRADE_FG = { Good: COLOR.goodFg, Fair: COLOR.fairFg, Repair: COLOR.repairFg, NA: COLOR.naFg };
-
 /* ─── Save record to Supabase (non-blocking) ─── */
 const isUuid = (v) => typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
 async function saveInspectionRecord(b64) {
@@ -939,6 +1014,7 @@ async function saveInspectionRecord(b64) {
     toast(res && !res.uploaded
       ? 'Report saved (PDF copy could not upload)'
       : 'This report has been saved', 'success');
+    markClean();
     return true;
   } catch (err) {
     console.error(err);
@@ -947,562 +1023,14 @@ async function saveInspectionRecord(b64) {
   }
 }
 
+/* The layout itself lives in report-pdf.js, which has no DOM access so the
+   same file can be rendered and checked outside the browser. */
 function buildReportDoc() {
-  const A = window.MMQLD_ASSETS;
-  const PAGE_W = 595, PAGE_H = 842;
-  const HEADER_H = 60, FOOTER_H = 28;
-
-  // Aggregate stats for the cover snapshot
-  let totalRepairs = 0, totalNa = 0, totalGood = 0;
-  SECTIONS.forEach(s => {
-    state.sections[s.id].grades.forEach(g => {
-      if (g === 'Repair') totalRepairs++;
-      else if (g === 'NA') totalNa++;
-      else if (g === 'Good') totalGood++;
-    });
+  return window.MMQLD_REPORT.build(state, {
+    business: BUSINESS,
+    sections: SECTIONS,
+    logo: window.MMQLD_ASSETS.logoPng,
   });
-
-  return {
-    pageSize: 'A4',
-    pageMargins: [44, HEADER_H + 18, 44, FOOTER_H + 12],
-    defaultStyle: { font: 'Roboto', fontSize: 10, color: COLOR.ink, lineHeight: 1.3 },
-    info: {
-      title: state.reportNumber || 'Vehicle Inspection Report',
-      author: BUSINESS.name,
-      subject: 'Vehicle Inspection Report',
-    },
-
-    background: function (currentPage, pageSize) {
-      return [
-        // Top navy band — slimmer than the invoice, full bleed
-        {
-          canvas: [
-            { type: 'rect', x: 0, y: 0, w: pageSize.width, h: HEADER_H, color: COLOR.navy },
-            { type: 'rect', x: pageSize.width - 180, y: 0, w: 180, h: HEADER_H, color: COLOR.navyBright, fillOpacity: 0.18 },
-          ],
-        },
-        // Footer strip
-        {
-          canvas: [
-            { type: 'rect', x: 0, y: pageSize.height - FOOTER_H, w: pageSize.width, h: FOOTER_H, color: COLOR.navyDeep },
-            { type: 'rect', x: 0, y: pageSize.height - FOOTER_H - 3, w: pageSize.width, h: 3, color: COLOR.navyBright },
-          ],
-        },
-      ];
-    },
-
-    header: function (currentPage) {
-      return {
-        margin: [44, 16, 44, 0],
-        columns: [
-          // Logo + brand
-          {
-            width: '*',
-            columns: [
-              { image: A.logoPng, width: 30, height: 30 },
-              {
-                width: '*',
-                margin: [8, 4, 0, 0],
-                stack: [
-                  { text: BUSINESS.name, color: 'white', fontSize: 13, bold: true, characterSpacing: -0.1 },
-                  { text: BUSINESS.tagline, color: 'white', fontSize: 7.5, characterSpacing: 1.6, margin: [0, 1, 0, 0], opacity: 0.78 },
-                ],
-              },
-            ],
-          },
-          // Right side — phone + website
-          {
-            width: 230,
-            alignment: 'right',
-            margin: [0, 6, 0, 0],
-            stack: [
-              { text: BUSINESS.phone + '  ·  ' + BUSINESS.website, color: 'white', fontSize: 9, opacity: 0.92 },
-              { text: 'ABN ' + BUSINESS.abn, color: 'white', fontSize: 8.5, opacity: 0.7, margin: [0, 2, 0, 0] },
-            ],
-          },
-        ],
-      };
-    },
-
-    footer: function (currentPage, pageCount) {
-      return {
-        margin: [44, 8, 44, 0],
-        columns: [
-          { text: BUSINESS.website, color: 'white', fontSize: 9, alignment: 'left' },
-          { text: 'Page ' + currentPage + ' of ' + pageCount, color: 'white', fontSize: 9, alignment: 'right', opacity: 0.7 },
-        ],
-      };
-    },
-
-    content: [
-
-      /* ─── Cover (page 1) ─── */
-      {
-        margin: [0, 0, 0, 0],
-        text: 'VEHICLE INSPECTION REPORT',
-        fontSize: 10,
-        bold: true,
-        characterSpacing: 2.2,
-        color: COLOR.subtle,
-      },
-      {
-        margin: [0, 6, 0, 0],
-        text: state.inspection.makeModel || 'Vehicle Inspection',
-        fontSize: 26,
-        bold: true,
-        characterSpacing: -0.3,
-        color: COLOR.ink,
-      },
-      // Rego badge + key facts row
-      {
-        margin: [0, 14, 0, 0],
-        columns: [
-          regoBadge(),
-          {
-            width: '*',
-            margin: [16, 0, 0, 0],
-            stack: keyFactsList(),
-          },
-        ],
-      },
-
-      // Snapshot tiles
-      snapshotTiles(totalGood, totalRepairs, totalNa),
-
-      // Client + report metadata
-      detailsBlock(),
-
-      // Each inspection section
-      ...SECTIONS.map(sec => sectionPage(sec)),
-
-      // Images
-      ...imagesPages(A),
-
-      // Overall rating + comments
-      overallPage(),
-
-      // Sign-off
-      signaturePage(),
-
-      // Terms
-      termsPage(),
-    ],
-
-    styles: {
-      eyebrow:    { fontSize: 9, bold: true, characterSpacing: 1.6, color: COLOR.subtle },
-      sectionTag: { fontSize: 9, bold: true, characterSpacing: 1.8, color: COLOR.navy },
-      sectionTitle: { fontSize: 20, bold: true, color: COLOR.ink, characterSpacing: -0.2 },
-      kvKey:      { fontSize: 8.5, bold: true, characterSpacing: 1.2, color: COLOR.subtle },
-      kvVal:      { fontSize: 11, color: COLOR.ink, bold: true },
-    },
-  };
-}
-
-function regoBadge() {
-  const rego = (state.inspection.registration || '—').toUpperCase();
-  return {
-    width: 'auto',
-    table: {
-      widths: ['auto'],
-      body: [[
-        {
-          stack: [
-            { text: 'REGO', fontSize: 8, bold: true, color: 'white', characterSpacing: 2, opacity: 0.75 },
-            { text: rego, fontSize: 22, bold: true, color: 'white', characterSpacing: 2, margin: [0, 4, 0, 0] },
-          ],
-          fillColor: COLOR.navy,
-          border: [false, false, false, false],
-          margin: [16, 12, 16, 12],
-        },
-      ]],
-    },
-    layout: 'noBorders',
-  };
-}
-
-function keyFactsList() {
-  const v = state.inspection;
-  const lines = [];
-  if (v.makeModel) lines.push({ text: [{ text: 'Make/Model  ', style: 'kvKey' }, { text: v.makeModel, style: 'kvVal' }], margin: [0, 0, 0, 4] });
-  if (v.year)      lines.push({ text: [{ text: 'Year  ',       style: 'kvKey' }, { text: v.year, style: 'kvVal' }], margin: [0, 0, 0, 4] });
-  if (v.odometer)  lines.push({ text: [{ text: 'Odometer  ',   style: 'kvKey' }, { text: Number(v.odometer).toLocaleString('en-AU') + ' km', style: 'kvVal' }], margin: [0, 0, 0, 4] });
-  if (v.location)  lines.push({ text: [{ text: 'Inspected at  ', style: 'kvKey' }, { text: v.location, style: 'kvVal', fontSize: 10 }], margin: [0, 0, 0, 4] });
-  if (v.date)      lines.push({ text: [{ text: 'Inspection date  ', style: 'kvKey' }, { text: fmtDate(v.date), style: 'kvVal' }], margin: [0, 0, 0, 0] });
-  return lines;
-}
-
-function snapshotTiles(good, repair, na) {
-  return {
-    margin: [0, 18, 0, 0],
-    columns: [
-      tile('GOOD',    String(good),   COLOR.goodBg,   COLOR.goodFg),
-      tile('REPAIRS', String(repair), COLOR.repairBg, COLOR.repairFg),
-      tile('N / A',   String(na),     COLOR.naBg,     COLOR.naFg),
-      tile('RATING',  state.overall.toUpperCase(), GRADE_BG[state.overall], GRADE_FG[state.overall]),
-    ],
-    columnGap: 8,
-  };
-}
-function tile(label, value, bg, fg) {
-  return {
-    width: '*',
-    table: {
-      widths: ['*'],
-      body: [[
-        {
-          stack: [
-            { text: label, fontSize: 8.5, bold: true, characterSpacing: 1.6, color: fg, opacity: 0.7 },
-            { text: value, fontSize: 18, bold: true, color: fg, margin: [0, 4, 0, 0] },
-          ],
-          fillColor: bg,
-          border: [false, false, false, false],
-          margin: [12, 10, 12, 10],
-        },
-      ]],
-    },
-    layout: 'noBorders',
-  };
-}
-
-function detailsBlock() {
-  // Client details + report metadata, side by side
-  const rd = [
-    ['Report no.', state.reportNumber],
-    ['Report date', fmtDate(state.reportDate)],
-    ['Appointment', fmtDate(state.appointmentDate) + (state.appointmentStart ? '  ' + state.appointmentStart : '') + (state.appointmentEnd ? ' – ' + state.appointmentEnd : '')],
-  ];
-  const cd = [
-    ['Contact', state.client.contact || '—'],
-    ['Phone',   state.client.phone   || '—'],
-    ['Address', state.client.address || '—'],
-  ];
-  return {
-    margin: [0, 22, 0, 0],
-    columns: [
-      kvCard('REPORT', rd),
-      kvCard('CLIENT', cd),
-    ],
-    columnGap: 14,
-  };
-}
-function kvCard(label, rows) {
-  return {
-    width: '*',
-    table: {
-      widths: ['*'],
-      body: [[
-        {
-          stack: [
-            { text: label, style: 'sectionTag', margin: [0, 0, 0, 6] },
-            ...rows.map(([k, v]) => ({
-              margin: [0, 0, 0, 3],
-              text: [
-                { text: k + '  ', style: 'kvKey' },
-                { text: v || '—', fontSize: 10, color: COLOR.ink },
-              ],
-            })),
-          ],
-          fillColor: COLOR.soft,
-          border: [true, false, false, false],
-          borderColor: [COLOR.navy, COLOR.navy, COLOR.navy, COLOR.navy],
-          margin: [14, 12, 14, 12],
-        },
-      ]],
-    },
-    layout: {
-      defaultBorder: false,
-      vLineWidth: (i) => i === 0 ? 3 : 0,
-      vLineColor: () => COLOR.navy,
-    },
-  };
-}
-
-function sectionPage(sec) {
-  const sst = state.sections[sec.id];
-  return {
-    pageBreak: 'before',
-    stack: [
-      { text: 'SECTION ' + sec.num, style: 'sectionTag' },
-      { text: sec.title, style: 'sectionTitle', margin: [0, 4, 0, 0] },
-      sectionHeadline(sst, sec),
-      criteriaTable(sec, sst),
-      sst.comments.trim() ? commentsCard(sst.comments) : { text: '' },
-    ],
-  };
-}
-function sectionHeadline(sst, sec) {
-  const flags = sst.grades.filter(g => g === 'Repair').length;
-  if (flags === 0) {
-    return { text: 'All criteria look good or are within fair range.', fontSize: 10.5, color: COLOR.muted, italics: true, margin: [0, 8, 0, 12] };
-  }
-  return {
-    margin: [0, 8, 0, 12],
-    columns: [
-      {
-        width: 'auto',
-        table: { body: [[{ text: flags + ' to repair', color: COLOR.repairFg, fillColor: COLOR.repairBg, bold: true, fontSize: 10, margin: [10, 5, 10, 5], border: [false, false, false, false] }]] },
-        layout: 'noBorders',
-      },
-      { text: '', width: '*' },
-    ],
-  };
-}
-
-function criteriaTable(sec, sst) {
-  // 2-column grid of criteria. Each cell: label on top, grade chip below.
-  const rows = [];
-  for (let i = 0; i < sec.criteria.length; i += 2) {
-    const leftIdx = i;
-    const rightIdx = i + 1;
-    rows.push([
-      critCell(sec.criteria[leftIdx], sst.grades[leftIdx]),
-      rightIdx < sec.criteria.length ? critCell(sec.criteria[rightIdx], sst.grades[rightIdx]) : { text: '', border: [false, false, false, false] },
-    ]);
-  }
-  return {
-    margin: [0, 0, 0, 14],
-    table: {
-      widths: ['*', '*'],
-      body: rows,
-    },
-    layout: {
-      hLineWidth: () => 0,
-      vLineWidth: (i) => i === 1 ? 0 : 0,
-      paddingTop: () => 4,
-      paddingBottom: () => 4,
-      paddingLeft: (i) => i === 0 ? 0 : 6,
-      paddingRight: (i) => i === 1 ? 0 : 6,
-    },
-  };
-}
-function critCell(label, grade) {
-  return {
-    border: [false, false, false, false],
-    stack: [
-      {
-        table: {
-          widths: ['*'],
-          body: [[
-            {
-              stack: [
-                { text: label, fontSize: 10, bold: true, color: COLOR.ink },
-                {
-                  margin: [0, 5, 0, 0],
-                  columns: [
-                    {
-                      width: 'auto',
-                      table: { body: [[{ text: grade, color: GRADE_FG[grade], fillColor: GRADE_BG[grade], fontSize: 9, bold: true, characterSpacing: 0.6, margin: [8, 3, 8, 3], border: [false, false, false, false] }]] },
-                      layout: 'noBorders',
-                    },
-                    { text: '', width: '*' },
-                  ],
-                },
-              ],
-              fillColor: COLOR.soft,
-              border: [false, false, false, false],
-              margin: [12, 10, 12, 10],
-            },
-          ]],
-        },
-        layout: 'noBorders',
-      },
-    ],
-  };
-}
-
-function commentsCard(text) {
-  return {
-    margin: [0, 4, 0, 0],
-    table: {
-      widths: ['*'],
-      body: [[
-        {
-          stack: [
-            { text: 'COMMENTS', style: 'sectionTag' },
-            { text: text, color: COLOR.muted, fontSize: 10.5, margin: [0, 4, 0, 0], lineHeight: 1.45 },
-          ],
-          fillColor: COLOR.navyTint,
-          border: [true, false, false, false],
-          margin: [14, 10, 14, 12],
-        },
-      ]],
-    },
-    layout: {
-      defaultBorder: false,
-      vLineWidth: (i) => i === 0 ? 3 : 0,
-      vLineColor: () => COLOR.navy,
-    },
-  };
-}
-
-function imagesPages(A) {
-  if (state.images.length === 0) return [];
-  // 6 images per page (3 rows × 2 cols)
-  const perPage = 6;
-  const pages = [];
-  for (let i = 0; i < state.images.length; i += perPage) {
-    pages.push(state.images.slice(i, i + perPage));
-  }
-  return pages.map((batch, pi) => ({
-    pageBreak: 'before',
-    stack: [
-      ...(pi === 0 ? [
-        { text: 'APPENDIX', style: 'sectionTag' },
-        { text: 'Inspection images', style: 'sectionTitle', margin: [0, 4, 0, 0] }
-      ] : []),
-      ...buildImageGrid(batch),
-    ],
-  }));
-}
-function buildImageGrid(batch) {
-  // Build rows of 2 images each.
-  const rows = [];
-  for (let i = 0; i < batch.length; i += 2) {
-    const left = batch[i];
-    const right = batch[i + 1];
-    rows.push({
-      margin: [0, 0, 0, 14],
-      columns: [
-        imageCell(left),
-        right ? imageCell(right) : { text: '', width: '*' },
-      ],
-      columnGap: 14,
-    });
-  }
-  return rows;
-}
-function imageCell(img) {
-  if (!img) return { text: '', width: '*' };
-  const cell = {
-    width: '*',
-    stack: [
-      { image: img.dataUrl, width: 246, alignment: 'left' },
-    ],
-  };
-  if (img.caption && img.caption.trim()) {
-    cell.stack.push({
-      text: img.caption,
-      fontSize: 9,
-      color: COLOR.muted,
-      margin: [0, 5, 0, 0],
-      italics: true,
-    });
-  }
-  return cell;
-}
-
-function overallPage() {
-  return {
-    pageBreak: 'before',
-    stack: [
-      { text: 'SECTION 7', style: 'sectionTag' },
-      { text: 'Overall rating', style: 'sectionTitle', margin: [0, 4, 0, 16] },
-      {
-        columns: [
-          {
-            width: 'auto',
-            table: {
-              body: [[{
-                stack: [
-                  { text: 'OVERALL', fontSize: 8.5, bold: true, characterSpacing: 1.6, color: GRADE_FG[state.overall], opacity: 0.8 },
-                  { text: state.overall, fontSize: 28, bold: true, color: GRADE_FG[state.overall], margin: [0, 6, 0, 0] },
-                ],
-                fillColor: GRADE_BG[state.overall],
-                border: [false, false, false, false],
-                margin: [22, 16, 22, 16],
-              }]],
-            },
-            layout: 'noBorders',
-          },
-          { width: '*', text: '' },
-        ],
-      },
-      ...(state.overallComments.trim() ? [{
-        margin: [0, 18, 0, 0],
-        stack: [
-          { text: 'GENERAL COMMENTS', style: 'sectionTag' },
-          { text: state.overallComments, color: COLOR.muted, fontSize: 11, margin: [0, 6, 0, 0], lineHeight: 1.55 },
-        ],
-      }] : []),
-    ],
-  };
-}
-
-function signaturePage() {
-  return {
-    pageBreak: 'before',
-    stack: [
-      { text: 'SECTION 8', style: 'sectionTag' },
-      { text: 'Sign-off', style: 'sectionTitle', margin: [0, 4, 0, 16] },
-      {
-        margin: [0, 0, 0, 22],
-        table: {
-          widths: ['*'],
-          body: [[
-            {
-              stack: [
-                { text: 'STATEMENT', style: 'sectionTag' },
-                { text: 'I confirm I have inspected and road-tested the above vehicle as per the findings of this report.',
-                  fontSize: 11, color: COLOR.ink, margin: [0, 6, 0, 0], lineHeight: 1.5 },
-              ],
-              fillColor: COLOR.soft,
-              border: [true, false, false, false],
-              margin: [14, 12, 14, 14],
-            },
-          ]],
-        },
-        layout: {
-          defaultBorder: false,
-          vLineWidth: (i) => i === 0 ? 3 : 0,
-          vLineColor: () => COLOR.navy,
-        },
-      },
-      {
-        columns: [
-          {
-            width: '*',
-            stack: [
-              { text: 'NAME', style: 'kvKey' },
-              { text: state.signature.name || ' ', fontSize: 13, color: COLOR.ink, bold: true, margin: [0, 6, 0, 6] },
-              { canvas: [{ type: 'line', x1: 0, y1: 0, x2: 220, y2: 0, lineWidth: 0.6, lineColor: COLOR.ink }] },
-            ],
-          },
-          {
-            width: '*',
-            stack: [
-              { text: 'DATE', style: 'kvKey' },
-              { text: fmtDate(state.signature.date) || ' ', fontSize: 13, color: COLOR.ink, bold: true, margin: [0, 6, 0, 6] },
-              { canvas: [{ type: 'line', x1: 0, y1: 0, x2: 220, y2: 0, lineWidth: 0.6, lineColor: COLOR.ink }] },
-            ],
-          },
-        ],
-      },
-      {
-        margin: [0, 22, 0, 0],
-        stack: [
-          { text: 'SIGNATURE', style: 'kvKey' },
-          state.signature.dataUrl
-            ? { image: state.signature.dataUrl, fit: [260, 90], margin: [0, 8, 0, 6] }
-            : { text: '(not signed)', italics: true, color: COLOR.subtle, margin: [0, 12, 0, 8] },
-          { canvas: [{ type: 'line', x1: 0, y1: 0, x2: 460, y2: 0, lineWidth: 0.6, lineColor: COLOR.ink }] },
-        ],
-      },
-    ],
-  };
-}
-
-function termsPage() {
-  return {
-    pageBreak: 'before',
-    stack: [
-      { text: 'SECTION 9', style: 'sectionTag' },
-      { text: 'Terms and conditions', style: 'sectionTitle', margin: [0, 4, 0, 12] },
-      { text: 'DISCLAIMER', style: 'sectionTag', margin: [0, 6, 0, 4] },
-      { ul: state.terms.disclaimer.map(t => ({ text: t, fontSize: 9.5, color: COLOR.ink, margin: [0, 0, 0, 3] })), color: COLOR.navy },
-      { text: BUSINESS.name + ' does not check the following items', style: 'sectionTag', margin: [0, 14, 0, 4] },
-      { ul: state.terms.notChecked.map(t => ({ text: t, fontSize: 9.5, color: COLOR.ink, margin: [0, 0, 0, 2] })), color: COLOR.navy },
-    ],
-  };
 }
 
 /* ────────────────────────────────────────────────────────────────────
@@ -1711,6 +1239,15 @@ function init() {
     renderForm();
     setupSignature();
     setupCustomerLookup();
+    markClean();
+    // Ask before leaving with unsaved work (logo, phone back, closing the tab).
+    if (window.MMQLD_LEAVE) {
+      MMQLD_LEAVE.init({
+        isDirty: () => snapshot() !== CLEAN,
+        saveDraft: async () => { if (!(await saveDraft({ quiet: true }))) throw new Error('Could not save the draft.'); },
+        backUrl: '../index.html',
+      });
+    }
   })();
 }
 init();

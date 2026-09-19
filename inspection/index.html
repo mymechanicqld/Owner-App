@@ -38,7 +38,7 @@
 <link rel="stylesheet"
   href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" />
 
-<link rel="stylesheet" href="styles.css?v=38" />
+<link rel="stylesheet" href="styles.css?v=41" />
 
 <!-- pdfmake — real client-side PDF generator (selectable text, small files). -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.10/pdfmake.min.js" defer></script>
@@ -76,6 +76,23 @@
   <section class="hero">
     <h1>New inspection</h1>
     <p>Default grade is <strong>Fair</strong> on every criterion. Tap to change. Bulk-set the whole section if everything looks the same.</p>
+  </section>
+
+  <!-- ─────────── Cover photo: one shot of the whole car, used on page one ─────────── -->
+  <section class="cover" id="coverBox" data-has="false">
+    <div class="cover__head"><span class="cover__title">Cover photo</span><span class="cover__tag">Page one</span></div>
+    <p class="cover__hint">Start here. Step back and take the whole car with the phone held <strong>sideways</strong>. It becomes the big photo on the front of the report.</p>
+    <div class="cover__frame" id="coverPreviewWrap">
+      <div class="cover__empty"><svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>No cover photo yet</div>
+      <div id="coverPreview"></div>
+    </div>
+    <div class="cover__actions">
+      <label class="cover__btn cover__btn--primary"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg><span class="lbl-new">Take photo</span><span class="lbl-re">Retake</span>
+        <input type="file" accept="image/*" capture="environment" id="coverInput" /></label>
+      <label class="cover__btn"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>Gallery
+        <input type="file" accept="image/*" id="coverInputGallery" /></label>
+    </div>
+    <button type="button" class="cover__remove" id="coverRemove">Remove cover photo</button>
   </section>
 
   <!-- ─────────── Report details ─────────── -->
@@ -223,6 +240,15 @@
       <svg class="sec__chev" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
     </summary>
     <div class="sec__body">
+      <div class="score" id="scoreBox" data-set="false">
+        <div class="score__top">
+          <span class="score__label">Overall score</span>
+          <span class="score__value"><span id="scoreValue">Not scored</span><small>/ 100</small></span>
+        </div>
+        <input type="range" id="scoreRange" min="0" max="100" step="10" value="60" aria-label="Overall score out of 100" />
+        <div class="score__scale"><span>0</span><span>50</span><span>100</span></div>
+        <div class="score__foot"><span>Shown as a gauge on the report. Sets the rating below.</span><button type="button" id="scoreClear">Clear</button></div>
+      </div>
       <fieldset class="field">
         <legend class="field__label">Overall rating</legend>
         <div class="grades grades--big" id="overallGrades" role="radiogroup"></div>
@@ -324,10 +350,12 @@
 <script src="../settings.js?v=38"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="../storage.js?v=38" defer></script>
-<script src="../customers.js?v=38" defer></script>
+<script src="../customers.js?v=39" defer></script>
 <script src="../gmail-send.js?v=38" defer></script>
 <script src="assets.js?v=38" defer></script>
-<script src="app.js?v=38" defer></script>
+<script src="../leave-guard.js?v=40" defer></script>
+<script src="report-pdf.js?v=43" defer></script>
+<script src="app.js?v=42" defer></script>
 
 </body>
 </html>

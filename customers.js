@@ -1,9 +1,9 @@
 /* ============================================================================
    Customer lookup + autocomplete, shared by the invoice and inspection
-   generators.
+   generators and the main app's booking sheet.
 
-   Pulls the people the business has already dealt with (website inquiries and
-   previously issued invoices), de-duplicates them, and offers them as a
+   Pulls the people the business has already dealt with (website inquiries,
+   previously issued invoices and calendar bookings), de-duplicates them, and offers them as a
    type-ahead dropdown ordered by recency. Picking one fills the whole form, so
    the owner never retypes a customer he already has on file.
 
@@ -40,9 +40,11 @@
     if (cache && !force) return cache;
     if (inflight) return inflight;
     inflight = (async () => {
-      const [subs, invs] = await Promise.all([
+      // select=* on bookings so an older table without customer_email still loads.
+      const [subs, invs, bks] = await Promise.all([
         getJson('quote_submissions?select=id,full_name,email,phone,suburb,address,vehicle_rego,vehicle_make,vehicle_model,vehicle_year,created_at&order=created_at.desc&limit=400'),
         getJson('invoices?select=customer_name,business_name,customer_email,vehicle_rego,vehicle,created_at&order=created_at.desc&limit=200'),
+        getJson('calendar_events?select=*&order=starts_at.desc&limit=200'),
       ]);
 
       const all = [];
@@ -73,6 +75,19 @@
         src: 'invoice',
       }));
 
+      bks.forEach((b) => all.push({
+        name: (b.customer_name || '').trim(),
+        business: '',
+        email: (b.customer_email || '').trim(),
+        phone: (b.customer_phone || '').trim(),
+        address: (b.address || '').trim(),
+        suburb: (b.suburb || '').trim(),
+        rego: (b.vehicle_rego || '').trim(),
+        make: '', year: '',
+        submissionId: b.submission_id || '',
+        when: b.updated_at || b.created_at || '',
+        src: 'booking',
+      }));
       // Newest first, then keep the first sighting of each person+vehicle and
       // backfill any blanks from their older records.
       all.sort((a, b) => new Date(b.when || 0) - new Date(a.when || 0));

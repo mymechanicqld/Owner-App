@@ -68,7 +68,7 @@
   const slimBooking = (r) => ({
     id: r.id, when: niceWhen(r.starts_at), starts_at: r.starts_at,
     finishes: r.ends_at ? niceWhen(r.ends_at) : null, title: r.title,
-    job: svcLabel(r.service) || r.service || null, customer: r.customer_name, phone: r.customer_phone,
+    job: svcLabel(r.service) || r.service || null, customer: r.customer_name, phone: r.customer_phone, email: r.customer_email || null,
     rego: r.vehicle_rego, suburb: r.suburb, address: r.address, notes: clip(r.notes, 300), status: r.status,
   });
   const slimInvoice = (r) => ({
@@ -179,7 +179,7 @@
     });
     bookings.forEach((r) => {
       const p = slot(r.customer_name, r.vehicle_rego);
-      fill(p, { phone: r.customer_phone, suburb: r.suburb, address: r.address });
+      fill(p, { email: r.customer_email, phone: r.customer_phone, suburb: r.suburb, address: r.address });
       p.bookings.push(slimBooking(r));
     });
 
@@ -334,6 +334,7 @@
     set('title', a.title);
     set('service', a.job_type ? (svcKey(a.job_type) || a.job_type) : undefined);
     set('customer_name', a.customer_name); set('customer_phone', a.customer_phone);
+    set('customer_email', a.customer_email ? String(a.customer_email).trim().toLowerCase() : undefined);
     set('vehicle_rego', a.vehicle_rego); set('suburb', a.suburb);
     set('address', a.address); set('notes', a.notes);
 
@@ -350,10 +351,16 @@
       delete row.address;
       ({ data, error } = await run(row));
     }
+    let emailNote;
+    if (error && /customer_email/i.test(error.message)) {
+      delete row.customer_email;
+      ({ data, error } = await run(row));
+      emailNote = 'Saved without the email: the calendar cannot store emails yet. Tell him the email was not kept.';
+    }
     if (error) return { error: error.message };
     if (typeof loadEvents === 'function') { try { await loadEvents(); if (STATE.view === 'calendar') render(); } catch (_) {} }
     const saved = (data && data[0]) || {};
-    return { ok: true, action: a.id ? 'updated' : 'created', booking: slimBooking(saved) };
+    return { ok: true, action: a.id ? 'updated' : 'created', booking: slimBooking(saved), note: emailNote };
   }
 
   async function update_inquiry(a) {
@@ -530,7 +537,7 @@
         properties: {
           kind: { type: 'string', enum: ['invoices', 'inspections'] },
           since_days: { type: 'number', description: 'How far back to look, in days. Default 90.' },
-          payment_status: { type: 'string', enum: ['paid', 'partial', 'outstanding'], description: 'Invoices only' },
+          payment_status: { type: 'string', enum: ['paid', 'outstanding'], description: 'Invoices only' },
           unpaid_only: { type: 'boolean', description: 'Invoices only. Anything not fully paid.' },
           customer: { type: 'string', description: 'Filter by customer name' },
           limit: { type: 'number' },
@@ -585,6 +592,7 @@
           time: { type: 'string', description: 'HH:MM, 24 hour' },
           duration_minutes: { type: 'number' },
           customer_name: { type: 'string' }, customer_phone: { type: 'string' },
+          customer_email: { type: 'string', description: 'Keep it on the booking whenever you know it, so the invoice can be emailed later' },
           vehicle_rego: { type: 'string' }, suburb: { type: 'string' },
           address: { type: 'string' }, notes: { type: 'string' },
         },
@@ -626,7 +634,7 @@
         type: 'object',
         properties: {
           id: { type: 'string' },
-          payment_status: { type: 'string', enum: ['paid', 'partial', 'outstanding'] },
+          payment_status: { type: 'string', enum: ['paid', 'outstanding'] },
           paid: { type: 'number', description: 'Amount received so far' },
           notes: { type: 'string' },
         },

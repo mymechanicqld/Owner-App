@@ -38,7 +38,7 @@
 <link rel="stylesheet"
   href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" />
 
-<link rel="stylesheet" href="styles.css?v=36" />
+<link rel="stylesheet" href="styles.css?v=43" />
 
 <!-- pdfmake — real client-side PDF generator. Produces selectable text,
      not screenshots. Total bundle ~1.3 MB but cached after first load. -->
@@ -165,16 +165,11 @@
     </header>
     <div class="card__body card__body--flush">
       <div id="itemsList" class="items"></div>
-      <div class="add-row">
-        <button class="add-btn" id="addItem" type="button">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          Add item
-        </button>
-        <button class="add-btn" id="savedItemsBtn" type="button">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
-          Saved items
-        </button>
-      </div>
+      <!-- One way in: search the price list, tap to add, or create a new item. -->
+      <button class="add-btn add-btn--big" id="addItemsBtn" type="button">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Add items
+      </button>
     </div>
   </section>
 
@@ -212,7 +207,6 @@
           <legend class="field__label">Status</legend>
           <div class="seg" id="statusSeg" role="radiogroup">
             <button type="button" class="seg__opt seg__opt--paid"        data-status="paid">Paid</button>
-            <button type="button" class="seg__opt seg__opt--partial"     data-status="partial">Partial</button>
             <button type="button" class="seg__opt seg__opt--outstanding" data-status="outstanding">Outstanding</button>
           </div>
         </fieldset>
@@ -232,7 +226,7 @@
     </header>
     <div class="card__body">
       <label class="field">
-        <textarea id="notes" rows="3" placeholder="Bank: BSB 064-000, Acc 123456789. Reference the invoice number on transfer." data-bind="notes"></textarea>
+        <textarea id="notes" rows="3" placeholder="Anything the customer should know about this job. Bank details are printed on the invoice automatically." data-bind="notes"></textarea>
       </label>
     </div>
   </section>
@@ -290,21 +284,54 @@
   <div class="drafts__list" id="draftsList"></div>
 </div>
 
-<!-- Saved items picker -->
-<div class="drafts" id="savedPanel" hidden>
+<!-- Item picker: search, tap to add (as many as needed), or create a new one -->
+<div class="drafts picker" id="savedPanel" hidden>
   <div class="drafts__head">
-    <h3>Saved items <small id="savedCount" style="font-weight:600;color:#78716C;font-size:12px"></small></h3>
+    <h3>Add items <small id="savedCount"></small></h3>
     <button class="iconbtn" id="closeSavedBtn" aria-label="Close">
       <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
     </button>
   </div>
-  <div style="padding:0 16px 10px">
-    <input id="savedFilter" type="search" placeholder="Search your price list" autocomplete="off"
-      style="width:100%;padding:11px 13px;border:1px solid #E7E5E0;border-radius:11px;font-size:16px;background:#fff" />
+
+  <div class="picker__view" id="pickView">
+    <div class="picker__search">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input id="savedFilter" type="search" placeholder="Search parts and jobs" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="search" />
+    </div>
+    <p class="picker__hint">Tap an item to add it. Tap again to add another.</p>
+    <div class="picker__list" id="savedList"></div>
   </div>
-  <div class="drafts__list" id="savedList"></div>
+
+  <div class="picker__view" id="newView" hidden>
+    <div class="picker__form">
+      <label class="field">
+        <span class="field__label">Item name</span>
+        <input id="newName" type="text" placeholder="e.g. Coolant flush" autocomplete="off" />
+      </label>
+      <div class="row-2">
+        <label class="field">
+          <span class="field__label">Price (inc GST)</span>
+          <input id="newPrice" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0.00" />
+        </label>
+        <label class="field">
+          <span class="field__label">Qty</span>
+          <input id="newQty" type="number" inputmode="decimal" min="0" step="0.5" value="1" />
+        </label>
+      </div>
+      <label class="field">
+        <span class="field__label">Description <em>optional</em></span>
+        <input id="newDesc" type="text" placeholder="A short note to tell similar items apart" autocomplete="off" />
+      </label>
+      <label class="picker__check">
+        <input type="checkbox" id="newRemember" checked />
+        <span><strong>Save to my price list</strong><small>So it comes up in search next time</small></span>
+      </label>
+    </div>
+  </div>
+
   <div class="saved__foot">
-    <button class="fab__btn fab__btn--primary" id="addSelectedBtn" type="button">Add selected</button>
+    <button class="fab__btn fab__btn--secondary" id="newBackBtn" type="button" hidden>Back to list</button>
+    <button class="fab__btn fab__btn--primary" id="addSelectedBtn" type="button">Done</button>
   </div>
 </div>
 
@@ -314,14 +341,16 @@
 <div class="toasts" id="toastWrap"></div>
 
 <script src="https://accounts.google.com/gsi/client" async defer></script>
-<script src="../config.js?v=36"></script>
-<script src="../settings.js?v=36"></script>
+<script src="../config.js?v=40"></script>
+<script src="../settings.js?v=40"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="../storage.js?v=36" defer></script>
-<script src="../customers.js?v=36" defer></script>
-<script src="../gmail-send.js?v=36" defer></script>
-<script src="assets.js?v=36" defer></script>
-<script src="app.js?v=36" defer></script>
+<script src="../storage.js?v=40" defer></script>
+<script src="../customers.js?v=39" defer></script>
+<script src="../gmail-send.js?v=40" defer></script>
+<script src="assets.js?v=40" defer></script>
+<script src="../leave-guard.js?v=40" defer></script>
+<script src="invoice-pdf.js?v=43" defer></script>
+<script src="app.js?v=43" defer></script>
 
 </body>
 </html>

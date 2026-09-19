@@ -18,6 +18,7 @@ create table if not exists public.calendar_events (
   all_day       boolean not null default false,
   customer_name text,
   customer_phone text,
+  customer_email text,
   vehicle_rego  text,
   suburb        text,
   address       text,
@@ -29,6 +30,7 @@ create table if not exists public.calendar_events (
 create index if not exists calendar_events_starts_idx on public.calendar_events (starts_at);
 -- For calendar_events tables created before the address column existed:
 alter table public.calendar_events add column if not exists address text;
+alter table public.calendar_events add column if not exists customer_email text;
 
 alter table public.calendar_events enable row level security;
 drop policy if exists "cal_all" on public.calendar_events;
@@ -134,5 +136,5 @@ create policy "docs_delete" on storage.objects
   using (bucket_id in ('invoices', 'inspections'));
 
 -- ============================================================================
--- Done. Files are named <date>_<rego>.pdf inside each bucket.
+-- Done. Current app file names include date, rego and a unique time suffix.
 -- ============================================================================

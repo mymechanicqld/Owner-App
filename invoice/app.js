@@ -24,6 +24,8 @@ const BUSINESS = {
   email:   'mymechanicqld@gmail.com',
   website: 'www.mymechanicqld.com.au',
   abn:     '85 829 529 258',
+  // Printed on every invoice so a customer always knows where to pay.
+  bank: { name: 'My Mechanic Qld', bsb: '484-799', account: '506731007' },
 };
 
 /* ────────────────────────────────────────────────────────────────────
@@ -59,7 +61,7 @@ const blankItem    = () => ({ id: uid(), desc: '', qty: 1, price: 0 });
    next invoice, with no step in between. FALLBACK_ITEMS only ever appears if
    the price list is empty or unreachable, so the picker is never blank. */
 const FALLBACK_ITEMS = [
-  { desc: 'Standard (regular) service', price: 369 },
+  { desc: 'Standard Service', price: 369 },
   { desc: 'Mobile diagnostic (inspect and test)', price: 189 },
   { desc: 'Front brake pads supplied and fitted', price: 359 },
   { desc: 'Rear brake pads supplied and fitted', price: 369 },
@@ -78,12 +80,13 @@ let savedFilter = '';
     if (Array.isArray(c) && c.length) SAVED_ITEMS = c;
   } catch (_) {}
 
-  fetch(CONFIG.SUPABASE_URL.replace(/\/+$/, '') + '/rest/v1/products?select=name,description,price&active=eq.true&order=name.asc',
+  fetch(CONFIG.SUPABASE_URL.replace(/\/+$/, '') + '/rest/v1/products?select=id,code,name,description,price&active=eq.true&order=name.asc',
     { headers: { apikey: CONFIG.SUPABASE_KEY } })
     .then((r) => (r.ok ? r.json() : null))
     .then((rows) => {
       if (!rows || !rows.length) return;
       SAVED_ITEMS = rows.map((r) => ({
+        code: r.code,
         desc: r.name,
         price: r.price == null ? 0 : Number(r.price),
         note: r.description || '',
@@ -139,6 +142,9 @@ function blankState() {
 }
 
 let state = blankState();
+/* The form as it was last loaded or saved. Anything different is unsaved. */
+let CLEAN = '';
+function markClean() { CLEAN = JSON.stringify(state); }
 
 /* URL-param prefill — populated in init() from query string. Kept separately
    so the send and inquiry-link paths still work with older saved state. */
@@ -202,6 +208,9 @@ function renderAll() {
     if (el.value !== val) el.value = val ?? '';
   });
 
+  // Partial payments are not offered any more; older invoices read as outstanding.
+  if (state.invoice && state.invoice.status === 'partial') state.invoice.status = 'outstanding';
+
   // Status segment
   $$('#statusSeg .seg__opt').forEach(b => {
     b.setAttribute('aria-pressed', String(b.dataset.status === state.invoice.status));
@@ -236,6 +245,7 @@ function renderItems() {
     <div class="item" data-id="${it.id}">
       <input type="text" class="item__desc" placeholder="Description" data-field="desc"
              value="${escA(it.desc)}" />
+      ${detailsHtml(it)}
       <div class="item__row">
         <label class="item__cell">
           <span class="item__cell-label">Qty</span>
@@ -259,6 +269,19 @@ function renderItems() {
     </div>
   `).join('');
   $('#itemsCountHint').textContent = state.items.length === 1 ? '1 item' : `${state.items.length} items`;
+}
+
+/* Optional details under a line, printed on the invoice beneath it (the
+   Standard Service checklist, say). Filled from the price list when the item
+   is added; shown for editing only once there is something to show. */
+const openDetails = new Set();
+function detailsHtml(it) {
+  if (!it.details && !openDetails.has(it.id)) {
+    return `<button type="button" class="item__more" data-details="${it.id}">+ Add details for the customer</button>`;
+  }
+  const rows = Math.min(14, Math.max(3, String(it.details || '').split('\n').length + 1));
+  return `<label class="item__details-wrap"><span class="item__cell-label">Details printed on the invoice</span>
+    <textarea class="item__details" data-field="details" rows="${rows}" placeholder="One point per line. End a line with a colon to start a checklist, e.g. Inspected the following:">${escA(it.details || '')}</textarea></label>`;
 }
 
 function renderReceipts() {
@@ -363,6 +386,7 @@ document.addEventListener('input', (e) => {
       renderTotals();
     } else {
       item[t.dataset.field] = t.value;
+      if (t.dataset.field === 'details') t.rows = Math.min(14, Math.max(3, t.value.split('\n').length + 1));
     }
     return;
   }
@@ -410,6 +434,16 @@ document.addEventListener('click', (e) => {
     return;
   }
 
+  // Show the details box for a line
+  const more = e.target.closest('[data-details]');
+  if (more) {
+    openDetails.add(more.dataset.details);
+    renderItems();
+    const box = $(`.item[data-id="${more.dataset.details}"] .item__details`);
+    if (box) box.focus();
+    return;
+  }
+
   // Remove item
   const rmItem = e.target.closest('[data-remove]');
   if (rmItem) {
@@ -442,15 +476,6 @@ $('#gstToggle').addEventListener('keydown', (e) => {
   }
 });
 
-// Add buttons
-$('#addItem').addEventListener('click', () => {
-  state.items.push(blankItem());
-  renderItems();
-  renderTotals();
-  // Focus the new item's desc
-  const last = $$('.item[data-id]').pop();
-  last?.querySelector('.item__desc')?.focus();
-});
 
 $('#addReceipt').addEventListener('click', () => {
   state.receipts.push(blankReceipt());
@@ -463,6 +488,7 @@ $('#newBtn').addEventListener('click', () => {
   if (!confirm('Start a new invoice? Unsaved changes will be lost.')) return;
   state = blankState();
   renderAll();
+  markClean();
   toast('New invoice started.');
 });
 
@@ -473,39 +499,169 @@ const scrim = $('#scrim');
 function closeOverlays() { draftsPanel.hidden = true; savedPanel.hidden = true; scrim.hidden = true; }
 function openDrafts() { renderDrafts(); draftsPanel.hidden = false; scrim.hidden = false; }
 function closeDrafts() { closeOverlays(); }
-function openSaved() { savedFilter = ''; const sf = $('#savedFilter'); if (sf) sf.value = ''; renderSaved(); savedPanel.hidden = false; scrim.hidden = false; }
+/* ─── Item picker ───
+   One button opens it. Search the price list, tap a row to put it on the
+   invoice (tap again for another), and if it is not there, add it as a new
+   item, which is also saved to the price list for next time. */
+let pickAdded = 0;
+
+/* Ranking: the name starting with what was typed beats a word inside the
+   name starting with it, which beats the letters merely appearing somewhere.
+   "se" puts "Service..." above "Brake service" above "Hose". Every typed
+   word must match somewhere, so "front pad" narrows properly. */
+function pickScore(it, q) {
+  const name = String(it.desc || '').toLowerCase();
+  const note = String(it.note || '').toLowerCase();
+  const toks = q.split(/\s+/).filter(Boolean);
+  if (!toks.every((t) => name.includes(t) || note.includes(t))) return -1;
+  const first = toks[0];
+  if (name.startsWith(q)) return 0;
+  if (name.startsWith(first)) return 1;
+  if (name.split(/[^a-z0-9]+/).some((w) => w.startsWith(first))) return 2;
+  if (name.includes(first)) return 3;
+  return 4;                                   // matched on the description only
+}
+function highlight(name, q) {
+  const first = q.split(/\s+/).filter(Boolean)[0];
+  if (!first) return escA(name);
+  const lower = name.toLowerCase();
+  let at = lower.startsWith(first) ? 0 : -1;
+  if (at < 0) { const m = lower.match(new RegExp('[^a-z0-9]' + first.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))); if (m) at = m.index + 1; }
+  if (at < 0) return escA(name);
+  return escA(name.slice(0, at)) + '<mark>' + escA(name.slice(at, at + first.length)) + '</mark>' + escA(name.slice(at + first.length));
+}
+function linesFor(desc) {
+  return state.items.filter((x) => x.desc === desc).reduce((n, x) => n + (Number(x.qty) || 0), 0);
+}
+function openSaved() {
+  savedFilter = '';
+  pickAdded = 0;
+  const sf = $('#savedFilter'); if (sf) sf.value = '';
+  showPickList();
+  renderSaved();
+  savedPanel.hidden = false; scrim.hidden = false;
+}
+function showPickList() {
+  $('#pickView').hidden = false; $('#newView').hidden = true;
+  $('#newBackBtn').hidden = true;
+  $('#addSelectedBtn').textContent = pickAdded ? 'Done, ' + pickAdded + ' added' : 'Done';
+}
 function renderSaved() {
   const q = savedFilter.trim().toLowerCase();
   const rows = SAVED_ITEMS
-    .map((it, i) => ({ it, i }))
-    .filter(({ it }) => !q || (it.desc + ' ' + (it.note || '')).toLowerCase().includes(q));
-  $('#savedCount').textContent = SAVED_ITEMS.length + (SAVED_ITEMS.length === 1 ? ' item' : ' items');
-  $('#savedList').innerHTML = rows.length
-    ? rows.map(({ it, i }) =>
-        `<label class="saved-item"><input type="checkbox" data-i="${i}">` +
-        `<span class="saved-item__desc">${escA(it.desc)}` +
-        (it.note ? `<small>${escA(it.note)}</small>` : '') + `</span>` +
-        `<span class="saved-item__price">${it.price ? '$' + it.price : '<em>no price</em>'}</span></label>`
-      ).join('')
-    : '<div class="drafts__empty">Nothing matches that.</div>';
+    .map((it, i) => ({ it, i, sc: q ? pickScore(it, q) : 0 }))
+    .filter((r) => r.sc >= 0)
+    .sort((a, b) => a.sc - b.sc || String(a.it.desc).localeCompare(String(b.it.desc)));
+  $('#savedCount').textContent = q ? rows.length + ' of ' + SAVED_ITEMS.length : SAVED_ITEMS.length + ' items';
+  const plus = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>';
+  const typed = savedFilter.trim();
+  const newRow = `<button type="button" class="pick pick--new" data-new="1"><span class="pick__main"><span class="pick__name">${typed ? 'Add “' + escA(typed) + '” as a new item' : 'Add a new item'}</span><span class="pick__note">Not on the list? Add it here and it is saved for next time</span></span><span class="pick__add">${plus}</span></button>`;
+  $('#savedList').innerHTML = (rows.length ? '' : `<div class="picker__empty">Nothing on your list matches “${escA(typed)}”.</div>`)
+    + rows.map(({ it, i }) => {
+      const n = linesFor(it.desc);
+      return `<button type="button" class="pick${n ? ' is-added' : ''}" data-i="${i}">`
+        + `<span class="pick__main"><span class="pick__name">${highlight(it.desc, q)}</span>`
+        + (it.note ? `<span class="pick__note">${escA(it.note)}</span>` : '')
+        + `<span class="pick__count">${n ? 'On invoice' + (n > 1 ? ' ×' + n : '') : ''}</span></span>`
+        + `<span class="pick__price">${it.price ? '$' + it.price : '<em>no price</em>'}</span>`
+        + `<span class="pick__add">${n ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>' : plus}</span></button>`;
+    }).join('') + newRow;
+}
+/* Put an item on the invoice. The same item again raises its quantity
+   rather than adding a duplicate line; the empty starter line is reused. */
+function addLine(desc, price, qty, details) {
+  const q = Number(qty) || 1;
+  const same = state.items.find((x) => x.desc === desc && Number(x.price) === Number(price || 0));
+  if (same) same.qty = (Number(same.qty) || 0) + q;
+  else {
+    // The price list description comes along as the line's printed details.
+    const line = { desc, qty: q, price: Number(price) || 0 };
+    if (details && String(details).trim()) line.details = String(details).trim();
+    const blank = state.items.find((x) => !String(x.desc || '').trim() && !Number(x.price));
+    if (blank) Object.assign(blank, line);
+    else state.items.push(Object.assign({ id: uid() }, line));
+  }
+  pickAdded += 1;
+  renderItems();
+  renderTotals();
+}
+function openNewItem() {
+  const typed = savedFilter.trim();
+  $('#newName').value = typed ? typed.charAt(0).toUpperCase() + typed.slice(1) : '';
+  $('#newPrice').value = ''; $('#newQty').value = '1'; $('#newDesc').value = '';
+  $('#newRemember').checked = true;
+  $('#pickView').hidden = true; $('#newView').hidden = false;
+  $('#newBackBtn').hidden = false;
+  $('#addSelectedBtn').textContent = 'Add to invoice';
+  setTimeout(() => $(typed ? '#newPrice' : '#newName').focus(), 60);
+}
+async function addNewItem() {
+  const name = $('#newName').value.trim();
+  if (!name) { toast('Give the item a name', 'error'); $('#newName').focus(); return; }
+  const priceRaw = $('#newPrice').value.trim();
+  const price = priceRaw === '' ? null : Math.round(Number(priceRaw) * 100) / 100;
+  const note = $('#newDesc').value.trim();
+  addLine(name, price || 0, $('#newQty').value, note);
+  savedFilter = ''; $('#savedFilter').value = '';
+  showPickList(); renderSaved();
+  if (!$('#newRemember').checked) { toast('Added to this invoice'); return; }
+  const btn = $('#addSelectedBtn');
+  try {
+    btn.disabled = true;
+    await saveToPriceList({ name, price, note });
+    toast('Added, and saved to your price list', 'success');
+  } catch (err) {
+    console.error(err);
+    toast('Added to the invoice, but it could not be saved to the price list', 'error');
+  } finally { btn.disabled = false; }
+}
+/* Same table and upsert key the price list page uses, so the item shows up
+   there too and editing it later updates this row. */
+async function saveToPriceList({ name, price, note }) {
+  let code = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60) || 'item';
+  if (SAVED_ITEMS.some((x) => x.code === code)) code += '-' + Date.now().toString(36);
+  const res = await fetch(CONFIG.SUPABASE_URL.replace(/\/+$/, '') + '/rest/v1/products?on_conflict=code', {
+    method: 'POST',
+    headers: { apikey: CONFIG.SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=representation' },
+    body: JSON.stringify([{ code, name, description: note || null, price, active: true }]),
+  });
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  SAVED_ITEMS.push({ code, desc: name, price: price == null ? 0 : price, note });
+  SAVED_ITEMS.sort((a, b) => String(a.desc).localeCompare(String(b.desc)));
+  try { localStorage.setItem(PRODUCTS_CACHE, JSON.stringify(SAVED_ITEMS)); } catch (_) {}
 }
 $('#loadBtn').addEventListener('click', openDrafts);
 $('#closeDraftsBtn').addEventListener('click', closeDrafts);
-$('#savedItemsBtn').addEventListener('click', openSaved);
-$('#savedFilter').addEventListener('input', (e) => { savedFilter = e.target.value; renderSaved(); });
+$('#addItemsBtn').addEventListener('click', openSaved);
+$('#savedFilter').addEventListener('input', (e) => { savedFilter = e.target.value; renderSaved(); $('#savedList').scrollTop = 0; });
+$('#savedFilter').addEventListener('keydown', (e) => {
+  // Enter adds the top match, handy with a keyboard.
+  if (e.key !== 'Enter') return;
+  e.preventDefault();
+  const first = $('#savedList .pick[data-i]');
+  if (first) first.click(); else openNewItem();
+});
+$('#savedList').addEventListener('click', (e) => {
+  const row = e.target.closest('.pick');
+  if (!row) return;
+  if (row.dataset.new) return openNewItem();
+  const it = SAVED_ITEMS[+row.dataset.i];
+  if (!it) return;
+  addLine(it.desc, it.price || 0, 1, it.note);
+  const scroll = $('#savedList').scrollTop;
+  renderSaved();
+  $('#savedList').scrollTop = scroll;
+  const again = $(`#savedList .pick[data-i="${row.dataset.i}"]`);
+  if (again) { again.classList.add('flash'); }
+  $('#addSelectedBtn').textContent = 'Done, ' + pickAdded + ' added';
+});
+$('#newBackBtn').addEventListener('click', () => { showPickList(); renderSaved(); });
 $('#closeSavedBtn').addEventListener('click', closeOverlays);
 $('#scrim').addEventListener('click', closeOverlays);
 $('#addSelectedBtn').addEventListener('click', () => {
-  const checks = $$('#savedList input[type="checkbox"]');
-  let added = 0;
-  checks.forEach((c) => {
-    if (c.checked) { const it = SAVED_ITEMS[+c.dataset.i]; state.items.push({ id: uid(), desc: it.desc, qty: 1, price: it.price || 0 }); added++; }
-  });
-  if (!added) { toast('Select at least one item'); return; }
-  renderItems();
-  renderTotals();
+  if (!$('#newView').hidden) return addNewItem();
   closeOverlays();
-  toast(added + (added > 1 ? ' items' : ' item') + ' added');
+  if (pickAdded) toast(pickAdded + (pickAdded > 1 ? ' items' : ' item') + ' added');
 });
 
 /* Save — writes the invoice to the records so it shows in the Invoices list.
@@ -609,6 +765,7 @@ $('#draftsList').addEventListener('click', (e) => {
     // Older drafts predate the signature field — keep state shape stable.
     if (!state.signature) state.signature = { name: '', dataUrl: '' };
     renderAll();
+    markClean();
     closeDrafts();
     toast('Draft loaded.');
   }
@@ -633,24 +790,7 @@ function toast(msg, kind) {
    the layout works on every browser.
    ─────────────────────────────────────────────────────────────────── */
 
-const COLOR = {
-  navy:        '#1E3A8A',
-  navyDeep:    '#1A2E6E',
-  navyBright:  '#2563EB',
-  navyTint:    '#E8EEFB',
-  ink:         '#0C0A09',
-  muted:       '#44403C',
-  subtle:      '#78716C',
-  hairline:    '#E7E5E0',
-  soft:        '#F5F4EF',
-  surface:     '#FFFFFF',
-  success:     '#047857',
-  successBg:   '#D1FAE5',
-  warning:     '#B45309',
-  warningBg:   '#FEF3C7',
-  danger:      '#B91C1C',
-  dangerBg:    '#FEE2E2',
-};
+
 
 /* ────────────────────────────────────────────────────────────────────
    Save record to Supabase — logs the computed invoice + uploads the PDF.
@@ -697,6 +837,7 @@ async function saveInvoiceRecord(b64) {
     } else {
       toast('This invoice has been saved', 'success');
     }
+    markClean();
     return true;
   } catch (err) {
     console.error(err);
@@ -705,552 +846,10 @@ async function saveInvoiceRecord(b64) {
   }
 }
 
+/* The printed layout lives in invoice-pdf.js, which has no DOM access, so
+   the same file can be rendered and checked outside the browser. */
 function buildInvoiceDoc(t, A) {
-  const statusMap = {
-    paid:        { label: 'PAID IN FULL',    bg: COLOR.successBg, fg: COLOR.success },
-    partial:     { label: 'PARTIAL PAYMENT', bg: COLOR.warningBg, fg: COLOR.warning },
-    outstanding: { label: 'OUTSTANDING',     bg: COLOR.dangerBg,  fg: COLOR.danger  },
-  };
-  const status = statusMap[state.invoice.status];
-
-  // pdfmake document uses points (1 pt = 1/72 inch). A4 = 595 × 842 pt.
-  const HEADER_H = 110;   // navy header band — tightened from 150 to free up body space
-  const FOOTER_H = 30;    // navy footer strip
-
-  return {
-    pageSize: 'A4',
-    pageMargins: [40, HEADER_H + 18, 40, FOOTER_H + 12],
-    defaultStyle: { font: 'Roboto', fontSize: 10, color: COLOR.ink, lineHeight: 1.25 },
-
-    info: {
-      title: state.invoice.number || 'Invoice',
-      author: BUSINESS.name,
-      subject: 'Tax invoice',
-      creator: BUSINESS.name + ' invoice generator',
-    },
-
-    /* Background runs first on every page — used for the watermark, the
-       navy header band and the navy footer strip. */
-    background: function (currentPage, pageSize) {
-      return [
-        // Centered watermark — gear+wrench+M
-        {
-          image: A.watermarkPng,
-          width: 320,
-          opacity: 0.08,
-          absolutePosition: {
-            x: (pageSize.width - 320) / 2,
-            y: (pageSize.height - 320) / 2,
-          },
-        },
-        // Navy header band on every page
-        {
-          canvas: [
-            { type: 'rect', x: 0, y: 0, w: pageSize.width, h: HEADER_H,
-              color: COLOR.navy },
-            // Subtle gradient overlay (right edge a touch brighter)
-            { type: 'rect', x: pageSize.width - 220, y: 0, w: 220, h: HEADER_H,
-              color: COLOR.navyBright, fillOpacity: 0.18 },
-          ],
-        },
-        // Footer strip
-        {
-          canvas: [
-            { type: 'rect', x: 0, y: pageSize.height - FOOTER_H,
-              w: pageSize.width, h: FOOTER_H, color: COLOR.navyDeep },
-            { type: 'rect', x: 0, y: pageSize.height - FOOTER_H - 4,
-              w: pageSize.width, h: 4, color: COLOR.navyBright },
-          ],
-        },
-      ];
-    },
-
-    /* The header column on every page: logo + contact info, sitting on
-       top of the navy band. Tighter than the original to free up the
-       page body. */
-    header: function () {
-      return {
-        margin: [40, 22, 40, 0],
-        columns: [
-          // Logo + brand block
-          {
-            width: '*',
-            columns: [
-              {
-                image: A.logoPng,
-                width: 46,
-                height: 46,
-              },
-              {
-                width: '*',
-                margin: [10, 4, 0, 0],
-                stack: [
-                  { text: BUSINESS.name, color: 'white', fontSize: 17, bold: true, characterSpacing: -0.2 },
-                  { text: BUSINESS.tagline, color: 'white', fontSize: 8.5, characterSpacing: 2, margin: [0, 2, 0, 0], opacity: 0.78 },
-                ],
-              },
-            ],
-          },
-          // Contact info — denser stack
-          {
-            width: 220,
-            alignment: 'right',
-            margin: [0, 2, 0, 0],
-            stack: [
-              { text: BUSINESS.phone,             color: 'white', fontSize: 9.5,  margin: [0, 0, 0, 0] },
-              { text: BUSINESS.email,             color: 'white', fontSize: 9.5,  margin: [0, 1, 0, 0] },
-              { text: BUSINESS.website,           color: 'white', fontSize: 9.5,  margin: [0, 1, 0, 0] },
-              { text: 'ABN ' + BUSINESS.abn,      color: 'white', fontSize: 8.5,  opacity: 0.78, margin: [0, 3, 0, 0], characterSpacing: 0.5 },
-            ],
-          },
-        ],
-      };
-    },
-
-    /* Footer — repeats on every page */
-    footer: function (currentPage, pageCount) {
-      return {
-        margin: [40, 10, 40, 0],
-        columns: [
-          { text: BUSINESS.website, color: 'white', fontSize: 10, alignment: 'left' },
-          { text: 'Page ' + currentPage + ' of ' + pageCount,
-            color: 'white', fontSize: 9, alignment: 'right', opacity: 0.7 },
-        ],
-      };
-    },
-
-    content: [
-
-      /* ─── Customer (with vehicle bullets) + invoice meta block ─── */
-      {
-        columns: [
-          // Customer (left) — name, address, then vehicle bullets
-          {
-            width: '*',
-            stack: [
-              { text: 'BILL TO', style: 'eyebrow' },
-              ...billToStack(),
-              { text: state.customer.address || '',
-                color: COLOR.muted, fontSize: 10.5, lineHeight: 1.45 },
-              ...vehicleBullets(),
-            ],
-          },
-          // Invoice meta (right)
-          {
-            width: 200,
-            alignment: 'right',
-            stack: [
-              { text: 'TAX INVOICE', style: 'docTitle' },
-              { text: [
-                  { text: 'No.  ', style: 'metaKey' },
-                  { text: state.invoice.number || '', style: 'metaVal' },
-                ], margin: [0, 6, 0, 0] },
-              { text: [
-                  { text: 'Issued  ', style: 'metaKey' },
-                  { text: fmtDate(state.invoice.date), style: 'metaVal' },
-                ], margin: [0, 1, 0, 0] },
-              { text: [
-                  { text: 'Due by  ', style: 'metaKey' },
-                  { text: fmtDate(state.invoice.due), style: 'metaVal' },
-                ], margin: [0, 1, 0, 0] },
-            ],
-          },
-        ],
-      },
-
-      /* ─── Line items table ─── */
-      itemsTable(),
-
-      /* ─── Totals ─── */
-      {
-        margin: [0, 10, 0, 0],
-        unbreakable: true,
-        columns: [
-          { width: '*', text: '' },
-          {
-            width: 230,
-            stack: totalsStack(t, status),
-          },
-        ],
-      },
-
-      /* ─── Notes flow at full width so long text can cross pages safely ─── */
-      ...notesSection(),
-
-      /* ─── Receipts table + subtle status pill (only when there are receipts) ─── */
-      paymentSection(status, t),
-
-      /* ─── Customer signature block (only when signed) ─── */
-      ...signatureBlock(),
-
-      /* ─── Sign-off line ─── */
-      {
-        margin: [0, 22, 0, 0],
-        columns: [
-          { text: 'Drive safe — call us if anything comes up.', color: COLOR.subtle, italics: true, fontSize: 10 },
-          { text: 'Issued by ' + BUSINESS.name, color: COLOR.subtle, alignment: 'right', fontSize: 10 },
-        ],
-      },
-
-    ],
-
-    styles: {
-      eyebrow:      { fontSize: 9,  bold: true, characterSpacing: 1.4, color: COLOR.subtle },
-      customerName: { fontSize: 15, bold: true,  color: COLOR.ink },
-      docTitle:     { fontSize: 22, bold: true,  characterSpacing: -0.3, color: COLOR.ink },
-      metaKey:      { fontSize: 10.5, bold: true,  color: COLOR.ink },
-      metaVal:      { fontSize: 10.5, color: COLOR.muted },
-      th:           { fontSize: 9.5, bold: true, characterSpacing: 1.1, color: COLOR.subtle },
-      tdDesc:       { fontSize: 11, color: COLOR.ink, bold: false },
-      tdNum:        { fontSize: 11, alignment: 'right', color: COLOR.ink },
-      vehLabel:     { fontSize: 9, bold: true, characterSpacing: 1.4, color: COLOR.subtle },
-      vehValue:     { fontSize: 12, bold: true, color: COLOR.ink },
-    },
-  };
-}
-
-// BILL TO name block — business name (with optional contact) or person name.
-function billToStack() {
-  const isBiz = state.customer.billTo === 'business';
-  const name = isBiz ? (state.customer.business || '—') : (state.customer.name || '—');
-  const out = [{ text: name, style: 'customerName', margin: [0, 3, 0, (isBiz && state.customer.name) ? 1 : 3] }];
-  if (isBiz && state.customer.name) {
-    out.push({ text: 'Attn: ' + state.customer.name, color: COLOR.muted, fontSize: 10.5, margin: [0, 0, 0, 3] });
-  }
-  return out;
-}
-
-// Format an odometer value with thousands separators when it is numeric.
-function fmtOdo(v) {
-  const digits = String(v).replace(/[^0-9]/g, '');
-  return digits ? Number(digits).toLocaleString('en-AU') : String(v);
-}
-
-function vehicleBullets() {
-  // Compact vehicle card under the customer address. A small navy "rego
-  // plate" sits left, make/model + year + odometer stack right, all inside a
-  // soft tinted background. Skipped entirely when no fields are filled.
-  const v = state.vehicle || {};
-  if (!v.rego && !v.makeModel && !v.year && !v.odometer) return [];
-
-  // Build the right-hand stack
-  const rightStack = [];
-  if (v.makeModel) rightStack.push({
-    text: v.makeModel, fontSize: 11.5, bold: true, color: COLOR.ink,
-  });
-  if (v.year) rightStack.push({
-    text: 'Year  ' + v.year, fontSize: 10, color: COLOR.muted, margin: [0, 2, 0, 0],
-  });
-  if (v.odometer) rightStack.push({
-    text: 'Odometer  ' + fmtOdo(v.odometer) + ' km', fontSize: 10, color: COLOR.muted, margin: [0, 2, 0, 0],
-  });
-  if (!v.makeModel && !v.year && !v.odometer) rightStack.push({
-    text: 'Vehicle on record', fontSize: 10, color: COLOR.subtle, italics: true,
-  });
-
-  // Compose: optional rego plate (left) + details (right)
-  const cells = [];
-  if (v.rego) cells.push({
-    width: 'auto',
-    stack: [
-      { text: 'REGO', fontSize: 7, bold: true, color: 'white', characterSpacing: 1.8, opacity: 0.72 },
-      { text: v.rego.toUpperCase(), fontSize: 13, bold: true, color: 'white', characterSpacing: 1.5, margin: [0, 3, 0, 0] },
-    ],
-    fillColor: COLOR.navy,
-    margin: [12, 7, 12, 7],
-  });
-  cells.push({
-    width: '*',
-    stack: rightStack,
-    margin: [v.rego ? 12 : 14, v.rego ? 8 : 9, 14, 8],
-  });
-
-  return [
-    { text: 'VEHICLE', style: 'eyebrow', margin: [0, 14, 0, 6] },
-    {
-      table: {
-        widths: v.rego ? ['auto', '*'] : ['*'],
-        body: [[
-          // Cells with their own fill colors — wrap in a single row
-          ...cells.map((c, i) => ({
-            ...c,
-            border: [false, false, false, false],
-            // Soft fill for the right-hand details cell
-            ...(i === cells.length - 1 && v.rego ? { fillColor: COLOR.soft } : {}),
-            ...(!v.rego && i === 0 ? { fillColor: COLOR.soft } : {}),
-          })),
-        ]],
-      },
-      layout: 'noBorders',
-    },
-  ];
-}
-
-function itemsTable() {
-  const headerRow = [
-    { text: 'DESCRIPTION', style: 'th' },
-    { text: 'QTY / HRS',   style: 'th', alignment: 'right' },
-    { text: 'UNIT PRICE',  style: 'th', alignment: 'right' },
-    { text: 'AMOUNT',      style: 'th', alignment: 'right' },
-  ];
-  const body = [headerRow];
-  if (state.items.length === 0) {
-    body.push([
-      { text: 'No items', italics: true, color: COLOR.subtle, colSpan: 4, alignment: 'center', margin: [0, 10, 0, 10] },
-      {}, {}, {},
-    ]);
-  } else {
-    state.items.forEach(it => {
-      body.push([
-        { text: it.desc || 'Untitled item', style: 'tdDesc', margin: [0, 5, 0, 5] },
-        { text: String(it.qty || 0), style: 'tdNum', margin: [0, 5, 0, 5] },
-        { text: fmtMoney(it.price), style: 'tdNum', margin: [0, 5, 0, 5] },
-        { text: fmtMoney((it.qty || 0) * (it.price || 0)), style: 'tdNum', bold: true, margin: [0, 5, 0, 5] },
-      ]);
-    });
-  }
-
-  return {
-    margin: [0, 18, 0, 0],
-    table: {
-      headerRows: 1,
-      widths: ['*', 60, 80, 80],
-      body,
-    },
-    layout: {
-      hLineWidth: (i, node) => {
-        if (i === 0) return 0;
-        if (i === 1) return 1.5;
-        if (i === node.table.body.length) return 1;
-        return 0.5;
-      },
-      vLineWidth: () => 0,
-      hLineColor: (i, node) => i === 1 ? COLOR.ink : COLOR.hairline,
-      paddingTop: () => 3,
-      paddingBottom: () => 3,
-      paddingLeft: (i) => i === 0 ? 0 : 6,
-      paddingRight: (i, node) => i === node.table.widths.length - 1 ? 0 : 6,
-    },
-  };
-}
-
-function notesSection() {
-  const notes = (state.notes || '').trim();
-  if (!notes) return [];
-
-  // pdfmake can let one very long text node resume inside the next page's
-  // header. Keep each entered line small and unbreakable so page breaks happen
-  // only between note blocks, where the normal page margins are respected.
-  const chunks = [];
-  let paragraphGap = false;
-  notes.split(/\r?\n/).forEach((raw) => {
-    const line = raw.trim();
-    if (!line) { paragraphGap = true; return; }
-    const words = line.split(/\s+/);
-    let chunk = '';
-    words.forEach((word) => {
-      const next = chunk ? chunk + ' ' + word : word;
-      if (chunk && next.length > 240) {
-        chunks.push({ text: chunk, gap: paragraphGap });
-        chunk = word;
-        paragraphGap = false;
-      } else {
-        chunk = next;
-      }
-    });
-    if (chunk) chunks.push({ text: chunk, gap: paragraphGap });
-    paragraphGap = false;
-  });
-
-  const first = chunks.shift();
-  const out = [{
-    margin: [0, 18, 0, 0],
-    unbreakable: true,
-    stack: [
-      {
-        canvas: [
-          { type: 'line', x1: 0, y1: 0, x2: 515, y2: 0, lineWidth: 1, lineColor: COLOR.hairline },
-        ],
-      },
-      { text: 'NOTES', style: 'eyebrow', color: COLOR.navy, margin: [0, 10, 0, 0] },
-      { text: first.text, color: COLOR.muted, margin: [0, 6, 0, 0], lineHeight: 1.45 },
-    ],
-  }];
-
-  chunks.forEach((part) => out.push({
-    unbreakable: true,
-    stack: [{
-      text: part.text,
-      color: COLOR.muted,
-      margin: [0, part.gap ? 8 : 2, 0, 0],
-      lineHeight: 1.45,
-    }],
-  }));
-  return out;
-}
-
-function totalsStack(t, status) {
-  const rows = [];
-  // If no receipts recorded but a status is set, the small status pill
-  // rides above the totals so it still appears on the invoice.
-  if (state.receipts.length === 0 && status) {
-    rows.push({
-      alignment: 'right',
-      margin: [0, 0, 0, 6],
-      columns: [
-        { text: '', width: '*' },
-        {
-          width: 'auto',
-          table: { body: [[{
-            text: status.label,
-            color: status.fg, fillColor: status.bg,
-            fontSize: 8.5, bold: true, characterSpacing: 1.1,
-            margin: [9, 3, 9, 3], border: [false, false, false, false],
-          }]] },
-          layout: 'noBorders',
-        },
-      ],
-    });
-  }
-  if (state.gstInclusive) {
-    rows.push({ columns: [
-      { text: 'Subtotal', color: COLOR.muted, fontSize: 10.5 },
-      { text: fmtMoney(t.subtotal), alignment: 'right', fontSize: 10.5, bold: true },
-    ]});
-    rows.push({ columns: [
-      { text: 'Includes GST (10%)', color: COLOR.muted, fontSize: 10.5 },
-      { text: fmtMoney(t.gst), alignment: 'right', fontSize: 10.5, bold: true },
-    ], margin: [0, 4, 0, 0] });
-  } else {
-    rows.push({ columns: [
-      { text: 'Subtotal', color: COLOR.muted, fontSize: 10.5 },
-      { text: fmtMoney(t.subtotal), alignment: 'right', fontSize: 10.5, bold: true },
-    ]});
-    rows.push({ columns: [
-      { text: 'GST (10%)', color: COLOR.muted, fontSize: 10.5 },
-      { text: fmtMoney(t.gst), alignment: 'right', fontSize: 10.5, bold: true },
-    ], margin: [0, 4, 0, 0] });
-  }
-  // Total — bold rule above
-  rows.push({
-    margin: [0, 10, 0, 0],
-    table: {
-      widths: ['*', 'auto'],
-      body: [[
-        { text: 'TOTAL', bold: true, fontSize: 13, color: COLOR.ink, border: [false, true, false, false], borderColor: [COLOR.ink, COLOR.ink, COLOR.ink, COLOR.ink], margin: [0, 8, 0, 0] },
-        { text: fmtMoney(t.total), bold: true, fontSize: 14, color: COLOR.ink, alignment: 'right', border: [false, true, false, false], borderColor: [COLOR.ink, COLOR.ink, COLOR.ink, COLOR.ink], margin: [0, 8, 0, 0] },
-      ]],
-    },
-    layout: {
-      defaultBorder: false,
-      hLineWidth: (i) => i === 0 ? 1.5 : 0,
-      hLineColor: () => COLOR.ink,
-    },
-  });
-  if (t.paid > 0) {
-    rows.push({ columns: [
-      { text: 'Balance paid', color: COLOR.success, fontSize: 10.5 },
-      { text: fmtMoney(t.paid), alignment: 'right', color: COLOR.success, fontSize: 10.5, bold: true },
-    ], margin: [0, 6, 0, 0] });
-  }
-  if (t.outstanding > 0) {
-    rows.push({ columns: [
-      { text: 'OUTSTANDING', color: COLOR.danger, fontSize: 11.5, bold: true, characterSpacing: 0.5 },
-      { text: fmtMoney(t.outstanding), alignment: 'right', color: COLOR.danger, fontSize: 12, bold: true },
-    ], margin: [0, 4, 0, 0] });
-  }
-  return rows;
-}
-
-function paymentSection(status, t) {
-  // If there are no receipts, the status pill rides inline with the
-  // totals stack (handled in totalsStack). Nothing to render here.
-  if (state.receipts.length === 0) return { text: '' };
-
-  // Subtle status pill — tiny next to the section heading
-  const statusPill = {
-    width: 'auto',
-    table: {
-      widths: ['auto'],
-      body: [[
-        {
-          text: status.label,
-          color: status.fg,
-          fontSize: 8.5,
-          bold: true,
-          characterSpacing: 1.1,
-          fillColor: status.bg,
-          margin: [9, 3, 9, 3],
-          border: [false, false, false, false],
-        },
-      ]],
-    },
-    layout: 'noBorders',
-  };
-
-  const receiptsTable = {
-    margin: [0, 8, 0, 0],
-    table: {
-      headerRows: 1,
-      widths: [80, '*', 80],
-      body: [
-        [
-          { text: 'PAYMENT DATE',   style: 'th' },
-          { text: 'PAYMENT METHOD', style: 'th' },
-          { text: 'AMOUNT PAID',    style: 'th', alignment: 'right' },
-        ],
-        ...state.receipts.map(r => [
-          { text: fmtDate(r.date),  fontSize: 10, margin: [0, 4, 0, 4] },
-          { text: r.method || '—',  fontSize: 10, color: COLOR.muted, margin: [0, 4, 0, 4] },
-          { text: fmtMoney(r.amount), fontSize: 10, alignment: 'right', bold: true, margin: [0, 4, 0, 4] },
-        ]),
-      ],
-    },
-    layout: {
-      hLineWidth: (i, node) => i === 0 ? 0 : (i === 1 ? 1 : 0.5),
-      vLineWidth: () => 0,
-      hLineColor: () => COLOR.hairline,
-      paddingTop: () => 3,
-      paddingBottom: () => 3,
-    },
-  };
-
-  return {
-    margin: [0, 24, 0, 0],
-    stack: [
-      // Header row: section label on left, subtle status pill on right
-      {
-        columns: [
-          { text: 'PAYMENTS RECEIVED', style: 'eyebrow', width: '*', margin: [0, 4, 0, 0] },
-          statusPill,
-        ],
-      },
-      receiptsTable,
-    ],
-  };
-}
-
-function signatureBlock() {
-  // Only render when the customer has actually signed.
-  const sig = state.signature || {};
-  if (!sig.dataUrl) return [];
-  const signer = sig.name || state.customer.name || '';
-  return [{
-    margin: [0, 24, 0, 0],
-    columns: [
-      { width: '*', text: '' },
-      {
-        width: 220,
-        stack: [
-          { text: 'CUSTOMER SIGNATURE', style: 'eyebrow', margin: [0, 0, 0, 4] },
-          { image: sig.dataUrl, fit: [160, 64], margin: [0, 0, 0, 4] },
-          { canvas: [{ type: 'line', x1: 0, y1: 0, x2: 200, y2: 0, lineWidth: 0.6, lineColor: COLOR.ink }] },
-          { text: 'Signed by: ' + (signer || '—'), color: COLOR.muted, fontSize: 10, margin: [0, 5, 0, 0] },
-          { text: fmtDate(state.invoice.date), color: COLOR.subtle, fontSize: 9.5, margin: [0, 1, 0, 0] },
-        ],
-      },
-    ],
-  }];
+  return window.MMQLD_INVOICE_PDF.build(state, t, { business: BUSINESS, assets: A });
 }
 
 /* ────────────────────────────────────────────────────────────────────
@@ -1530,6 +1129,15 @@ function init() {
     renderAll();
     setupSignature();
     setupCustomerLookup();
+    markClean();
+    // Ask before leaving with unsaved work (logo, phone back, closing the tab).
+    if (window.MMQLD_LEAVE) {
+      MMQLD_LEAVE.init({
+        isDirty: () => JSON.stringify(state) !== CLEAN,
+        saveDraft: () => { saveDraft({ quiet: true }); },
+        backUrl: '../index.html',
+      });
+    }
   })();
 }
 

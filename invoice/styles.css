@@ -240,7 +240,8 @@ input, textarea, select { width: 100%; }
 /* ───── Segmented (status pill) ───── */
 .seg {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;       /* as many equal buttons as it holds */
   gap: 6px;
   background: var(--soft);
   padding: 4px;
@@ -688,3 +689,65 @@ input, textarea, select { width: 100%; }
    under the name so he can tell two similar items apart. */
 .saved-item__desc small { display: block; font-size: 12px; color: #78716C; font-weight: 500; margin-top: 2px; }
 .saved-item__price em { font-style: normal; color: #B45309; font-size: 12px; font-weight: 700; }
+
+/* ───── Item picker (one "Add items" button) ─────
+   A tall sheet: search on top, tap a row to add it straight to the invoice,
+   and a way to create an item that is not on the list yet. */
+.add-btn--big { padding: 15px 14px; font-size: 15px; }
+.picker { display: flex; flex-direction: column; max-height: 88vh; overflow: hidden; }
+.picker[hidden] { display: none; }   /* display:flex would otherwise beat [hidden] */
+.picker .drafts__head h3 small { font-weight: 600; color: var(--subtle); font-size: 12px; margin-left: 4px; }
+.picker__view { display: flex; flex-direction: column; min-height: 0; flex: 1; }
+.picker__view[hidden] { display: none; }
+.picker__search { position: relative; margin: 12px 14px 4px; }
+.picker__search svg { position: absolute; left: 13px; top: 50%; transform: translateY(-50%); color: var(--subtle); pointer-events: none; }
+.picker__search input {
+  width: 100%; padding: 13px 14px 13px 38px; border: 1px solid var(--hairline); border-radius: 12px;
+  font-size: 16px; background: var(--soft);
+}
+.picker__search input:focus { outline: none; border-color: var(--navy); background: var(--surface); box-shadow: 0 0 0 3px rgba(30,58,138,.12); }
+.picker__hint { margin: 2px 16px 6px; font-size: 12px; color: var(--subtle); }
+.picker__list { overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 0 8px 8px; flex: 1; min-height: 120px; }
+
+.pick { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; padding: 12px 10px; border-radius: 12px;
+  background: none; border: none; cursor: pointer; color: var(--ink); font: inherit; }
+.pick + .pick { border-top: 1px solid var(--hairline); border-radius: 0; }
+.pick:active { background: var(--soft); }
+.pick__main { flex: 1; min-width: 0; }
+.pick__name { display: block; font-weight: 600; font-size: 14.5px; line-height: 1.3; }
+.pick__name mark { background: none; color: var(--navy); font-weight: 800; }
+.pick__note { display: block; font-size: 12px; color: var(--subtle); margin-top: 2px; }
+.pick__price { font-weight: 800; color: var(--navy); font-variant-numeric: tabular-nums; font-size: 14px; }
+.pick__price em { font-style: normal; color: var(--warning); font-size: 11.5px; font-weight: 700; }
+.pick__add { flex: 0 0 auto; width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center;
+  background: var(--navy-tint); color: var(--navy); transition: background .15s, color .15s; }
+.pick.is-added .pick__add { background: var(--success); color: #fff; }
+.pick__count { display: none; font-size: 11px; font-weight: 800; color: var(--success); margin-top: 3px; }
+.pick.is-added .pick__count { display: block; }
+.pick.flash { animation: pickFlash .45s ease; }
+@keyframes pickFlash { 0% { background: var(--success-bg); } 100% { background: transparent; } }
+
+.pick--new { margin-top: 6px; border: 1px dashed var(--strong) !important; border-radius: 12px !important; background: var(--surface); }
+.pick--new .pick__add { background: var(--navy); color: #fff; }
+.pick--new .pick__name { color: var(--navy); }
+.picker__empty { padding: 22px 16px 6px; text-align: center; color: var(--subtle); font-size: 14px; }
+
+.picker__form { padding: 14px 16px 6px; overflow-y: auto; }
+.picker__form .field__label em { font-style: normal; font-weight: 500; color: var(--subtle); }
+.picker .row-2 { grid-template-columns: 1.5fr 1fr; gap: 12px; }
+.picker__check { display: flex; gap: 12px; align-items: flex-start; padding: 12px; border-radius: 12px; background: var(--soft); cursor: pointer; margin-top: 4px; }
+.picker__check input { width: 22px; height: 22px; accent-color: var(--navy); flex: 0 0 auto; margin: 1px 0 0; }
+.picker__check strong { display: block; font-size: 14px; }
+.picker__check small { display: block; font-size: 12px; color: var(--subtle); margin-top: 1px; }
+.saved__foot { display: flex; gap: 10px; }
+.saved__foot .fab__btn { flex: 1; }
+.saved__foot .fab__btn[hidden] { display: none; }
+
+/* Printed details under a line item */
+.item__more { display: block; margin: 0 0 8px; padding: 2px 0; background: none; border: 0; color: var(--navy); font-weight: 600; font-size: 13px; cursor: pointer; }
+.item__details-wrap { display: block; margin: 2px 0 10px; }
+.item__details {
+  width: 100%; margin-top: 4px; padding: 10px 11px; border: 1px solid var(--hairline); border-radius: 10px;
+  background: var(--surface); font-size: 13.5px; line-height: 1.45; color: var(--muted); resize: vertical;
+}
+.item__details:focus { outline: none; border-color: var(--navy); }

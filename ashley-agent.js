@@ -1,9 +1,9 @@
 /* ============================================================================
    Ashley - the agent loop
    ----------------------------------------------------------------------------
-   Talks to the model through this project's own endpoint (see
-   app/api/ashley/route.ts on the website). The OpenRouter key lives there, on
-   the server, and never reaches this app: the owner-app repository is public.
+   Talks to the model through this project's own endpoint in api/ashley.js.
+   The OpenRouter key lives there, on the server, and never reaches the browser:
+   the owner-app repository is public.
 
    The loop is the same shape that makes coding agents feel quick:
 

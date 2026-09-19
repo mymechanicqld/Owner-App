@@ -1,148 +1,154 @@
-# My Mechanic QLD - Owner app
+# My Mechanic QLD owner app
 
-A mobile-first web app for the business owner. Hosted on GitHub Pages, no
-backend. It reads customer submissions from Supabase and sends threaded replies
-straight from Gmail in the browser.
+Mobile-first owner console for running the daily office side of My Mechanic QLD. It is designed to be installed on the business owner's phone and used between jobs.
 
-## Pages (bottom nav)
+The production app is deployed on Vercel at:
 
-- **Dashboard** - quick pulse: new leads, last 48h, this week, top job type, and recent inquiries.
-- **Inquiries** - recent leads with a job-type icon, name, suburb and rego. Filter by last 48h / week / month / year (default 48h). Tap a lead to see full details and reply.
-- **Search** - find any customer by name, rego, suburb, phone or email.
-- **Ashley** - the assistant. Ask her anything about the business in plain English and she goes and finds it. See below.
+- <https://mmqld-app.vercel.app/>
 
-Analytics moved into the sidebar menu (top left) to make room for Ashley. It is unchanged: bar charts of inquiries over time, busiest day of week, most common job type and top suburbs, toggled Daily / Weekly / Monthly.
+The app is plain HTML, CSS and browser JavaScript. Most business data is read and written directly between the browser and Supabase. Gmail is accessed directly from the browser after Google OAuth. Ashley is the only feature with its own server endpoint, because the OpenRouter key must remain server-side.
 
-## Replying (threaded Gmail)
+## Current navigation
 
-Open a lead, tap **Reply by email**, pick **Logbook service**, **Diagnostic** or
-**Custom**, adjust the price, edit the text, and **Send**. The reply goes out in
-the customer's existing Gmail thread, so the inquiry, your reply and their
-follow-up all stay together in one conversation.
+The five bottom tabs are:
 
----
+1. Dashboard
+2. Inquiries
+3. Calendar
+4. Search
+5. Ashley
 
-## Setup
+The sidebar groups the complete app:
 
-Everything is configured in **`config.js`**.
+- Day to day: Dashboard, Ashley, Inquiries, Calendar, Search
+- Create: New invoice, New inspection
+- Records: Invoices, Inspection reports
+- Business: Analytics, Price list, Settings
 
-### 1. Supabase (already wired)
+## Main capabilities
 
-The current project URL and publishable key are in `config.js`. The publishable
-key is safe to be public (it relies on Row Level Security). After you rotate
-keys (below), paste the new values there.
+- Read, search and update website inquiries.
+- Reply to an inquiry in its existing Gmail thread.
+- Call or prepare an SMS for a customer.
+- Create, edit, reorder and delete calendar bookings.
+- Create editable invoice PDFs, record payments, save drafts, send invoices and reopen saved invoices.
+- Create detailed vehicle inspection PDFs with grades, comments, camera or gallery images, signatures and editable terms.
+- Maintain the parts and job price list that feeds the invoice item picker.
+- View and manage saved invoice and inspection records.
+- Ask Ashley to look up business information, work across Supabase and Gmail, update routine records, and prepare confirmed customer communications.
+- Manage app defaults, Gmail connection and on-device data from Settings.
 
-### 2. Gmail (Web OAuth client)
+## Architecture at a glance
 
-The app sends email through the owner's Google account in the browser, which
-needs a **Web** OAuth client (the existing Desktop client cannot be used here).
-
-1. Go to <https://console.cloud.google.com> > APIs & Services > **Credentials**.
-2. **Create credentials > OAuth client ID > Web application**.
-3. Under **Authorised JavaScript origins**, add your GitHub Pages origin, e.g.
-   `https://YOURNAME.github.io` (origin only, no path).
-4. Create, copy the **Client ID**, and paste it into `config.js` as
-   `GOOGLE_CLIENT_ID`.
-5. Make sure the Gmail API is enabled (APIs & Services > Library > Gmail API).
-
-The owner taps Reply, signs in with Google once, grants Gmail access, and can
-send from then on.
-
-### 3. Deploy to GitHub Pages
-
-1. Put the contents of this `owner-app/` folder in a repo (or a `/docs` folder).
-2. Repo **Settings > Pages**, set the source to that branch/folder.
-3. Open the published URL on the phone. On iOS, Share > **Add to Home Screen**
-   for an app-like icon (no manifest needed).
-
----
-
-## Rotating keys (do this when ready)
-
-You rotate in each provider's console, then paste the new values into
-`config.js`. Nothing secret lives in this app.
-
-- **Supabase**: Dashboard > Project Settings > API keys. Roll the **publishable**
-  key, and importantly roll the **secret** key if it was ever shared. Update
-  `SUPABASE_KEY` here, and update the Python email-assistant `.env` and the
-  desktop dashboard with the new publishable key too.
-- **Gmail**: create the Web OAuth client above. Optionally delete the old Desktop
-  client and revoke old access at <https://myaccount.google.com/permissions>.
-- **Resend** (used by the website form, not this app): roll the API key at
-  <https://resend.com/api-keys> and update the website's environment variable.
-
----
-
-## Security note
-
-You chose **no passcode gate**, so anyone who has the URL can open the app and
-see customer data (the Supabase publishable key is in the page and RLS currently
-allows public reads). Keep the URL private. To add a gate later, set `GATE_PIN`
-in `config.js` to any code, that is the only change needed.
-
-## Files
-
+```text
+Owner's phone
+  |
+  |-- Static PWA pages on Vercel
+  |     |-- Main owner console
+  |     |-- Invoice generator
+  |     |-- Inspection generator
+  |     |-- Price list
+  |     `-- Settings
+  |
+  |-- Supabase
+  |     |-- Inquiries, bookings, documents, products and settings
+  |     `-- Public invoice and inspection PDF buckets
+  |
+  |-- Google Identity Services and Gmail API
+  |     `-- Inbox search, threaded replies and PDF attachments
+  |
+  `-- /api/ashley on the same Vercel deployment
+        `-- OpenRouter model request with server-side credentials
 ```
+
+The app intentionally does not register a service worker. A controlling service worker caused cross-origin PDF uploads to fail on iOS WebKit. The manifest and Apple touch icons still provide the installed home-screen experience, but the app requires a network connection.
+
+## Documentation
+
+- [Feature inventory](docs/FEATURES.md)
+- [Architecture and runtime flows](docs/ARCHITECTURE.md)
+- [Data and integrations](docs/DATA_AND_INTEGRATIONS.md)
+- [Ashley agent harness](docs/ASHLEY.md)
+- [Operations and deployment](docs/OPERATIONS.md)
+- [Current limitations](docs/CURRENT_LIMITATIONS.md)
+
+These documents describe the code as it exists on 17 September 2026. `CURRENT_LIMITATIONS.md` records places where the UI wording or older setup files are ahead of the actual wiring.
+
+## Repository map
+
+```text
 owner-app/
-  index.html    shell + CDN scripts (Supabase, Lucide, Google Identity)
-  styles.css    brand styling, mobile first
-  app.js        data, pages, detail + reply, Gmail send
-  config.js     credentials, templates, service map  (edit this)
-  sw.js         service worker (offline shell, no manifest)
+  index.html              Main shell, navigation and shared drawers
+  app.js                  Dashboard, inquiries, calendar, records and Gmail actions
+  styles.css              Main shell and Ashley styling
+  config.js               Public browser configuration and message templates
+  settings.js             Shared local and Supabase-backed settings layer
+  customers.js            Shared recent-customer autocomplete
+  storage.js              Record-first document saving and PDF storage uploads
+  gmail-send.js           Shared Gmail sender for generator pages
+  ashley-agent.js         Tool-calling loop and system instructions
+  ashley-tools.js         Ashley's tool definitions and implementations
+  ashley-ui.js            Ashley chat interface and confirmation cards
+  api/ashley.js           Vercel serverless OpenRouter proxy
+  invoice/                Invoice form and PDF generator
+  inspection/             Inspection form and PDF generator
+  prices/                 Supabase-backed product and pricing editor
+  settings/               Owner-facing settings page
+  manifest.json           Installed-app metadata and icons
+  vercel.json             Function limits, caching and security headers
+  supabase-schema.sql     Original calendar/document setup SQL
+  sw.js                   Legacy no-cache service worker, not registered
+  docs/                   Current technical and product documentation
 ```
 
+## Configuration
 
----
+`config.js` contains browser-safe configuration:
 
-## Ashley (the assistant)
+- Supabase URL and publishable key
+- Google OAuth web client ID
+- Ashley endpoint and browser handshake value
+- baseline business details and quick-message defaults
+- storage bucket names
 
-Ashley is the fifth tab. Ask her something in ordinary language and she works it
-out by going and looking, the same way you would:
+The values are obfuscated to discourage casual copying, but that is not encryption. Never add a Supabase secret key, Google client secret or OpenRouter key to browser code.
 
-- "What's on today?" / "What does my week look like?"
-- "Who still owes me money?"
-- "Tell me everything about Kim Whackett"
-- "Book in a brake repair for Dave on Friday at 9, rego 123ABC, Springwood"
-- "Kim's job is done, send her the invoice"
-- "How many booking confirmations came in this week?"
+The Ashley server function requires these Vercel environment variables:
 
-### What she can and cannot do on her own
+- `OPENROUTER_API_KEY`
+- `ASHLEY_APP_KEY`
+- `ASHLEY_MODEL`, optional, currently defaulting to `google/gemini-3.7-flash`
 
-| She just does it | She asks first |
-| --- | --- |
-| Any lookup: calendar, enquiries, invoices, reports, inbox | Sending an email |
-| Adding or changing a booking | Texting a customer |
-| Changing an enquiry's status | Deleting anything |
-| Marking an invoice paid | |
+## Security model
 
-When she asks, you get a card showing exactly what is about to happen, including
-the full email text, and nothing happens until you press the button.
+This is currently a single-owner internal app, not a multi-user authenticated product.
 
-She does not create new invoices or inspection reports. She can find, send and
-mark off ones that already exist. Making a new one stays a manual job so the
-numbers are always yours.
+- Supabase access uses a publishable browser key and depends entirely on Row Level Security.
+- The current owner-app policies allow broad anonymous access to operational tables and document buckets.
+- The optional passcode is a client-side convenience gate, not real database authentication.
+- Gmail access tokens are cached in browser local storage until shortly before expiry.
+- The Ashley browser handshake is not a secret. The OpenRouter key remains server-side.
+- Invoice and inspection PDF buckets are public so documents can be opened directly.
 
-### How it works
+Keep the production URL private until proper user authentication and restrictive RLS policies are added.
 
-Three files: `ashley-tools.js` (the fifteen things she can do), `ashley-agent.js`
-(the loop that decides which to use) and `ashley-ui.js` (the chat screen).
+## Development and verification
 
-She can call several tools in one go and they run at the same time, so
-"how's the business going and tell me about Evren" is one round trip, not two.
+Serve this folder through HTTP rather than opening files directly:
 
-### The API key
+```bash
+python3 -m http.server 8771
+```
 
-The OpenRouter key is **not in this repo**, because this repo is public and
-scrapers harvest keys from GitHub within days. It lives in the website project's
-Vercel environment variables, and this app calls `https://mymechanicqld.com.au/api/ashley/`
-instead. See `app/api/ashley/route.ts` in the website repo.
+Then open <http://127.0.0.1:8771/>. Localhost is accepted by the Ashley proxy only for the configured development origins. Gmail OAuth also requires the exact origin to be listed in the Google OAuth web client.
 
-`CONFIG.ASHLEY.APP_KEY` in `config.js` is only a handshake so that endpoint
-ignores random traffic. It is obscurity, not a secret. If the endpoint is ever
-abused, change `ASHLEY_APP_KEY` in Vercel and re-ramble the new value here.
+Before shipping changes, verify at minimum:
 
-Nothing identifying the business is sent to the model provider: no app name, no
-URL, no attribution headers, and requests are restricted to providers that do
-not retain data. The email signature is added by this app after Ashley finishes
-writing, so the business name and phone number are always right and never have
-to be sent to the model at all.
+1. Main navigation and sidebar routes.
+2. Supabase inquiry and calendar loading.
+3. Invoice Save, Open and Send.
+4. Inspection Save, Open and Send.
+5. Gmail connection from Settings and from Ashley.
+6. Ashley read, write and confirmation paths.
+7. Installed-app icon and iPhone home-screen launch.
+8. No service worker controls any owner-app page.

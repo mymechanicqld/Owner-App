@@ -23,7 +23,7 @@ const STATE = {
   activeId: null,
   replyTmpl: 'service',
   msgTmpl: 'website',
-  calView: 'week',
+  calView: 'day',
   calRef: null,
   editEventId: null,
   invoices: null,
@@ -106,6 +106,18 @@ function toast(msg, kind = '') {
   setTimeout(() => t.remove(), 3000);
 }
 
+/* A toast with one button, e.g. Undo after a drag. Stays a little longer so
+   there is time to reach it. */
+function toastAction(msg, label, fn, kind = '') {
+  const t = document.createElement('div');
+  t.className = 'toast has-act ' + kind;
+  t.innerHTML = `<span>${esc(msg)}</span><button type="button">${esc(label)}</button>`;
+  t.querySelector('button').addEventListener('click', () => { t.remove(); fn(); });
+  $('#toasts').appendChild(t);
+  setTimeout(() => { t.style.opacity = '0'; t.style.transition = 'opacity .3s'; }, 5200);
+  setTimeout(() => t.remove(), 5600);
+}
+
 /* ------------------------------------------------------------------ data -- */
 async function loadData(spinner = true) {
   if (spinner && !STATE.loaded) renderInquiries(true);
@@ -149,6 +161,7 @@ function setView(v) {
   closeSidebar();
   // Ashley manages her own scrolling, so the outer scroller stands down.
   document.body.classList.toggle('ash-mode', v === 'ashley');
+  if (v === 'calendar') STATE._calScrolledFor = null; // land on the right hour again
   $('.main').scrollTop = 0;
   render();
   icons();
@@ -465,19 +478,152 @@ function sameDay(a, b) { return startOfDay(a).getTime() === startOfDay(b).getTim
 function fmtTime(iso) { return iso ? new Date(iso).toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit' }) : ''; }
 function toLocalInput(d) { const x = new Date(d); const p = (n) => String(n).padStart(2, '0'); return x.getFullYear() + '-' + p(x.getMonth() + 1) + '-' + p(x.getDate()) + 'T' + p(x.getHours()) + ':' + p(x.getMinutes()); }
 
+/* Day view is a timeline, Google Calendar style: hours down the left, each
+   booking drawn to scale on the right. Hold a booking to pick it up and drag
+   it to a new time; drag its bottom edge to change how long it runs. Week view
+   stays a plain list because seven columns do not fit a phone. */
+const CAL_HOUR_PX = 64;   // height of one hour on the timeline
+const CAL_SNAP_MIN = 15;  // drag and tap both snap to quarter hours
+let CAL_DRAG = null;      // the gesture in progress, if any
+
+function calDayBounds(evs) {
+  // Working hours by default, stretched to fit anything booked outside them.
+  let lo = 6, hi = 20;
+  evs.forEach((e) => {
+    const s = new Date(e.starts_at), en = e.ends_at ? new Date(e.ends_at) : new Date(s.getTime() + 3600000);
+    lo = Math.min(lo, s.getHours());
+    const endH = sameDay(s, en) ? en.getHours() + (en.getMinutes() ? 1 : 0) : 24;
+    hi = Math.max(hi, endH);
+  });
+  return [Math.max(0, lo), Math.min(24, hi)];
+}
+function hourLabel(h) { return h === 0 || h === 24 ? '12 am' : h === 12 ? '12 pm' : h < 12 ? h + ' am' : (h - 12) + ' pm'; }
+function minsLabel(m) { const d = new Date(2000, 0, 1, 0, m); return d.toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit' }); }
+
+/* Side-by-side columns for bookings that overlap, so none hides another. */
+function calLayout(evs) {
+  const items = evs.map((e) => {
+    const s = new Date(e.starts_at);
+    const st = s.getHours() * 60 + s.getMinutes();
+    const dur = e.ends_at ? Math.max(15, Math.round((new Date(e.ends_at) - s) / 60000)) : 60;
+    return { e, st, en: Math.min(st + dur, 24 * 60), col: 0, cols: 1 };
+  }).sort((a, b) => a.st - b.st || b.en - a.en);
+  let cluster = [], colEnds = [], clusterEnd = -1;
+  const flush = () => { cluster.forEach((it) => { it.cols = colEnds.length; }); cluster = []; colEnds = []; };
+  items.forEach((it) => {
+    if (it.st >= clusterEnd) { flush(); clusterEnd = -1; }
+    let c = colEnds.findIndex((end) => end <= it.st);
+    if (c < 0) { c = colEnds.length; colEnds.push(0); }
+    colEnds[c] = it.en; it.col = c;
+    cluster.push(it); clusterEnd = Math.max(clusterEnd, it.en);
+  });
+  flush();
+  return items;
+}
+
 function renderCalendar() {
+  // Never repaint under a finger mid-drag; catch up once it is dropped.
+  if (CAL_DRAG && CAL_DRAG.active) { CAL_DRAG.pendingRender = true; return; }
   if (!STATE.calRef) STATE.calRef = new Date();
+  if (STATE.calView === 'week') return renderWeekList();
+  const day = startOfDay(STATE.calRef);
+  const isToday = sameDay(day, new Date());
+  const evs = STATE.events.filter((e) => sameDay(e.starts_at, day));
+  const timed = evs.filter((e) => !e.all_day);
+  const allDay = evs.filter((e) => e.all_day);
+  const [lo, hi] = calDayBounds(timed);
+  const p2 = (n) => String(n).padStart(2, '0');
+  const dateVal = day.getFullYear() + '-' + p2(day.getMonth() + 1) + '-' + p2(day.getDate());
+
+  // Week strip: the seven days around the selected one, with a dot for busy days.
+  const ws = weekStartM(day);
+  const strip = Array.from({ length: 7 }, (_, i) => addDays(ws, i)).map((d) => {
+    const n = STATE.events.filter((e) => sameDay(e.starts_at, d)).length;
+    return `<button class="cs-day${sameDay(d, day) ? ' on' : ''}${sameDay(d, new Date()) ? ' today' : ''}" data-cal-day="${d.getTime()}">
+      <span class="w">${d.toLocaleDateString('en-AU', { weekday: 'narrow' })}</span>
+      <span class="n">${d.getDate()}</span>
+      <span class="d">${n ? '<i></i>'.repeat(Math.min(n, 3)) : ''}</span>
+    </button>`;
+  }).join('');
+
+  const hours = [];
+  for (let h = lo; h <= hi; h++) hours.push(`<div class="tl-h" style="top:${(h - lo) * CAL_HOUR_PX}px"><span>${hourLabel(h)}</span></div>`);
+
+  const blocks = calLayout(timed).map((it) => {
+    const e = it.e, color = svcColor(e.service);
+    const top = (it.st - lo * 60) / 60 * CAL_HOUR_PX;
+    const h = Math.max(26, (it.en - it.st) / 60 * CAL_HOUR_PX - 2);
+    const meta = [e.customer_name, e.suburb].filter(Boolean).join(' · ');
+    const w = 100 / it.cols;
+    const when = it.cols > 1 ? minsLabel(it.st) : minsLabel(it.st) + ' - ' + minsLabel(it.en);
+    return `<div class="tl-ev${h < 44 ? ' short' : ''}${h < 84 ? ' nometa' : ''}${it.cols > 1 ? ' narrow' : ''}" data-tl-ev="${e.id}" style="top:${top}px;height:${h}px;left:calc(${it.col * w}% + 2px);width:calc(${w}% - 4px);--c:${color}">
+      <div class="tl-ev__t">${esc(when)}</div>
+      <div class="tl-ev__n">${esc(e.title)}</div>
+      ${meta ? `<div class="tl-ev__m">${esc(meta)}</div>` : ''}
+      <div class="tl-rs" data-tl-rs aria-hidden="true"></div>
+    </div>`;
+  }).join('');
+
+  let nowLine = '';
+  if (isToday) {
+    const n = new Date(), m = n.getHours() * 60 + n.getMinutes();
+    if (m >= lo * 60 && m <= hi * 60) nowLine = `<div class="tl-now" style="top:${(m - lo * 60) / 60 * CAL_HOUR_PX}px"></div>`;
+  }
+
+  const count = evs.length;
+  $('#view-calendar').innerHTML = `
+    <div class="seg" id="cal-seg"><button data-cv="day" class="active">Day</button><button data-cv="week">Week</button></div>
+    <div class="cal-top">
+    <div class="cal-head">
+      <label class="cal-date" aria-label="Pick a date">
+        <span class="cal-date__d">${esc(day.toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'short' }))}</span>
+        <span class="cal-date__s">${count ? count + (count === 1 ? ' booking' : ' bookings') : 'Nothing booked'}${day.getFullYear() !== new Date().getFullYear() ? ' · ' + day.getFullYear() : ''}<i data-lucide="chevron-down"></i></span>
+        <input type="date" id="cal-date-input" value="${dateVal}" />
+      </label>
+      <div class="cal-nav">
+        <button id="cal-prev" aria-label="Previous day"><i data-lucide="chevron-left"></i></button>
+        <button class="cal-today" id="cal-today" ${isToday ? 'disabled' : ''}>Today</button>
+        <button id="cal-next" aria-label="Next day"><i data-lucide="chevron-right"></i></button>
+      </div>
+    </div>
+    <div class="cal-strip">${strip}</div>
+    </div>
+    ${STATE._calErr ? `<div class="cal-empty" style="color:var(--rose)">Calendar not set up yet. Run owner-app-schema.sql in Supabase.</div>` : ''}
+    ${allDay.length ? `<div class="tl-allday">${allDay.map((e) => `<div class="event" data-ev="${e.id}" style="border-left-color:${svcColor(e.service)}"><div class="et">All day</div><div class="eb"><div class="etitle">${esc(e.title)}</div></div></div>`).join('')}</div>` : ''}
+    ${timed.length ? `<div class="tl-hint"><i data-lucide="hand"></i>Hold a booking to drag it. Tap an empty time to add one.</div>` : `<div class="tl-hint"><i data-lucide="plus"></i>Tap any time to add a booking.</div>`}
+    <div class="tl" style="height:${(hi - lo) * CAL_HOUR_PX}px">
+      <div class="tl-hours">${hours.join('')}</div>
+      <div class="tl-grid" id="tl-grid" data-lo="${lo}" data-hi="${hi}" data-day="${day.getTime()}">
+        ${blocks}${nowLine}
+      </div>
+    </div>
+    <button class="fab-new" id="cal-add" aria-label="New booking"><i data-lucide="plus"></i></button>
+  `;
+
+  // Land on something useful: now if today, else the first booking, else 8 am.
+  if (STATE._calScrolledFor !== day.getTime()) {
+    STATE._calScrolledFor = day.getTime();
+    const target = isToday ? new Date().getHours() - 1 : timed.length ? Math.min(...timed.map((e) => new Date(e.starts_at).getHours())) - 1 : 8;
+    requestAnimationFrame(() => {
+      const tl = $('.tl'), main = $('.main'), top = $('.cal-top');
+      if (!tl || !main) return;
+      const y = tl.getBoundingClientRect().top - main.getBoundingClientRect().top + main.scrollTop
+        + (Math.max(lo, target) - lo) * CAL_HOUR_PX - (top ? top.offsetHeight : 0) - 4;
+      main.scrollTop = Math.max(0, y);
+    });
+  }
+}
+
+function renderWeekList() {
   const ref = STATE.calRef;
-  const days = STATE.calView === 'day' ? [startOfDay(ref)] : Array.from({ length: 7 }, (_, i) => addDays(weekStartM(ref), i));
-  const title = STATE.calView === 'day'
-    ? ref.toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long' })
-    : days[0].toLocaleDateString('en-AU', { day: 'numeric', month: 'short' }) + ' - ' + days[6].toLocaleDateString('en-AU', { day: 'numeric', month: 'short' });
+  const days = Array.from({ length: 7 }, (_, i) => addDays(weekStartM(ref), i));
+  const title = days[0].toLocaleDateString('en-AU', { day: 'numeric', month: 'short' }) + ' - ' + days[6].toLocaleDateString('en-AU', { day: 'numeric', month: 'short' });
   const evByDay = (d) => STATE.events.filter((e) => sameDay(e.starts_at, d)).sort((a, b) => new Date(a.starts_at) - new Date(b.starts_at));
   const dayBlock = (d) => {
     const evs = evByDay(d);
     return `
     <div class="cal-day ${sameDay(d, new Date()) ? 'today' : ''}">
-      <div class="cal-day__h"><span class="dn">${d.toLocaleDateString('en-AU', { weekday: 'long' })}</span><span class="dd">${d.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}</span></div>
+      <button class="cal-day__h" data-cal-open="${d.getTime()}"><span class="dn">${d.toLocaleDateString('en-AU', { weekday: 'long' })}</span><span class="dd">${d.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}</span><i data-lucide="chevron-right"></i></button>
       ${evs.length ? evs.map((e, i) => eventChip(e, i, evs.length)).join('') : '<div class="cal-empty">No bookings</div>'}
     </div>`;
   };
@@ -489,18 +635,146 @@ function renderCalendar() {
   $('#view-calendar').innerHTML = `
     <div class="cal-head"><h2>${esc(title)}</h2>
       <div class="cal-nav">
-        <button id="cal-prev" aria-label="Previous"><i data-lucide="chevron-left"></i></button>
+        <button id="cal-prev" aria-label="Previous week"><i data-lucide="chevron-left"></i></button>
         <button class="cal-today" id="cal-today">Today</button>
-        <button id="cal-next" aria-label="Next"><i data-lucide="chevron-right"></i></button>
+        <button id="cal-next" aria-label="Next week"><i data-lucide="chevron-right"></i></button>
       </div>
     </div>
-    <div class="seg" id="cal-seg"><button data-cv="day" class="${STATE.calView === 'day' ? 'active' : ''}">Day</button><button data-cv="week" class="${STATE.calView === 'week' ? 'active' : ''}">Week</button></div>
+    <div class="seg" id="cal-seg"><button data-cv="day">Day</button><button data-cv="week" class="active">Week</button></div>
     ${legend}
     ${STATE._calErr ? `<div class="cal-empty" style="color:var(--rose)">Calendar not set up yet. Run owner-app-schema.sql in Supabase.</div>` : ''}
     ${days.map(dayBlock).join('')}
     <button class="fab-new" id="cal-add" aria-label="New booking"><i data-lucide="plus"></i></button>
   `;
 }
+
+/* ------------------------------------------------ timeline drag and drop -- */
+/* Touch needs a short hold before a booking lifts, otherwise every scroll that
+   starts on a booking would drag it. A mouse drags straight away. */
+function calGestureStart(e) {
+  const el = e.target.closest('[data-tl-ev]');
+  if (!el || CAL_DRAG) return;
+  const touch = e.type === 'touchstart';
+  if (!touch && e.button !== 0) return;
+  const pt = touch ? e.touches[0] : e;
+  const grid = $('#tl-grid'); const main = $('.main');
+  const ev = STATE.events.find((x) => x.id === el.dataset.tlEv);
+  if (!grid || !ev) return;
+  const s = new Date(ev.starts_at);
+  const st = s.getHours() * 60 + s.getMinutes();
+  const dur = ev.ends_at ? Math.max(15, Math.round((new Date(ev.ends_at) - s) / 60000)) : 60;
+  CAL_DRAG = {
+    el, ev, touch, mode: e.target.closest('[data-tl-rs]') ? 'resize' : 'move',
+    x0: pt.clientX, y0: pt.clientY, y: pt.clientY, scroll0: main.scrollTop,
+    st, dur, newSt: st, newDur: dur,
+    lo: +grid.dataset.lo, hi: +grid.dataset.hi, day: +grid.dataset.day,
+    active: false, timer: null, raf: null,
+  };
+  if (touch) CAL_DRAG.timer = setTimeout(calLift, 380);
+}
+function calLift() {
+  const d = CAL_DRAG; if (!d) return;
+  d.active = true;
+  d.el.classList.add('lifted');
+  document.body.classList.add('cal-dragging');
+  if (navigator.vibrate) try { navigator.vibrate(12); } catch (_) {}
+  calAutoScroll();
+}
+function calGestureMove(e) {
+  const d = CAL_DRAG; if (!d) return;
+  const pt = d.touch ? (e.touches && e.touches[0]) : e;
+  if (!pt) return;
+  const moved = Math.hypot(pt.clientX - d.x0, pt.clientY - d.y0);
+  if (!d.active) {
+    // Moving before the hold completes means he is scrolling: let it scroll.
+    if (d.touch) { if (moved > 8) calGestureEnd(null, true); return; }
+    if (moved < 4) return;
+    calLift();
+  }
+  if (e.cancelable) e.preventDefault();
+  d.y = pt.clientY;
+  calApplyDrag();
+}
+function calApplyDrag() {
+  const d = CAL_DRAG; if (!d || !d.active) return;
+  const main = $('.main');
+  const dy = (d.y - d.y0) + (main.scrollTop - d.scroll0);
+  const delta = Math.round((dy / CAL_HOUR_PX * 60) / CAL_SNAP_MIN) * CAL_SNAP_MIN;
+  const minSt = d.lo * 60, maxEnd = d.hi * 60;
+  if (d.mode === 'move') {
+    d.newSt = Math.max(minSt, Math.min(d.st + delta, maxEnd - d.dur));
+    d.newDur = d.dur;
+    d.el.style.top = ((d.newSt - minSt) / 60 * CAL_HOUR_PX) + 'px';
+  } else {
+    d.newSt = d.st;
+    d.newDur = Math.max(CAL_SNAP_MIN, Math.min(d.dur + delta, maxEnd - d.st));
+    d.el.style.height = Math.max(26, d.newDur / 60 * CAL_HOUR_PX - 2) + 'px';
+  }
+  const t = d.el.querySelector('.tl-ev__t');
+  // While held, always show the full range: that is what he is choosing.
+  if (t) t.textContent = minsLabel(d.newSt) + ' - ' + minsLabel(d.newSt + d.newDur);
+}
+/* While a booking is held near the top or bottom edge, keep scrolling so it
+   can travel further than one screen. */
+function calAutoScroll() {
+  const d = CAL_DRAG; if (!d || !d.active) return;
+  const main = $('.main'); const r = main.getBoundingClientRect();
+  const edge = 70;
+  const bottom = r.bottom - (parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--nav-h')) || 64);
+  let v = 0;
+  if (d.y < r.top + edge) v = -Math.ceil((r.top + edge - d.y) / 6);
+  else if (d.y > bottom - edge) v = Math.ceil((d.y - (bottom - edge)) / 6);
+  if (v) { const before = main.scrollTop; main.scrollTop += v; if (main.scrollTop !== before) calApplyDrag(); }
+  d.raf = requestAnimationFrame(calAutoScroll);
+}
+function calGestureEnd(e, cancelled) {
+  const d = CAL_DRAG; if (!d) return;
+  clearTimeout(d.timer); cancelAnimationFrame(d.raf);
+  CAL_DRAG = null;
+  document.body.classList.remove('cal-dragging');
+  if (!d.active) return;               // a plain tap: the click handler opens it
+  STATE._calJustDropped = Date.now();  // swallow the click that follows a drop
+  d.el.classList.remove('lifted');
+  if (cancelled || (d.newSt === d.st && d.newDur === d.dur)) { renderCalendar(); icons(); return; }
+  commitCalDrag(d);
+}
+async function commitCalDrag(d) {
+  const ev = d.ev;
+  const before = { starts_at: ev.starts_at, ends_at: ev.ends_at };
+  const start = new Date(d.day); start.setMinutes(d.newSt);
+  const row = { starts_at: start.toISOString(), ends_at: new Date(start.getTime() + d.newDur * 60000).toISOString(), updated_at: new Date().toISOString() };
+  Object.assign(ev, row);
+  renderCalendar(); icons();
+  // Mention a clash rather than block it: he may well be doing two jobs at one address.
+  const clash = STATE.events.find((x) => x.id !== ev.id && !x.all_day && sameDay(x.starts_at, start)
+    && new Date(x.starts_at) < new Date(row.ends_at) && new Date(x.ends_at || new Date(x.starts_at).getTime() + 3600000) > start);
+  const what = d.mode === 'move' ? 'Moved to ' + minsLabel(d.newSt) : 'Now ' + minsLabel(d.newSt) + ' to ' + minsLabel(d.newSt + d.newDur);
+  try {
+    const { error } = await sb.from('calendar_events').update(row).eq('id', ev.id);
+    if (error) throw error;
+    toastAction(what + (clash ? ', overlaps ' + (clash.customer_name || clash.title) : ''), 'Undo', () => undoCalDrag(ev, before), clash ? '' : 'ok');
+  } catch (err) {
+    Object.assign(ev, before); renderCalendar(); icons();
+    toast('Could not move it. Check your signal and try again.', 'err');
+  }
+}
+async function undoCalDrag(ev, before) {
+  const row = Object.assign({ updated_at: new Date().toISOString() }, before);
+  Object.assign(ev, before); renderCalendar(); icons();
+  const { error } = await sb.from('calendar_events').update(row).eq('id', ev.id);
+  if (error) { toast('Could not undo', 'err'); await loadEvents(); renderCalendar(); icons(); }
+  else toast('Put back', 'ok');
+}
+document.addEventListener('touchstart', calGestureStart, { passive: true });
+document.addEventListener('touchmove', calGestureMove, { passive: false });
+document.addEventListener('touchend', (e) => calGestureEnd(e, false));
+document.addEventListener('touchcancel', (e) => calGestureEnd(e, true));
+document.addEventListener('mousedown', calGestureStart);
+document.addEventListener('mousemove', calGestureMove);
+document.addEventListener('mouseup', (e) => calGestureEnd(e, false));
+// Android shows a context menu on long press; the hold is ours.
+document.addEventListener('contextmenu', (e) => { if (e.target.closest('[data-tl-ev]')) e.preventDefault(); });
+
 function eventChip(e, i, n) {
   const color = svcColor(e.service);
   const t = e.all_day ? 'All day' : fmtTime(e.starts_at) + (e.ends_at ? ' - ' + fmtTime(e.ends_at) : '');
@@ -545,8 +819,10 @@ function openEvent(ev) {
     <label class="form-field"><span>Job type</span><select id="ev-type" class="form-sel">${typeOpts}</select></label>
     <div class="row-2">${fld('Date', 'ev-date', 'date', dateVal)}${fld('Start time', 'ev-time', 'time', timeVal)}</div>
     <label class="form-field"><span>Duration</span><select id="ev-dur" class="form-sel">${durOpts}</select></label>
-    <div class="row-2">${fld('Customer', 'ev-cust', 'text', ev && ev.customer_name)}${fld('Phone', 'ev-phone', 'tel', ev && ev.customer_phone)}</div>
-    <div class="row-2">${fld('Rego', 'ev-rego', 'text', ev && ev.vehicle_rego)}${fld('Suburb', 'ev-suburb', 'text', ev && ev.suburb)}</div>
+    ${fld('Customer', 'ev-cust', 'text', ev && ev.customer_name, 'Start typing a name or rego')}
+    <label class="form-field"><span>Email <em class="opt">so the invoice can be emailed</em></span><input id="ev-email" type="email" inputmode="email" autocomplete="off" autocapitalize="off" spellcheck="false" value="${esc((ev && ev.customer_email) || '')}" placeholder="name@example.com" /></label>
+    <div class="row-2">${fld('Phone', 'ev-phone', 'tel', ev && ev.customer_phone)}${fld('Rego', 'ev-rego', 'text', ev && ev.vehicle_rego)}</div>
+    ${fld('Suburb', 'ev-suburb', 'text', ev && ev.suburb)}
     <label class="form-field"><span>Address</span><input id="ev-address" type="text" value="${esc((ev && ev.address) || '')}" placeholder="12 Smith St, Sunnybank" /></label>
     <label class="form-field"><span>Notes</span><textarea id="ev-notes" rows="2">${esc((ev && ev.notes) || '')}</textarea></label>
     ${isEdit && (ev.customer_phone || ev.customer_name || ev.vehicle_rego) ? `
@@ -569,10 +845,21 @@ function openEvent(ev) {
     if (!t.value.trim() && e.target.value) t.value = svcLabel(e.target.value);
   });
   $('#ev-save').addEventListener('click', saveEvent);
+  /* Past customers from inquiries, invoices and bookings: picking one fills
+     phone, email, rego and address so nothing is retyped. Only blank fields
+     are filled, never overwriting what he has already typed. */
+  if (window.MMQLD_CUSTOMERS) {
+    MMQLD_CUSTOMERS.attach($('#ev-cust'), { mode: 'person', onPick: (c) => {
+      const put = (id, v) => { const el = $(id); if (el && v && !el.value.trim()) el.value = v; };
+      $('#ev-cust').value = c.name || c.business || '';
+      put('#ev-phone', c.phone); put('#ev-email', c.email); put('#ev-rego', c.rego);
+      put('#ev-suburb', c.suburb); put('#ev-address', c.address);
+    } });
+  }
   if (isEdit) {
     $('#ev-del').addEventListener('click', () => deleteEvent(ev.id));
     // Quick actions reuse the booking's own customer data.
-    const evParams = () => new URLSearchParams({ name: ev.customer_name || '', phone: ev.customer_phone || '', suburb: ev.suburb || '', address: ev.address || '', rego: ev.vehicle_rego || '' }).toString();
+    const evParams = () => new URLSearchParams({ name: ev.customer_name || '', email: ev.customer_email || '', phone: ev.customer_phone || '', suburb: ev.suburb || '', address: ev.address || '', rego: ev.vehicle_rego || '', id: ev.submission_id || '' }).toString();
     const eMsg = $('#ev-msg'); if (eMsg) eMsg.addEventListener('click', () => openMessageFor(ev.customer_name, ev.customer_phone, () => openEvent(ev)));
     const eInv = $('#ev-invoice'); if (eInv) eInv.addEventListener('click', () => { location.href = 'invoice/index.html?' + evParams(); });
     const eIns = $('#ev-inspection'); if (eIns) eIns.addEventListener('click', () => { location.href = 'inspection/index.html?' + evParams(); });
@@ -583,6 +870,8 @@ async function saveEvent() {
   if (!title) return toast('Add a title', 'err');
   const date = $('#ev-date').value, time = $('#ev-time').value;
   if (!date || !time) return toast('Pick a date and start time', 'err');
+  const email = $('#ev-email').value.trim();
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return toast('That email does not look right', 'err');
   const start = new Date(date + 'T' + time);
   const durMin = parseInt($('#ev-dur').value, 10) || 60;
   const row = {
@@ -592,6 +881,7 @@ async function saveEvent() {
     ends_at: new Date(start.getTime() + durMin * 60000).toISOString(),
     customer_name: $('#ev-cust').value.trim() || null,
     customer_phone: $('#ev-phone').value.trim() || null,
+    customer_email: $('#ev-email').value.trim().toLowerCase() || null,
     vehicle_rego: $('#ev-rego').value.trim() || null,
     suburb: $('#ev-suburb').value.trim() || null,
     address: $('#ev-address').value.trim() || null,
@@ -610,8 +900,18 @@ async function saveEvent() {
       delete row.address;
       ({ error } = await save(row));
     }
+    // Same again for the email column, but say so: a silently lost email is
+    // exactly the problem this field exists to fix.
+    let emailLost = false;
+    if (error && /customer_email/i.test(error.message)) {
+      emailLost = !!row.customer_email;
+      delete row.customer_email;
+      ({ error } = await save(row));
+    }
     if (error) throw error;
-    await loadEvents(); toast('Booking saved', 'ok'); closeSheet(); STATE.view = 'calendar'; setView('calendar');
+    await loadEvents();
+    if (emailLost) toast('Booking saved, but the email was not. The database needs its email update.', 'err');
+    else toast('Booking saved', 'ok'); closeSheet(); STATE.view = 'calendar'; setView('calendar');
   } catch (e) { toast('Save failed: ' + String(e.message || e).slice(0, 50), 'err'); btn.disabled = false; btn.innerHTML = 'Save'; icons(); }
 }
 async function deleteEvent(id) {
@@ -652,7 +952,7 @@ function eventFromSubmission(s) {
   return {
     title: sv.label + ' - ' + (s.full_name || 'Customer'),
     starts_at: start.toISOString(), ends_at: new Date(start.getTime() + 3600000).toISOString(),
-    customer_name: s.full_name, customer_phone: s.phone, vehicle_rego: s.vehicle_rego, suburb: s.suburb,
+    customer_name: s.full_name, customer_phone: s.phone, customer_email: s.email || null, vehicle_rego: s.vehicle_rego, suburb: s.suburb,
     address: s.address || null,
     service: s.service_needed || null, notes: s.symptoms || '',
   };
@@ -814,7 +1114,8 @@ async function deleteLog(kind, table, bucket, id) {
     let imagePaths = [];
     if (kind === 'inspections') {
       const { data } = await sb.from(table).select('state').eq('id', id).maybeSingle();
-      imagePaths = ((((data || {}).state || {}).images) || [])
+      const st = (data || {}).state || {};
+      imagePaths = [st.coverImage, ...(st.images || [])]
         .flatMap((img) => [img && img.path, img && img.thumbPath]).filter(Boolean);
     }
     const { error } = await sb.from(table).delete().eq('id', id);
@@ -978,7 +1279,7 @@ async function sendAttachment(to, subject, bodyText, filename, pdfBase64, found)
   return gFetch('/users/me/messages/send', { method: 'POST', body: JSON.stringify(payload) });
 }
 // Resolve a customer email for a saved doc: the stored one, else the linked
-// inquiry, else the most recent inquiry for the same rego.
+// inquiry, else the most recent inquiry for the same rego, else a booking.
 async function resolveDocEmail(r) {
   if (r.customer_email) return r.customer_email;
   const base = CONFIG.SUPABASE_URL.replace(/\/+$/, '');
@@ -986,6 +1287,12 @@ async function resolveDocEmail(r) {
   const grab = async (qs) => { try { const res = await fetch(base + '/rest/v1/quote_submissions?' + qs, { headers }); const j = await res.json(); return (j && j[0] && j[0].email) || ''; } catch (_) { return ''; } };
   if (r.submission_id) { const e = await grab('id=eq.' + encodeURIComponent(r.submission_id) + '&select=email&limit=1'); if (e) return e; }
   if (r.vehicle_rego) { const e = await grab('vehicle_rego=eq.' + encodeURIComponent(r.vehicle_rego) + '&select=email&order=created_at.desc&limit=1'); if (e) return e; }
+  // Phone bookings never came through the website, so check the calendar too.
+  if (r.vehicle_rego) {
+    const b = STATE.events.filter((x) => x.customer_email && x.vehicle_rego && x.vehicle_rego.replace(/\s/g, '').toUpperCase() === r.vehicle_rego.replace(/\s/g, '').toUpperCase())
+      .sort((a, b2) => new Date(b2.starts_at) - new Date(a.starts_at))[0];
+    if (b) return b.customer_email;
+  }
   return '';
 }
 async function sendStoredDoc(kind, r) {
@@ -1027,14 +1334,36 @@ document.addEventListener('click', (e) => {
   const mvUp = e.target.closest('[data-move-up]'); if (mvUp) { e.stopPropagation(); moveEvent(mvUp.dataset.moveUp, -1); return; }
   const mvDn = e.target.closest('[data-move-down]'); if (mvDn) { e.stopPropagation(); moveEvent(mvDn.dataset.moveDown, 1); return; }
   const evEl = e.target.closest('.event[data-ev]'); if (evEl) { const ev = STATE.events.find((x) => x.id === evEl.dataset.ev); if (ev) openEvent(ev); return; }
+  // Timeline: tap a booking to open it, tap empty time to start one there.
+  const tlEv = e.target.closest('[data-tl-ev]');
+  if (tlEv) { if (Date.now() - (STATE._calJustDropped || 0) < 400) return; const ev = STATE.events.find((x) => x.id === tlEv.dataset.tlEv); if (ev) openEvent(ev); return; }
+  const grid = e.target.closest('#tl-grid');
+  if (grid) {
+    const y = e.clientY - grid.getBoundingClientRect().top;
+    const mins = +grid.dataset.lo * 60 + Math.floor((y / CAL_HOUR_PX * 60) / 30) * 30;
+    const d = new Date(+grid.dataset.day); d.setMinutes(Math.max(0, Math.min(mins, 23 * 60 + 30)));
+    return openEvent({ starts_at: d.toISOString() });
+  }
+  const sd = e.target.closest('[data-cal-day]'); if (sd) { STATE.calRef = new Date(+sd.dataset.calDay); renderCalendar(); icons(); return; }
+  const od = e.target.closest('[data-cal-open]'); if (od) { STATE.calRef = new Date(+od.dataset.calOpen); STATE.calView = 'day'; renderCalendar(); icons(); return; }
   const chip = e.target.closest('.chip[data-range]'); if (chip) { STATE.inqRange = chip.dataset.range; renderInquiries(); icons(); return; }
   const per = e.target.closest('.seg button[data-period]'); if (per) { STATE.period = per.dataset.period; renderAnalytics(); icons(); return; }
   const cv = e.target.closest('#cal-seg button[data-cv]'); if (cv) { STATE.calView = cv.dataset.cv; renderCalendar(); icons(); return; }
   if (e.target.closest('#cal-prev')) { STATE.calRef = addDays(STATE.calRef || new Date(), STATE.calView === 'day' ? -1 : -7); renderCalendar(); icons(); return; }
   if (e.target.closest('#cal-next')) { STATE.calRef = addDays(STATE.calRef || new Date(), STATE.calView === 'day' ? 1 : 7); renderCalendar(); icons(); return; }
   if (e.target.closest('#cal-today')) { STATE.calRef = new Date(); renderCalendar(); icons(); return; }
-  if (e.target.closest('#cal-add')) return openEvent(null);
+  if (e.target.closest('#cal-add')) {
+    // New bookings start on the day being looked at, not always today.
+    const d = startOfDay(STATE.calRef || new Date()); d.setHours(9, 0, 0, 0);
+    return openEvent({ starts_at: d.toISOString() });
+  }
   if (e.target.closest('#see-all')) return setView('inquiries');
+});
+// Jump to any date from the picker under the day title.
+document.addEventListener('change', (e) => {
+  if (e.target.id !== 'cal-date-input' || !e.target.value) return;
+  STATE.calRef = new Date(e.target.value + 'T00:00:00'); STATE.calView = 'day';
+  renderCalendar(); icons();
 });
 $('#scrim').addEventListener('click', closeSheet);
 $('#sheet-close').addEventListener('click', closeSheet);

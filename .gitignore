@@ -1,1 +1,3 @@
 .DS_Store
+# Local PDF exports can hold customer details; never commit them.
+output/
