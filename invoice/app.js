@@ -26,7 +26,12 @@ const BUSINESS = {
   abn:     '85 829 529 258',
   // Printed on every invoice so a customer always knows where to pay.
   bank: { name: 'My Mechanic Qld', bsb: '484-799', account: '506731007' },
+  signoff: 'Drive safe, and call us if anything comes up.',
 };
+/* The details actually printed: Settings wins, BUSINESS above is only the
+   fallback if settings.js failed to load. */
+const MS = window.MMQLD_SETTINGS || null;
+const businessProfile = () => (MS ? MS.business() : BUSINESS);
 
 /* ────────────────────────────────────────────────────────────────────
    Auto invoice numbering — INV_YYYYMMDD_NNNN, counter in localStorage
@@ -128,15 +133,22 @@ function sampleState() {
   };
 }
 
+/* New invoices start from Settings > Invoices: GST mode, payment terms (the
+   due date) and any standing note. */
+function dueFromTerms() {
+  const days = MS ? MS.num('invoice_terms_days') : 0;
+  const d = new Date(); d.setDate(d.getDate() + days);
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
 function blankState() {
   return {
     customer: { name: '', email: '', address: '', business: '', billTo: 'person' },
     vehicle:  { rego: '', makeModel: '', year: '', odometer: '' },
-    invoice:  { number: autoInvoiceNumber(), date: today(), due: today(), status: 'outstanding' },
+    invoice:  { number: autoInvoiceNumber(), date: today(), due: dueFromTerms(), status: 'outstanding' },
     items: [blankItem()],
-    gstInclusive: true,
+    gstInclusive: MS ? MS.bool('invoice_gst_inclusive') : true,
     receipts: [],
-    notes: '',
+    notes: MS ? String(MS.get('invoice_default_notes') || '') : '',
     signature: { name: '', dataUrl: '' },
   };
 }
@@ -849,7 +861,7 @@ async function saveInvoiceRecord(b64) {
 /* The printed layout lives in invoice-pdf.js, which has no DOM access, so
    the same file can be rendered and checked outside the browser. */
 function buildInvoiceDoc(t, A) {
-  return window.MMQLD_INVOICE_PDF.build(state, t, { business: BUSINESS, assets: A });
+  return window.MMQLD_INVOICE_PDF.build(state, t, { business: businessProfile(), assets: A });
 }
 
 /* ────────────────────────────────────────────────────────────────────
@@ -907,16 +919,11 @@ async function sendToClient(btn) {
   // Greet the contact person; fall back to the business name, then a neutral hello.
   const firstName = (state.customer.name || PREFILL.name || state.customer.business || '').split(/\s+/)[0] || 'there';
   const filename = 'invoice-' + (state.invoice.number || 'mmqld') + '.pdf';
-  const subject = 'Invoice from ' + CONFIG.BUSINESS_NAME;
-  const bodyText =
-`Hi ${firstName},
-
-Please find your invoice attached. Let me know if you have any questions.
-
-Thank you,
-Ashley
-My Mechanic QLD
-0451159954`;
+  // Wording from Settings > Invoices, signed with the shared signature.
+  const vars = { first_name: firstName, number: state.invoice.number || '' };
+  const subject = MS ? MS.text('email_invoice_subject', vars) : 'Invoice from ' + CONFIG.BUSINESS_NAME;
+  const bodyText = MS ? MS.text('email_invoice_body', vars) + MS.signature()
+    : `Hi ${firstName},\n\nPlease find your invoice attached. Let me know if you have any questions.`;
 
   const original = btn.innerHTML;
   btn.disabled = true;

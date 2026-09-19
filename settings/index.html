@@ -19,438 +19,875 @@
 </script>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <meta name="robots" content="noindex,nofollow" />
-<meta name="theme-color" content="#1E3A8A" />
+<meta name="theme-color" content="#F2F2F7" />
 <link rel="apple-touch-icon" sizes="180x180" href="../apple-touch-icon.png" />
 <link rel="icon" type="image/png" sizes="32x32" href="../favicon-32x32.png" />
 <title>Settings · My Mechanic QLD</title>
 <style>
+  /* iOS Settings, in the brand's navy. Grouped inset lists on system grey,
+     44pt-plus rows, tinted icon tiles, pages that slide, changes that save
+     themselves. */
   :root {
-    --navy: #1E3A8A; --navy-deep: #1A2E6E; --navy-bright: #2563EB; --navy-tint: #E8EEFB;
-    --bg: #FAFAF8; --surface: #FFFFFF; --soft: #F5F5F4;
-    --ink: #0C0A09; --muted: #44403C; --subtle: #78716C; --faint: #A8A29E;
-    --hairline: #E7E5E0; --strong: #D6D3CB;
-    --green: #15803D; --green-tint: #DCFCE7;
-    --amber: #B45309; --amber-tint: #FEF3C7;
-    --red: #B91C1C; --red-tint: #FEE2E2;
-    --safe-b: env(safe-area-inset-bottom, 0px);
-    --safe-t: env(safe-area-inset-top, 0px);
-    --bar-h: 76px;
+    --tint: #1E3A8A; --tint-bright: #2563EB; --gold: #C9A227;
+    --bg: #F2F2F7; --cell: #FFFFFF; --cell-press: #E5E5EA;
+    --label: #000000; --label2: rgba(60,60,67,0.6); --label3: rgba(60,60,67,0.3);
+    --sep: rgba(60,60,67,0.18); --fill: rgba(118,118,128,0.12);
+    --green: #34C759; --red: #FF3B30;
+    --safe-t: env(safe-area-inset-top, 0px); --safe-b: env(safe-area-inset-bottom, 0px);
+    --nav-h: 44px;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; }
   body {
-    background: var(--bg); color: var(--ink);
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Helvetica, Arial, sans-serif;
-    font-size: 15px; line-height: 1.5; -webkit-font-smoothing: antialiased;
-    padding-bottom: calc(var(--bar-h) + var(--safe-b) + 16px);
+    background: var(--bg); color: var(--label); overflow: hidden;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Inter, Helvetica, Arial, sans-serif;
+    font-size: 17px; line-height: 1.29; letter-spacing: -0.41px; -webkit-font-smoothing: antialiased;
   }
-  input, select, button, textarea { font-family: inherit; font-size: 16px; color: inherit; }
-  button { border: none; background: none; cursor: pointer; }
+  input, textarea, select, button { font: inherit; color: inherit; letter-spacing: inherit; }
+  button { border: 0; background: none; cursor: pointer; }
 
-  .top {
-    background: linear-gradient(180deg, var(--navy) 0%, var(--navy-deep) 100%);
-    color: #fff; padding: calc(var(--safe-t) + 18px) 18px 20px;
+  /* ---------------------------------------------------------- page stack -- */
+  #stack { position: fixed; inset: 0; overflow: hidden; }
+  .page {
+    position: absolute; inset: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; background: var(--bg);
+    padding: calc(var(--safe-t) + var(--nav-h)) 0 calc(var(--safe-b) + 40px);
   }
-  .top a.back { color: rgba(255,255,255,.75); font-size: 13px; font-weight: 600; text-decoration: none; display: inline-block; margin-bottom: 10px; }
-  .top h1 { font-size: 22px; font-weight: 800; letter-spacing: -0.02em; }
-  .top p { font-size: 13.5px; color: rgba(255,255,255,.8); margin-top: 6px; max-width: 46ch; }
+  .page.enter-right { animation: inRight .32s cubic-bezier(.2,.8,.2,1) both; z-index: 2; box-shadow: -8px 0 24px rgba(0,0,0,.08); }
+  .page.exit-left { animation: outLeft .32s cubic-bezier(.2,.8,.2,1) both; }
+  .page.enter-left { animation: inLeft .32s cubic-bezier(.2,.8,.2,1) both; }
+  .page.exit-right { animation: outRight .32s cubic-bezier(.2,.8,.2,1) both; z-index: 2; box-shadow: -8px 0 24px rgba(0,0,0,.08); }
+  @keyframes inRight { from { transform: translateX(100%); } to { transform: none; } }
+  @keyframes outLeft { from { transform: none; } to { transform: translateX(-30%); } }
+  @keyframes inLeft { from { transform: translateX(-30%); } to { transform: none; } }
+  @keyframes outRight { from { transform: none; } to { transform: translateX(100%); } }
 
-  .wrap { padding: 16px 14px 0; max-width: 720px; margin: 0 auto; }
-
-  .note {
-    background: var(--amber-tint); border: 1px solid #F3D9A4; border-radius: 14px;
-    padding: 14px 16px; margin-bottom: 16px; font-size: 13.5px; color: #7A4A08;
+  /* ------------------------------------------------------------- nav bar -- */
+  .nav {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 20;
+    height: calc(var(--safe-t) + var(--nav-h)); padding-top: var(--safe-t);
+    display: grid; grid-template-columns: 1fr auto 1fr; align-items: center;
+    background: rgba(242,242,247,0.82); backdrop-filter: saturate(180%) blur(20px); -webkit-backdrop-filter: saturate(180%) blur(20px);
+    border-bottom: .5px solid transparent; transition: border-color .2s;
   }
-  .note b { display: block; margin-bottom: 4px; color: var(--amber); }
+  .nav.scrolled { border-bottom-color: var(--sep); }
+  .nav__back { justify-self: start; display: flex; align-items: center; gap: 4px; padding: 0 8px; height: 44px; color: var(--tint-bright); font-size: 17px; max-width: 38vw; white-space: nowrap; overflow: hidden; }
+  .nav__back span { overflow: hidden; text-overflow: ellipsis; }
+  .nav__back svg { flex: none; }
+  .nav__title { font-weight: 600; font-size: 17px; opacity: 0; transition: opacity .15s; white-space: nowrap; max-width: 46vw; overflow: hidden; text-overflow: ellipsis; }
+  .nav.scrolled .nav__title, .nav.always .nav__title { opacity: 1; }
+  .nav__saved { justify-self: end; margin-right: 14px; font-size: 15px; color: var(--label2); display: flex; align-items: center; gap: 4px; opacity: 0; transition: opacity .25s; }
+  .nav__saved.show { opacity: 1; }
+  .nav__saved svg { color: var(--green); }
 
-  .group { margin-bottom: 22px; }
-  .group__h { font-size: 11.5px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--subtle); margin: 0 4px 8px; }
-  .group__note { font-size: 12.5px; color: var(--subtle); margin: 0 4px 10px; }
-  .card { background: var(--surface); border: 1px solid var(--hairline); border-radius: 14px; overflow: hidden; box-shadow: 0 1px 2px rgba(12,10,9,.05); }
+  .large-title { font-size: 34px; font-weight: 700; letter-spacing: 0.37px; line-height: 1.2; padding: 4px 16px 8px; }
 
-  .field { padding: 12px 14px; border-bottom: 1px solid var(--hairline); }
-  .field:last-child { border-bottom: none; }
-  .field label { display: block; font-size: 12.5px; font-weight: 700; color: var(--subtle); margin-bottom: 5px; }
-  .field input, .field select {
-    width: 100%; padding: 10px 12px; border: 1px solid var(--hairline); border-radius: 10px;
-    background: var(--surface); font-weight: 600;
+  /* ------------------------------------------------------------- search -- */
+  .search { margin: 2px 16px 18px; position: relative; }
+  .search input {
+    width: 100%; height: 36px; border: 0; border-radius: 10px; background: var(--fill);
+    padding: 0 30px 0 32px; font-size: 17px; outline: none; -webkit-appearance: none; appearance: none;
   }
-  .field input:focus, .field select:focus { outline: none; border-color: var(--navy); box-shadow: 0 0 0 3px rgba(30,58,138,.12); }
-  .field .hint { font-size: 12px; color: var(--subtle); margin-top: 6px; font-weight: 500; }
-  .field.money input { text-align: right; font-weight: 700; }
+  .search input::-webkit-search-cancel-button { display: none; }
+  .search input::placeholder { color: var(--label2); }
+  .search .mag { position: absolute; left: 9px; top: 50%; transform: translateY(-50%); color: var(--label2); pointer-events: none; }
+  .search .clr { position: absolute; right: 7px; top: 50%; transform: translateY(-50%); width: 18px; height: 18px; border-radius: 50%; background: var(--label3); color: #fff; display: none; place-items: center; }
+  .search.has .clr { display: grid; }
 
-  /* toggle rows */
-  .toggle { display: flex; align-items: center; gap: 12px; padding: 13px 14px; border-bottom: 1px solid var(--hairline); }
-  .toggle:last-child { border-bottom: none; }
-  .toggle__t { flex: 1; min-width: 0; }
-  .toggle__t b { display: block; font-size: 14.5px; font-weight: 700; }
-  .toggle__t span { display: block; font-size: 12.5px; color: var(--subtle); margin-top: 2px; }
-  .sw { flex: 0 0 auto; width: 50px; height: 30px; border-radius: 999px; background: var(--strong); position: relative; transition: background .18s; }
-  .sw::after { content: ''; position: absolute; top: 3px; left: 3px; width: 24px; height: 24px; border-radius: 50%; background: #fff; transition: transform .18s; box-shadow: 0 1px 3px rgba(0,0,0,.25); }
-  .sw[aria-pressed="true"] { background: var(--green); }
-  .sw[aria-pressed="true"]::after { transform: translateX(20px); }
-  .sw[disabled] { opacity: .5; }
+  /* -------------------------------------------------------------- groups -- */
+  .group { margin: 0 16px 35px; }
+  .group__head { font-size: 13px; line-height: 18px; color: var(--label2); text-transform: uppercase; letter-spacing: -0.08px; padding: 0 16px 7px; }
+  .group__foot { font-size: 13px; line-height: 18px; color: var(--label2); letter-spacing: -0.08px; padding: 7px 16px 0; }
+  .list { background: var(--cell); border-radius: 10px; overflow: hidden; }
 
-  /* action rows */
-  .act { display: flex; align-items: center; gap: 12px; width: 100%; padding: 14px; border-bottom: 1px solid var(--hairline); text-align: left; }
-  .act:last-child { border-bottom: none; }
-  .act__t { flex: 1; min-width: 0; }
-  .act__t b { display: block; font-size: 14.5px; font-weight: 700; }
-  .act__t span { display: block; font-size: 12.5px; color: var(--subtle); margin-top: 2px; }
-  .act .chev { color: var(--faint); font-size: 20px; line-height: 1; }
-  .act.danger b { color: var(--red); }
-  .pill { flex: 0 0 auto; font-size: 11.5px; font-weight: 700; padding: 4px 10px; border-radius: 999px; }
-  .pill.on { background: var(--green-tint); color: var(--green); }
-  .pill.off { background: var(--red-tint); color: var(--red); }
+  .row { position: relative; display: flex; align-items: center; min-height: 44px; padding: 0 16px; gap: 12px; width: 100%; text-align: left; background: var(--cell); color: var(--label); }
+  .row + .row::before { content: ""; position: absolute; top: 0; right: 0; left: 16px; border-top: .5px solid var(--sep); }
+  .row.has-icon + .row.has-icon::before { left: 57px; }
+  button.row:active, a.row:active, .row.tap:active { background: var(--cell-press); }
+  a.row { text-decoration: none; }
+  .row__icon { flex: none; width: 29px; height: 29px; border-radius: 7px; display: grid; place-items: center; color: #fff; }
+  .row__icon svg { width: 18px; height: 18px; }
+  .row__main { flex: 1; min-width: 0; padding: 11px 0; }
+  .row__label { display: block; }
+  .row__sub { display: block; font-size: 13px; line-height: 18px; color: var(--label2); margin-top: 1px; }
+  .row__value { flex: none; max-width: 52%; color: var(--label2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: right; }
+  .row__chev { flex: none; color: var(--label3); margin-right: -4px; }
+  .row.danger { color: var(--red); }
+  .row.action { color: var(--tint-bright); }
 
-  .bar {
-    position: fixed; left: 0; right: 0; bottom: 0; z-index: 30;
-    padding: 12px 14px calc(12px + var(--safe-b));
-    background: rgba(255,255,255,.95); backdrop-filter: saturate(160%) blur(14px);
-    border-top: 1px solid var(--hairline);
-    display: flex; gap: 12px; align-items: center;
+  /* Inline fields: label left, value right, like editing a contact on iOS. */
+  .field-row .row__main { flex: none; width: 38%; min-width: 104px; }
+  .field-row input {
+    flex: 1; min-width: 0; border: 0; outline: none; background: transparent; text-align: right;
+    font-size: 17px; padding: 11px 0; color: var(--label2);
   }
-  .bar__info { flex: 1; min-width: 0; font-size: 13px; font-weight: 600; color: var(--subtle); }
-  .bar__info b { color: var(--ink); display: block; font-size: 14px; }
-  .save { flex: 0 0 auto; padding: 14px 24px; border-radius: 12px; background: var(--navy); color: #fff; font-weight: 700; font-size: 15px; }
-  .save:disabled { opacity: .45; }
-  .save.ok { background: var(--green); }
+  .field-row input:focus { color: var(--label); }
+  .field-row input::placeholder { color: var(--label3); }
+  .field-row input.mono { font-variant-numeric: tabular-nums; }
+  .field-row .pre { color: var(--label2); margin-right: -10px; }
 
-  .foot { text-align: center; font-size: 12px; color: var(--faint); padding: 8px 0 20px; }
+  /* iOS switch */
+  .switch { flex: none; position: relative; width: 51px; height: 31px; border-radius: 16px; background: rgba(120,120,128,0.16); transition: background .25s; }
+  .switch::after { content: ""; position: absolute; top: 2px; left: 2px; width: 27px; height: 27px; border-radius: 50%; background: #fff; box-shadow: 0 3px 8px rgba(0,0,0,.15), 0 3px 1px rgba(0,0,0,.06); transition: transform .25s cubic-bezier(.3,.7,.4,1); }
+  .switch[aria-checked="true"] { background: var(--green); }
+  .switch[aria-checked="true"]::after { transform: translateX(20px); }
+  .switch[aria-disabled="true"] { opacity: .5; }
+  .check { flex: none; color: var(--tint-bright); }
+
+  /* ------------------------------------------------------- profile card -- */
+  .card-row { padding: 10px 16px; gap: 14px; }
+  .avatar { flex: none; width: 60px; height: 60px; border-radius: 50%; background: linear-gradient(160deg, #2749a8, #1A2E6E); display: grid; place-items: center; box-shadow: inset 0 0 0 2px rgba(201,162,39,.85); }
+  .avatar img { width: 40px; height: 40px; }
+  .card-row .row__label { font-size: 22px; letter-spacing: .35px; }
+
+  .preview-row .row__main { padding: 12px 0; }
+  .preview-row .cap { display: block; font-size: 12px; text-transform: uppercase; color: var(--label2); margin-bottom: 5px; letter-spacing: 0; }
+  .preview-row .body { display: block; white-space: pre-wrap; font-size: 15px; line-height: 1.45; }
+
+  /* ---------------------------------------------------------- editors -- */
+  .editor { margin: 20px 16px 8px; }
+  .editor textarea {
+    width: 100%; border: 0; border-radius: 10px; background: var(--cell); padding: 12px 14px; font-size: 16px; line-height: 1.42;
+    resize: none; outline: none; min-height: 60px; letter-spacing: -0.2px; display: block;
+  }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 16px 26px; }
+  .chip { padding: 6px 12px; border-radius: 16px; background: var(--cell); color: var(--tint-bright); font-size: 15px; box-shadow: 0 0 0 .5px var(--sep); }
+  .chip:active { background: var(--cell-press); }
+  .chip::before { content: "+ "; }
+  .preview { margin: 0 16px 35px; background: var(--cell); border-radius: 10px; padding: 14px 16px; font-size: 15px; line-height: 1.45; white-space: pre-wrap; color: #1c1c1e; }
+  .preview.sms { background: #E9E9EB; border-radius: 18px; border-bottom-left-radius: 5px; max-width: 86%; }
+  .preview .ph { color: var(--red); }
+
+  .empty { text-align: center; color: var(--label2); padding: 40px 20px; font-size: 15px; }
+  .hl { animation: hl 1.6s ease; }
+  @keyframes hl { 0%, 45% { background: #E4EBFF; } 100% { background: var(--cell); } }
 
   .toast {
-    position: fixed; left: 50%; transform: translateX(-50%);
-    bottom: calc(var(--bar-h) + var(--safe-b) + 18px); z-index: 60;
-    background: var(--ink); color: #fff; padding: 11px 18px; border-radius: 999px;
-    font-size: 13.5px; font-weight: 600; box-shadow: 0 6px 24px rgba(0,0,0,.2);
-    opacity: 0; pointer-events: none; transition: opacity .25s; max-width: 90vw; text-align: center;
+    position: fixed; left: 50%; bottom: calc(var(--safe-b) + 24px); transform: translate(-50%, 20px); z-index: 50;
+    background: rgba(28,28,30,.92); color: #fff; padding: 11px 18px; border-radius: 14px; font-size: 15px; opacity: 0; pointer-events: none;
+    transition: all .25s; max-width: calc(100% - 40px); text-align: center;
   }
-  .toast.show { opacity: 1; }
-  .toast.err { background: var(--red); }
-  .toast.ok { background: var(--green); }
+  .toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+  @media (min-width: 720px) {
+    .page > * { max-width: 680px; margin-left: auto !important; margin-right: auto !important; }
+    .page .group, .page .editor, .page .chips, .page .preview, .page .search { width: calc(100% - 32px); }
+  }
 </style>
+<script src="https://unpkg.com/lucide@latest"></script>
 </head>
 <body>
 
-<header class="top">
-  <a class="back" href="../index.html">‹ Back to the app</a>
-  <h1>Settings</h1>
-  <p>Your business details, default prices and how the app behaves. These flow through to your
-     invoices, reports and anything Ashley sends out.</p>
+<header class="nav" id="nav">
+  <button class="nav__back" id="navBack" type="button" aria-label="Back">
+    <svg width="13" height="21" viewBox="0 0 13 21" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="11 2 2.5 10.5 11 19"/></svg>
+    <span id="navBackLabel">Owner app</span>
+  </button>
+  <div class="nav__title" id="navTitle">Settings</div>
+  <div class="nav__saved" id="navSaved"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg><span>Saved</span></div>
 </header>
 
-<div class="wrap">
-  <div id="sync-note" class="note" hidden>
-    <b>Settings are saved on this phone only</b>
-    The settings table has not been created in the database yet, so these will not follow you to
-    another device. Everything still works here.
-  </div>
-
-  <div class="group">
-    <div class="group__h">Business details</div>
-    <div class="group__note">Printed on every invoice and inspection report, and used to sign off emails.</div>
-    <div class="card">
-      <div class="field"><label for="business_name">Business name</label><input id="business_name" data-s="business_name" type="text" /></div>
-      <div class="field"><label for="business_phone">Phone</label><input id="business_phone" data-s="business_phone" type="tel" inputmode="tel" /></div>
-      <div class="field"><label for="business_email">Email</label><input id="business_email" data-s="business_email" type="email" inputmode="email" autocapitalize="off" /></div>
-      <div class="field"><label for="business_abn">ABN</label><input id="business_abn" data-s="business_abn" type="text" inputmode="numeric" /></div>
-      <div class="field"><label for="business_website">Website</label><input id="business_website" data-s="business_website" type="text" autocapitalize="off" /></div>
-    </div>
-  </div>
-
-  <div class="group">
-    <div class="group__h">Default prices</div>
-    <div class="group__note">Used to fill in quick quotes and text messages. You can always change the price on the day.</div>
-    <div class="card">
-      <div class="field money"><label for="price_service">Standard service</label><input id="price_service" data-s="price_service" inputmode="decimal" /><div class="hint">Inc GST</div></div>
-      <div class="field money"><label for="price_diagnostic">Diagnostic</label><input id="price_diagnostic" data-s="price_diagnostic" inputmode="decimal" /><div class="hint">Inc GST</div></div>
-      <div class="field money"><label for="price_callout">Call-out fee</label><input id="price_callout" data-s="price_callout" inputmode="decimal" /><div class="hint">Inc GST</div></div>
-    </div>
-  </div>
-
-  <div class="group">
-    <div class="group__h">Invoices</div>
-    <div class="card">
-      <div class="toggle">
-        <div class="toggle__t"><b>Prices include GST</b><span>How new invoices start. GST is worked out as one eleventh of the total.</span></div>
-        <button class="sw" data-s="invoice_gst_inclusive" role="switch" aria-pressed="false" aria-label="Prices include GST"></button>
-      </div>
-      <div class="field">
-        <label for="invoice_terms_days">Payment due after</label>
-        <select id="invoice_terms_days" data-s="invoice_terms_days">
-          <option value="0">On the day</option>
-          <option value="7">7 days</option>
-          <option value="14">14 days</option>
-          <option value="30">30 days</option>
-        </select>
-      </div>
-      <a class="act" href="../prices/index.html">
-        <div class="act__t"><b>Price list</b><span id="price-count">Your saved parts and jobs</span></div>
-        <span class="chev">›</span>
-      </a>
-    </div>
-  </div>
-
-  <div class="group">
-    <div class="group__h">Calendar</div>
-    <div class="card">
-      <div class="field">
-        <label for="calendar_default_minutes">Default job length</label>
-        <select id="calendar_default_minutes" data-s="calendar_default_minutes">
-          <option value="30">30 minutes</option>
-          <option value="45">45 minutes</option>
-          <option value="60">1 hour</option>
-          <option value="90">1.5 hours</option>
-          <option value="120">2 hours</option>
-          <option value="180">3 hours</option>
-        </select>
-        <div class="hint">What a new booking starts at. You can still change it per job.</div>
-      </div>
-    </div>
-  </div>
-
-  <div class="group">
-    <div class="group__h">Ashley</div>
-    <div class="card">
-      <div class="toggle">
-        <div class="toggle__t"><b>Ashley is switched on</b><span>Turn off to hide the assistant tab.</span></div>
-        <button class="sw" data-s="ashley_enabled" role="switch" aria-pressed="false" aria-label="Ashley is switched on"></button>
-      </div>
-      <div class="toggle">
-        <div class="toggle__t"><b>Ask before changing the calendar</b><span>On: she shows you a card before adding or moving a booking. Off: she just does it and tells you.</span></div>
-        <button class="sw" data-s="ashley_confirm_bookings" role="switch" aria-pressed="false" aria-label="Ask before changing the calendar"></button>
-      </div>
-      <div class="toggle">
-        <div class="toggle__t"><b>Always ask before sending</b><span>Emails, texts and deletions always need your say-so. This cannot be turned off.</span></div>
-        <button class="sw" aria-pressed="true" disabled aria-label="Always ask before sending"></button>
-      </div>
-    </div>
-  </div>
-
-  <div class="group">
-    <div class="group__h">Security</div>
-    <div class="card">
-      <div class="field">
-        <label for="passcode">Passcode</label>
-        <input id="passcode" data-s="passcode" inputmode="numeric" autocomplete="off" placeholder="Leave empty for no lock" />
-        <div class="hint">Asks for this number before the app opens. Anyone with the web address can see your customers, so a passcode is worth setting.</div>
-      </div>
-    </div>
-  </div>
-
-  <div class="group">
-    <div class="group__h">Connections</div>
-    <div class="card">
-      <div class="act">
-        <div class="act__t"><b>Gmail</b><span id="gmail-sub">Used to send invoices and replies</span></div>
-        <span class="pill off" id="gmail-pill">Not connected</span>
-      </div>
-      <button class="act" id="gmail-connect">
-        <div class="act__t"><b id="gmail-btn-label">Connect Gmail</b><span>Opens Google to confirm it is you</span></div>
-        <span class="chev">›</span>
-      </button>
-    </div>
-  </div>
-
-  <div class="group">
-    <div class="group__h">Storage on this phone</div>
-    <div class="group__note">Nothing here touches your saved invoices, reports or bookings.</div>
-    <div class="card">
-      <button class="act" id="clear-drafts"><div class="act__t"><b>Clear invoice drafts</b><span id="drafts-count">Unfinished invoices kept on this phone</span></div><span class="chev">›</span></button>
-      <button class="act" id="clear-chat"><div class="act__t"><b>Clear Ashley's conversation</b><span>Starts her fresh next time</span></div><span class="chev">›</span></button>
-      <button class="act danger" id="reset-all"><div class="act__t"><b>Reset all settings</b><span>Puts everything on this page back to its starting value</span></div><span class="chev">›</span></button>
-    </div>
-  </div>
-
-  <div class="foot" id="foot"></div>
-</div>
-
-<div class="bar">
-  <div class="bar__info"><b id="bar-title">Everything is saved</b><span id="bar-sub">Loading</span></div>
-  <button class="save ok" id="save" disabled>Save</button>
-</div>
-
+<main id="stack"></main>
 <div class="toast" id="toast"></div>
 
-<script src="../config.js?v=36"></script>
-<script src="../settings.js?v=36"></script>
+<script src="../config.js?v=46"></script>
+<script src="../settings.js?v=46"></script>
+<script src="../invoice/assets.js?v=40"></script>
 <script>
 (function () {
   'use strict';
-  const $ = (s) => document.querySelector(s);
+
   const S = window.MMQLD_SETTINGS;
-  let dirty = false;
+  const $ = (s, r) => (r || document).querySelector(s);
+  const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const REST = CONFIG.SUPABASE_URL.replace(/\/+$/, '') + '/rest/v1/';
+  const H = { apikey: CONFIG.SUPABASE_KEY };
 
-  let toastTimer;
-  function toast(msg, kind) {
-    const t = $('#toast');
-    t.textContent = msg;
-    t.className = 'toast show ' + (kind || '');
-    clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => { t.className = 'toast ' + (kind || ''); }, 3200);
+  /* ------------------------------------------------------ live status -- */
+  const status = { synced: null, products: null, unpriced: 0, invDrafts: 0, repDrafts: null };
+  const INV_DRAFTS = 'mmqld_invoice_drafts_v2';
+  const INV_COUNTER = 'mmqld_invoice_counter', REP_COUNTER = 'mmqld_report_counter';
+  const lsGet = (k) => { try { return localStorage.getItem(k); } catch (_) { return null; } };
+  const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch (_) {} };
+  const lsDel = (k) => { try { localStorage.removeItem(k); } catch (_) {} };
+  const nextNumber = (k, base) => (parseInt(lsGet(k) || base, 10) || 0) + 1;
+  function gmailOn() {
+    try { const o = JSON.parse(lsGet('mmqld_gtok') || 'null'); return !!(o && o.t && Date.now() < o.e); } catch (_) { return false; }
   }
-
-  function fill() {
-    const v = S.all();
-    document.querySelectorAll('[data-s]').forEach((el) => {
-      const k = el.dataset.s;
-      if (el.classList.contains('sw')) el.setAttribute('aria-pressed', String(v[k] === true || v[k] === 'true'));
-      else el.value = v[k] == null ? '' : v[k];
+  function invDraftCount() {
+    try { const d = JSON.parse(lsGet(INV_DRAFTS) || '[]'); return Array.isArray(d) ? d.length : 0; } catch (_) { return 0; }
+  }
+  /* Inspection drafts live in IndexedDB, because they carry photos. */
+  function idb(mode, fn) {
+    return new Promise((resolve) => {
+      try {
+        const req = indexedDB.open('mmqld-owner', 1);
+        req.onupgradeneeded = () => { if (!req.result.objectStoreNames.contains('inspection-drafts')) req.result.createObjectStore('inspection-drafts', { keyPath: 'id' }); };
+        req.onerror = () => resolve(null);
+        req.onsuccess = () => {
+          try {
+            const tx = req.result.transaction('inspection-drafts', mode);
+            const r = fn(tx.objectStore('inspection-drafts'));
+            tx.oncomplete = () => resolve(r && 'result' in r ? r.result : true);
+            tx.onerror = () => resolve(null);
+          } catch (_) { resolve(null); }
+        };
+      } catch (_) { resolve(null); }
     });
   }
 
-  function markDirty() {
-    dirty = true;
-    $('#bar-title').textContent = 'Unsaved changes';
-    $('#save').disabled = false;
-    $('#save').classList.remove('ok');
+  /* --------------------------------------------------------- choices -- */
+  const HOURS = (from, to) => Array.from({ length: to - from + 1 }, (_, i) => {
+    const h = from + i; return [String(h), h === 12 ? '12 pm' : h < 12 ? h + ' am' : (h - 12) + ' pm'];
+  });
+  const CHOICES = {
+    invoice_terms_days: { title: 'Payment due', parent: 'invoices', opts: [['0', 'On receipt'], ['7', 'In 7 days'], ['14', 'In 14 days'], ['30', 'In 30 days']] },
+    calendar_default_minutes: { title: 'Default job length', parent: 'calendar', opts: [['30', '30 minutes'], ['45', '45 minutes'], ['60', '1 hour'], ['90', '1.5 hours'], ['120', '2 hours'], ['180', '3 hours']] },
+    calendar_day_start: { title: 'Day starts', parent: 'calendar', opts: HOURS(4, 11) },
+    calendar_day_end: { title: 'Day ends', parent: 'calendar', opts: HOURS(14, 23) },
+    calendar_snap: { title: 'Drag snaps to', parent: 'calendar', opts: [['15', 'Every 15 minutes'], ['30', 'Every 30 minutes']] },
+    calendar_default_view: { title: 'Open in', parent: 'calendar', opts: [['day', 'Day timeline'], ['week', 'Week list']] },
+  };
+  const choiceLabel = (k) => { const v = String(S.get(k)); const c = (CHOICES[k].opts).find((x) => x[0] === v); return c ? c[1] : v; };
+
+  /* Template metadata: which placeholders make sense, how to preview it and
+     which page it belongs to. */
+  const SAMPLE = { first_name: 'Sam', number: 'INV_20260919_0153', rego: '123ABC' };
+  const TEMPLATES = {
+    email_invoice_subject: { title: 'Email subject', parent: 'invoices', kind: 'line', vars: ['business', 'number'] },
+    email_invoice_body: { title: 'Email message', parent: 'invoices', kind: 'email', vars: ['first_name', 'number', 'business'], note: 'Your signature is added underneath automatically.' },
+    invoice_default_notes: { title: 'Default notes', parent: 'invoices', kind: 'plain', vars: [], note: 'Filled into the Notes box of every new invoice. Leave empty for none.' },
+    invoice_signoff: { title: 'Footer sign-off', parent: 'invoices', kind: 'line', vars: [], note: 'Printed in the navy footer of an invoice’s last page. Leave empty for none.' },
+    email_report_subject: { title: 'Email subject', parent: 'reports', kind: 'line', vars: ['business', 'rego'] },
+    email_report_body: { title: 'Email message', parent: 'reports', kind: 'email', vars: ['first_name', 'rego', 'business'], note: 'Your signature is added underneath automatically.' },
+    report_statement: { title: 'Sign-off statement', parent: 'reports', kind: 'plain', vars: [], note: 'Printed above the inspector’s signature.' },
+    report_disclaimer: { title: 'Disclaimer', parent: 'reports', kind: 'list', vars: [], note: 'One point per line. Used by new reports; each report can still be edited on its own.' },
+    report_not_checked: { title: 'Not checked', parent: 'reports', kind: 'list', vars: [], note: 'One item per line, printed under "does not check the following".' },
+    tpl_reply_service: { title: 'Service reply', parent: 'messages', kind: 'reply', vars: ['price', 'business'], price: 'price_service', note: 'Your reply to a website enquiry. "Hi Sam," goes above it and your signature below.' },
+    tpl_reply_diagnostic: { title: 'Diagnostic reply', parent: 'messages', kind: 'reply', vars: ['price', 'business'], price: 'price_diagnostic', note: 'Your reply to a website enquiry. "Hi Sam," goes above it and your signature below.' },
+    tpl_sms_website: { title: 'Website link text', parent: 'messages', kind: 'sms', vars: ['first_name', 'business', 'form_link', 'sender'] },
+    tpl_sms_service: { title: 'Service text', parent: 'messages', kind: 'sms', vars: ['first_name', 'price', 'business', 'sender'], price: 'price_service' },
+    tpl_sms_diagnostic: { title: 'Diagnostic text', parent: 'messages', kind: 'sms', vars: ['first_name', 'price', 'business', 'sender'], price: 'price_diagnostic' },
+  };
+  const VAR_LABEL = { first_name: 'First name', price: 'Price', business: 'Business name', sender: 'Your name', form_link: 'Booking link', number: 'Invoice number', rego: 'Rego' };
+  const firstLine = (k) => (String(S.get(k) || '').split('\n').find((x) => x.trim()) || '');
+
+  /* ------------------------------------------------------------ pages -- */
+  const nav = (to, label, o) => Object.assign({ t: 'nav', to, label }, o || {});
+  const text = (k, label, o) => Object.assign({ t: 'text', k, label }, o || {});
+  const toggle = (k, label, o) => Object.assign({ t: 'toggle', k, label }, o || {});
+  const choice = (k, label, o) => Object.assign({ t: 'nav', to: 'choice/' + k, label, value: () => choiceLabel(k), k }, o || {});
+  // Rows show the text as it will read ("Invoice from My Mechanic QLD"), not raw {placeholders}.
+  const tpl = (k, label, o) => Object.assign({ t: 'nav', to: 'edit/' + k, label, k,
+    value: () => { const m = TEMPLATES[k] || {}; return S.fill(firstLine(k), Object.assign({}, SAMPLE, { price: m.price ? S.get(m.price) : '' })) || 'None'; } }, o || {});
+
+  const ICON = {
+    business: ['building-2', '#1E3A8A'], payments: ['landmark', '#34C759'], invoices: ['receipt', '#007AFF'], reports: ['clipboard-check', '#FF9500'],
+    messages: ['message-circle', '#32ADE6'], prices: ['tag', '#5856D6'], calendar: ['calendar-days', '#FF3B30'], ashley: ['sparkles', '#AF52DE'],
+    gmail: ['mail', '#EA4335'], passcode: ['lock', '#8E8E93'], storage: ['hard-drive', '#8E8E93'], about: ['info', '#8E8E93'],
+  };
+
+  const PAGES = {
+    root: () => ({
+      title: 'Settings', large: true, search: true,
+      groups: [
+        { rows: [{ t: 'profile' }] },
+        { rows: [
+          nav('business', 'Business profile', { icon: 'business' }),
+          nav('payments', 'Payments', { icon: 'payments', value: () => (S.bool('invoice_show_bank') ? 'BSB ' + S.get('bank_bsb') : 'Off') }),
+        ] },
+        { rows: [
+          nav('invoices', 'Invoices', { icon: 'invoices' }),
+          nav('reports', 'Inspection reports', { icon: 'reports' }),
+          nav('messages', 'Messages', { icon: 'messages' }),
+          { t: 'link', href: '../prices/', label: 'Price list', icon: 'prices', value: () => (status.products == null ? '' : status.products + ' items') },
+        ] },
+        { rows: [
+          nav('calendar', 'Calendar', { icon: 'calendar' }),
+          nav('ashley', 'Ashley', { icon: 'ashley', value: () => (S.bool('ashley_enabled') ? 'On' : 'Off') }),
+        ] },
+        { rows: [
+          nav('gmail', 'Gmail', { icon: 'gmail', value: () => (gmailOn() ? 'Connected' : 'Not connected') }),
+          nav('passcode', 'Passcode', { icon: 'passcode', value: () => (S.get('passcode') ? 'On' : 'Off') }),
+          nav('storage', 'Storage on this phone', { icon: 'storage' }),
+          nav('about', 'About', { icon: 'about' }),
+        ] },
+      ],
+    }),
+
+    business: () => ({
+      title: 'Business profile',
+      groups: [
+        { head: 'Business', rows: [
+          text('business_name', 'Name', { placeholder: 'Business name' }),
+          text('business_tagline', 'Tagline', { placeholder: 'We come to you' }),
+          text('business_abn', 'ABN', { mono: true, inputmode: 'numeric' }),
+        ], foot: 'Printed at the top of every invoice and inspection report.' },
+        { head: 'Contact', rows: [
+          text('business_phone', 'Phone', { type: 'tel', mono: true }),
+          text('business_email', 'Email', { type: 'email' }),
+          text('business_website', 'Website', { type: 'url' }),
+          text('website_form_url', 'Booking link', { type: 'url', placeholder: 'https://' }),
+        ], foot: 'The booking link goes into the "Website link" text message.' },
+        { head: 'Signing off', rows: [
+          text('sender_name', 'Sign as', { placeholder: 'Ashley' }),
+          { t: 'signature' },
+        ], foot: 'Every email and text is signed with this name, then the business name, phone and email.' },
+      ],
+    }),
+
+    payments: () => ({
+      title: 'Payments',
+      groups: [
+        { rows: [toggle('invoice_show_bank', 'Show on invoices')], foot: 'A "How to pay" panel sits beside the totals on every invoice, paid or not, with the invoice number as the payment reference.' },
+        { head: 'Bank transfer', rows: [
+          text('bank_name', 'Account name'),
+          text('bank_bsb', 'BSB', { mono: true, inputmode: 'numeric', placeholder: '000-000' }),
+          text('bank_account', 'Account no.', { mono: true, inputmode: 'numeric' }),
+        ] },
+        { rows: [{ t: 'bankpreview' }] },
+      ],
+    }),
+
+    invoices: () => ({
+      title: 'Invoices',
+      groups: [
+        { head: 'New invoices', rows: [
+          toggle('invoice_gst_inclusive', 'Prices include GST'),
+          choice('invoice_terms_days', 'Payment due'),
+          tpl('invoice_default_notes', 'Default notes'),
+          { t: 'counter', key: INV_COUNTER, base: '49', label: 'Next number', prefix: 'INV_…_' },
+        ], foot: 'Payment due sets each new invoice’s due date. Numbers count up separately on each phone.' },
+        { head: 'On the PDF', rows: [
+          tpl('invoice_signoff', 'Footer sign-off'),
+          nav('payments', 'Bank details', { value: () => (S.bool('invoice_show_bank') ? 'Shown' : 'Hidden') }),
+        ] },
+        { head: 'Sending by email', rows: [
+          tpl('email_invoice_subject', 'Subject'),
+          tpl('email_invoice_body', 'Message'),
+        ] },
+      ],
+    }),
+
+    reports: () => ({
+      title: 'Inspection reports',
+      groups: [
+        { head: 'New reports', rows: [
+          text('report_inspector', 'Inspector', { placeholder: 'Name for the sign-off' }),
+          { t: 'counter', key: REP_COUNTER, base: '65', label: 'Next number', prefix: 'RPT_…_' },
+        ], foot: 'The inspector’s name is filled into the sign-off of every new report.' },
+        { head: 'On the PDF', rows: [
+          tpl('report_statement', 'Sign-off statement'),
+          tpl('report_disclaimer', 'Disclaimer', { value: () => S.lines('report_disclaimer').length + ' points' }),
+          tpl('report_not_checked', 'Not checked', { value: () => S.lines('report_not_checked').length + ' items' }),
+        ] },
+        { head: 'Sending by email', rows: [
+          tpl('email_report_subject', 'Subject'),
+          tpl('email_report_body', 'Message'),
+        ] },
+      ],
+    }),
+
+    messages: () => ({
+      title: 'Messages',
+      groups: [
+        { head: 'Quote prices', rows: [
+          text('price_service', 'Standard service', { prefix: '$', inputmode: 'decimal', mono: true }),
+          text('price_diagnostic', 'Diagnostic', { prefix: '$', inputmode: 'decimal', mono: true }),
+          text('price_callout', 'Call-out', { prefix: '$', inputmode: 'decimal', mono: true }),
+        ], foot: 'Used wherever a message says {price}. The price can still be changed on each message.' },
+        { head: 'Email replies to enquiries', rows: [
+          tpl('tpl_reply_service', 'Service'),
+          tpl('tpl_reply_diagnostic', 'Diagnostic'),
+        ] },
+        { head: 'Text messages', rows: [
+          tpl('tpl_sms_website', 'Website link'),
+          tpl('tpl_sms_service', 'Service'),
+          tpl('tpl_sms_diagnostic', 'Diagnostic'),
+        ], foot: 'Texts open in Messages ready to go. Nothing is sent until you press send there.' },
+      ],
+    }),
+
+    calendar: () => ({
+      title: 'Calendar',
+      groups: [
+        { head: 'Bookings', rows: [
+          choice('calendar_default_minutes', 'Default job length'),
+          choice('calendar_snap', 'Drag snaps to'),
+        ] },
+        { head: 'Day timeline', rows: [
+          choice('calendar_day_start', 'Day starts'),
+          choice('calendar_day_end', 'Day ends'),
+          choice('calendar_default_view', 'Open in'),
+        ], foot: 'Bookings outside these hours still show; the timeline stretches to fit them.' },
+      ],
+    }),
+
+    ashley: () => ({
+      title: 'Ashley',
+      groups: [
+        { rows: [toggle('ashley_enabled', 'Ashley')], foot: 'Turn off to hide Ashley’s tab and sidebar entry.' },
+        { head: 'Ask first', rows: [
+          toggle('ashley_confirm_bookings', 'Before changing bookings'),
+          { t: 'locked', label: 'Before emails, texts and deletions' },
+        ], foot: 'Emails, texts and deletions always wait for your tap. That cannot be turned off.' },
+        { head: 'Engine', rows: [
+          { t: 'info', label: 'Model', value: 'GLM 4.7 Flash' },
+          { t: 'info', label: 'Runs on', value: 'Cloudflare' },
+          { t: 'info', label: 'Daily allowance', value: 'About 200 questions' },
+        ], foot: 'The allowance resets at 10am each day.' },
+        { rows: [{ t: 'action', label: 'Clear conversation', danger: true, run: clearChat }] },
+      ],
+    }),
+
+    gmail: () => ({
+      title: 'Gmail',
+      groups: [
+        { rows: [{ t: 'info', label: 'Status', value: gmailOn() ? 'Connected' : 'Not connected' }],
+          foot: 'Invoices, reports and replies are sent from your own Gmail, inside the customer’s existing conversation when there is one.' },
+        { rows: [{ t: 'action', label: gmailOn() ? 'Reconnect Gmail' : 'Connect Gmail', run: connectGmail }],
+          foot: 'Google asks you to confirm in a pop-up. Access lasts about an hour and renews by itself when the app sends something.' },
+      ],
+    }),
+
+    passcode: () => ({
+      title: 'Passcode',
+      groups: [
+        { rows: [text('passcode', 'Passcode', { type: 'password', inputmode: 'numeric', placeholder: 'None', mono: true, autocomplete: 'new-password' })],
+          foot: 'Asked for when the app opens on this phone. Leave empty for none. It keeps a casual glance out; it does not lock your data.' },
+      ],
+    }),
+
+    storage: () => ({
+      title: 'Storage on this phone',
+      groups: [
+        { head: 'Drafts', rows: [
+          { t: 'info', label: 'Invoice drafts', value: String(status.invDrafts) },
+          { t: 'info', label: 'Inspection drafts', value: status.repDrafts == null ? '…' : String(status.repDrafts) },
+          { t: 'action', label: 'Clear invoice drafts', danger: true, run: clearInvDrafts },
+          { t: 'action', label: 'Clear inspection drafts', danger: true, run: clearRepDrafts },
+        ], foot: 'Drafts are unfinished invoices and reports kept on this phone. Saved documents are never touched.' },
+        { head: 'Other', rows: [
+          { t: 'action', label: 'Refresh the price list', run: refreshPrices },
+          { t: 'action', label: 'Clear Ashley’s conversation', danger: true, run: clearChat },
+        ], foot: 'Refreshing re-downloads the price list the invoice picker uses.' },
+        { rows: [{ t: 'action', label: 'Reset all settings', danger: true, run: resetAll }],
+          foot: 'Puts every setting back to how the app started. Invoices, reports and bookings are not touched.' },
+      ],
+    }),
+
+    about: () => ({
+      title: 'About',
+      groups: [
+        { rows: [
+          { t: 'info', label: 'App', value: 'My Mechanic QLD' },
+          { t: 'info', label: 'Address', value: location.host },
+          { t: 'info', label: 'Settings', value: status.synced == null ? 'Checking…' : status.synced ? 'Synced' : 'This phone only' },
+          { t: 'info', label: 'Price list', value: status.products == null ? '…' : status.products + ' items' + (status.unpriced ? ', ' + status.unpriced + ' unpriced' : '') },
+          { t: 'info', label: 'Assistant', value: 'GLM 4.7 Flash' },
+        ], foot: status.synced === false
+          ? 'Settings are saved on this phone. To have them follow you to another device, the app_settings table needs creating in Supabase once (migration 007).'
+          : 'Settings follow you to any phone or computer that opens this app.' },
+      ],
+    }),
+  };
+
+  /* -------------------------------------------------------- rendering -- */
+  const chev = '<svg class="row__chev" width="8" height="14" viewBox="0 0 8 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1.5 1.5 6.5 7 1.5 12.5"/></svg>';
+  const tick = '<svg class="check" width="17" height="14" viewBox="0 0 17 14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="1.5 7.5 6 12 15.5 1.5"/></svg>';
+  const iconHtml = (name) => { const i = ICON[name]; return i ? `<span class="row__icon" style="background:${i[1]}"><i data-lucide="${i[0]}"></i></span>` : ''; };
+  const val = (r) => (typeof r.value === 'function' ? r.value() : r.value);
+
+  function rowHtml(r, pageId) {
+    const icon = r.icon ? iconHtml(r.icon) : '';
+    const cls = 'row' + (r.icon ? ' has-icon' : '');
+    const key = r.k ? ` data-key="${r.k}"` : '';
+    switch (r.t) {
+      case 'profile': {
+        const logo = window.MMQLD_ASSETS && MMQLD_ASSETS.logoPng ? `<img src="${MMQLD_ASSETS.logoPng}" alt="" />` : '';
+        return `<button type="button" class="row card-row" data-go="business"><span class="avatar">${logo}</span>
+          <span class="row__main"><span class="row__label">${esc(S.get('business_name'))}</span>
+          <span class="row__sub">Business profile and payments</span></span>${chev}</button>`;
+      }
+      case 'nav': {
+        const v = val(r);
+        return `<button type="button" class="${cls}" data-go="${r.to}"${key}>${icon}<span class="row__main"><span class="row__label">${esc(r.label)}</span></span>${v != null && v !== '' ? `<span class="row__value">${esc(v)}</span>` : ''}${chev}</button>`;
+      }
+      case 'link': {
+        const v = val(r);
+        return `<a class="${cls}" href="${r.href}">${icon}<span class="row__main"><span class="row__label">${esc(r.label)}</span></span>${v ? `<span class="row__value">${esc(v)}</span>` : ''}${chev}</a>`;
+      }
+      case 'text': {
+        const v = S.get(r.k);
+        return `<label class="row field-row"${key}><span class="row__main"><span class="row__label">${esc(r.label)}</span></span>
+          ${r.prefix ? `<span class="pre">${r.prefix}</span>` : ''}
+          <input data-k="${r.k}" type="${r.type || 'text'}" value="${esc(v == null ? '' : v)}" placeholder="${esc(r.placeholder || '')}"
+            ${r.inputmode ? `inputmode="${r.inputmode}"` : ''} autocomplete="${r.autocomplete || 'off'}" ${['email', 'url', 'tel'].includes(r.type) ? 'autocapitalize="off" spellcheck="false"' : ''} class="${r.mono ? 'mono' : ''}" enterkeyhint="done" /></label>`;
+      }
+      case 'toggle':
+        return `<div class="${cls} tap" data-toggle="${r.k}"${key} role="button">${icon}<span class="row__main"><span class="row__label">${esc(r.label)}</span></span>
+          <span class="switch" role="switch" aria-checked="${S.bool(r.k)}"></span></div>`;
+      case 'locked':
+        return `<div class="row"><span class="row__main"><span class="row__label">${esc(r.label)}</span></span><span class="switch" role="switch" aria-checked="true" aria-disabled="true"></span></div>`;
+      case 'info':
+        return `<div class="row"><span class="row__main"><span class="row__label">${esc(r.label)}</span></span><span class="row__value">${esc(val(r))}</span></div>`;
+      case 'action':
+        return `<button type="button" class="row${r.danger ? ' danger' : ' action'}" data-act="${pageId}::${esc(r.label)}"><span class="row__main"><span class="row__label">${esc(r.label)}</span></span></button>`;
+      case 'counter':
+        return `<label class="row field-row"><span class="row__main"><span class="row__label">${esc(r.label)}</span></span>
+          <span style="color:var(--label2);font-variant-numeric:tabular-nums;margin-right:-10px">${r.prefix}</span>
+          <input data-counter="${r.key}" data-base="${r.base}" inputmode="numeric" class="mono" value="${String(nextNumber(r.key, r.base)).padStart(4, '0')}" style="max-width:62px" enterkeyhint="done" /></label>`;
+      case 'signature':
+        return `<div class="row preview-row"><span class="row__main"><span class="cap">Signature</span><span class="body" id="sigPreview">${esc(S.signature().trim())}</span></span></div>`;
+      case 'bankpreview': {
+        const b = S.business().bank;
+        return `<div class="row preview-row"><span class="row__main"><span class="cap">On the invoice</span>${b
+          ? `<span class="body"><b>How to pay</b> · Bank transfer\n${esc(b.name)}\nBSB ${esc(b.bsb)} · Account ${esc(b.account)}\n<span style="color:var(--label2)">Reference: the invoice number</span></span>`
+          : '<span class="body" style="color:var(--label2)">Bank details are not printed.</span>'}</span></div>`;
+      }
+    }
+    return '';
   }
 
-  document.addEventListener('input', (e) => { if (e.target.closest('[data-s]')) markDirty(); });
-  document.addEventListener('change', (e) => { if (e.target.closest('[data-s]')) markDirty(); });
+  function pageModel(id) {
+    if (id.startsWith('choice/')) return choicePage(id.slice(7));
+    if (id.startsWith('edit/')) return editorPage(id.slice(5));
+    return (PAGES[id] || PAGES.root)();
+  }
 
-  document.addEventListener('click', (e) => {
-    const sw = e.target.closest('.sw[data-s]');
-    if (sw && !sw.disabled) {
-      sw.setAttribute('aria-pressed', sw.getAttribute('aria-pressed') === 'true' ? 'false' : 'true');
-      markDirty();
+  function renderPage(id) {
+    const m = pageModel(id);
+    const el = document.createElement('section');
+    el.className = 'page';
+    el.dataset.id = id;
+    el.dataset.title = m.title;
+    let html = m.large ? `<h1 class="large-title">${esc(m.title)}</h1>` : '';
+    if (m.search) html += `<div class="search" id="search"><svg class="mag" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><input id="searchInput" type="search" placeholder="Search" autocomplete="off" autocapitalize="off" spellcheck="false" /><button class="clr" type="button" aria-label="Clear search"><svg width="8" height="8" viewBox="0 0 8 8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><line x1="1" y1="1" x2="7" y2="7"/><line x1="7" y1="1" x2="1" y2="7"/></svg></button></div><div id="searchResults"></div>`;
+    if (!m.large) html += '<div style="height:20px"></div>';
+    html += m.html || '';
+    html += '<div class="groups">' + (m.groups || []).map((g) => `<div class="group">
+      ${g.head ? `<div class="group__head">${esc(g.head)}</div>` : ''}
+      <div class="list">${g.rows.map((r) => rowHtml(r, id)).join('')}</div>
+      ${g.foot ? `<div class="group__foot">${esc(g.foot)}</div>` : ''}</div>`).join('') + '</div>';
+    el.innerHTML = html;
+    el._model = m;
+    return el;
+  }
+  const paintIcons = () => { if (window.lucide) try { lucide.createIcons(); } catch (_) {} };
+
+  /* A picker page: a list with a tick on the chosen value, like iOS. */
+  function choicePage(k) {
+    const c = CHOICES[k];
+    const cur = String(S.get(k));
+    return {
+      title: c.title,
+      html: `<div class="group"><div class="list">${c.opts.map(([v, l]) => `<button type="button" class="row" data-pick="${k}" data-v="${esc(v)}"><span class="row__main"><span class="row__label">${esc(l)}</span></span>${v === cur ? tick : ''}</button>`).join('')}</div></div>`,
+    };
+  }
+
+  /* A template or long-text editor with placeholder chips and a live preview. */
+  function editorPage(k) {
+    const meta = TEMPLATES[k] || { title: 'Edit', kind: 'plain', vars: [] };
+    const v = String(S.get(k) == null ? '' : S.get(k));
+    const chips = meta.vars.length
+      ? `<div class="group__head" style="margin:14px 16px 0">Insert</div><div class="chips" style="margin-top:6px">${meta.vars.map((x) => `<button type="button" class="chip" data-ins="{${x}}">${VAR_LABEL[x] || x}</button>`).join('')}</div>`
+      : '<div style="height:26px"></div>';
+    return {
+      title: meta.title,
+      html: `<div class="editor" style="margin-top:0"><textarea id="editor" data-k="${k}" rows="${meta.kind === 'line' ? 1 : 6}" spellcheck="true">${esc(v)}</textarea></div>
+        ${meta.note ? `<div class="group__foot" style="margin:0 16px">${esc(meta.note)}</div>` : ''}
+        ${chips}
+        ${meta.kind === 'list' ? '' : `<div class="group__head" style="margin:0 16px">Preview</div><div class="preview${meta.kind === 'sms' ? ' sms' : ''}" id="preview"></div>`}
+        <div class="group"><div class="list"><button type="button" class="row action" data-restore="${k}"><span class="row__main"><span class="row__label">Restore original wording</span></span></button></div></div>`,
+    };
+  }
+  function renderPreview() {
+    const ta = $('#editor'); const pv = $('#preview');
+    if (!ta || !pv) return;
+    const meta = TEMPLATES[ta.dataset.k] || {};
+    const vars = Object.assign({}, SAMPLE, { price: meta.price ? S.get(meta.price) : '' });
+    let out = S.fill(ta.value, vars);
+    if (meta.kind === 'email') out += S.signature();
+    if (meta.kind === 'reply') out = 'Hi ' + SAMPLE.first_name + ',\n\n' + out + S.signature();
+    // A placeholder that did not fill (a typo) shows in red.
+    pv.innerHTML = esc(out).replace(/\{(\w+)\}/g, '<span class="ph">{$1}</span>');
+  }
+
+  /* ------------------------------------------------------- navigation -- */
+  const stack = $('#stack');
+  let current = null;
+  let pendingFlash = null;
+  const parentOf = (id) => {
+    if (id === 'root') return null;
+    if (id.startsWith('choice/')) return CHOICES[id.slice(7)].parent;
+    if (id.startsWith('edit/')) return (TEMPLATES[id.slice(5)] || {}).parent || 'root';
+    return 'root';
+  };
+  const depth = (id) => { let d = 0; for (let p = id; p && p !== 'root'; p = parentOf(p)) d++; return d; };
+  const idFromHash = () => {
+    const id = decodeURIComponent((location.hash || '').replace(/^#\/?/, '')) || 'root';
+    if (id.startsWith('choice/') && !CHOICES[id.slice(7)]) return 'root';
+    return id;
+  };
+  const onScroll = (el) => el.addEventListener('scroll', () => $('#nav').classList.toggle('scrolled', el.scrollTop > (el._model.large ? 44 : 2)), { passive: true });
+
+  function show(id, dir) {
+    const next = renderPage(id);
+    stack.appendChild(next);
+    paintIcons();
+    const prev = current;
+    current = next;
+    if (prev && dir) {
+      next.classList.add(dir === 'fwd' ? 'enter-right' : 'enter-left');
+      prev.classList.add(dir === 'fwd' ? 'exit-left' : 'exit-right');
+      setTimeout(() => { prev.remove(); next.classList.remove('enter-right', 'enter-left'); }, 340);
+    } else if (prev) prev.remove();
+    const parent = parentOf(id);
+    $('#navBackLabel').textContent = parent ? pageModel(parent).title : 'Owner app';
+    $('#navTitle').textContent = next.dataset.title;
+    $('#nav').classList.toggle('always', !next._model.large);
+    $('#nav').classList.remove('scrolled');
+    onScroll(next);
+    if (id.startsWith('edit/')) { autosize($('#editor')); renderPreview(); }
+    if (pendingFlash) {
+      const hit = next.querySelector(`[data-key="${pendingFlash}"]`);
+      if (hit) { hit.scrollIntoView({ block: 'center' }); hit.classList.add('hl'); }
+      pendingFlash = null;
     }
+  }
+  function go(id) { location.hash = '#/' + (id === 'root' ? '' : id); }
+  window.addEventListener('hashchange', () => {
+    const id = idFromHash();
+    if (current && id === current.dataset.id) return;
+    const d0 = current ? depth(current.dataset.id) : 0;
+    show(id, depth(id) > d0 ? 'fwd' : 'back');
+  });
+  /* Back goes up one level; the root's Back returns to the owner app. Every
+     page has its own address (#/invoices), so the phone's back gesture works
+     too. */
+  $('#navBack').addEventListener('click', () => {
+    if (!current || current.dataset.id === 'root') { location.href = '../index.html'; return; }
+    go(parentOf(current.dataset.id));
   });
 
-  function collect() {
-    const out = {};
-    document.querySelectorAll('[data-s]').forEach((el) => {
-      const k = el.dataset.s;
-      out[k] = el.classList.contains('sw')
-        ? el.getAttribute('aria-pressed') === 'true'
-        : el.value.trim();
+  /* ----------------------------------------------------------- saving -- */
+  let savedTimer;
+  function flashSaved(where) {
+    const el = $('#navSaved');
+    el.querySelector('span').textContent = where || 'Saved';
+    el.classList.add('show');
+    clearTimeout(savedTimer);
+    savedTimer = setTimeout(() => el.classList.remove('show'), 1500);
+  }
+  async function saveKey(k, v) {
+    if (String(S.get(k)) === String(v)) return;
+    const res = await S.save({ [k]: v });
+    if (status.synced == null) status.synced = !!res.synced;
+    flashSaved();
+    if (['sender_name', 'business_name', 'business_phone', 'business_email'].includes(k)) { const sp = $('#sigPreview'); if (sp) sp.textContent = S.signature().trim(); }
+    if (/^bank_/.test(k)) repaintPart();
+  }
+  const timers = {};
+  function saveSoon(k, v, ms) { clearTimeout(timers[k]); timers[k] = setTimeout(() => saveKey(k, v), ms == null ? 450 : ms); }
+
+  stack.addEventListener('input', (e) => {
+    const t = e.target;
+    if (t.id === 'searchInput') return runSearch(t.value);
+    if (t.id === 'editor') { autosize(t); renderPreview(); return saveSoon(t.dataset.k, t.value, 600); }
+    if (t.dataset.k) {
+      if (t.dataset.k === 'passcode') t.value = t.value.replace(/\D/g, '').slice(0, 8);
+      return saveSoon(t.dataset.k, t.value.trim());
+    }
+    if (t.dataset.counter) {
+      const n = parseInt(t.value.replace(/\D/g, ''), 10);
+      if (n > 0) { lsSet(t.dataset.counter, String(n - 1)); flashSaved('Saved on phone'); }
+    }
+  });
+  stack.addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target.matches('.field-row input')) e.target.blur(); });
+  stack.addEventListener('focusout', (e) => {
+    // Save the moment a field is left, so a quick Back never loses a change.
+    const t = e.target;
+    if (t.dataset && t.dataset.k) { clearTimeout(timers[t.dataset.k]); saveKey(t.dataset.k, t.id === 'editor' ? t.value : t.value.trim()); }
+    if (t.dataset && t.dataset.counter) t.value = String(nextNumber(t.dataset.counter, t.dataset.base)).padStart(4, '0');
+  });
+
+  stack.addEventListener('click', async (e) => {
+    const g = e.target.closest('[data-go]');
+    if (g) return go(g.dataset.go);
+    const tg = e.target.closest('[data-toggle]');
+    if (tg) {
+      const k = tg.dataset.toggle; const on = !S.bool(k);
+      tg.querySelector('.switch').setAttribute('aria-checked', String(on));
+      await saveKey(k, on);
+      if (k === 'invoice_show_bank') repaintPart();
+      return;
+    }
+    const pk = e.target.closest('[data-pick]');
+    if (pk) {
+      current.querySelectorAll('[data-pick] .check').forEach((c) => c.remove());
+      pk.insertAdjacentHTML('beforeend', tick);
+      await saveKey(pk.dataset.pick, pk.dataset.v);
+      setTimeout(() => go(parentOf(current.dataset.id)), 220);
+      return;
+    }
+    const ins = e.target.closest('[data-ins]');
+    if (ins) {
+      const ta = $('#editor'); const a = ta.selectionStart ?? ta.value.length, b = ta.selectionEnd ?? a;
+      ta.value = ta.value.slice(0, a) + ins.dataset.ins + ta.value.slice(b);
+      ta.focus(); ta.selectionStart = ta.selectionEnd = a + ins.dataset.ins.length;
+      autosize(ta); renderPreview(); saveSoon(ta.dataset.k, ta.value, 300);
+      return;
+    }
+    const rs = e.target.closest('[data-restore]');
+    if (rs) {
+      if (!confirm('Put back the original wording?')) return;
+      await S.resetKeys([rs.dataset.restore]);
+      const ta = $('#editor'); ta.value = String(S.get(rs.dataset.restore) || ''); autosize(ta); renderPreview(); flashSaved('Restored');
+      return;
+    }
+    const act = e.target.closest('[data-act]');
+    if (act) {
+      const i = act.dataset.act.indexOf('::');
+      const pid = act.dataset.act.slice(0, i), label = act.dataset.act.slice(i + 2);
+      for (const grp of pageModel(pid).groups || []) for (const r of grp.rows) if (r.t === 'action' && r.label === label) return r.run();
+      return;
+    }
+    const res = e.target.closest('[data-result]');
+    if (res) { pendingFlash = res.dataset.flash || null; return go(res.dataset.result); }
+    if (e.target.closest('.search .clr')) { const i = $('#searchInput'); i.value = ''; runSearch(''); i.focus(); }
+  });
+
+  /* Repaint the current page in place (after a toggle or a status change),
+     keeping scroll position and never interrupting typing. */
+  function repaint() {
+    if (!current) return;
+    const top = current.scrollTop;
+    const next = renderPage(current.dataset.id);
+    stack.replaceChild(next, current); current = next; next.scrollTop = top;
+    paintIcons(); onScroll(next);
+  }
+  function repaintPart() {
+    const a = document.activeElement;
+    if (a && (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA') && a.dataset && a.dataset.k && !/^bank_/.test(a.dataset.k)) return;
+    const pv = current && current.querySelector('.preview-row');
+    if (!pv) return;
+    const tmp = document.createElement('div'); tmp.innerHTML = rowHtml({ t: 'bankpreview' });
+    pv.replaceWith(tmp.firstElementChild);
+  }
+  function autosize(ta) { if (!ta) return; ta.style.height = 'auto'; ta.style.height = Math.max(ta.scrollHeight, 48) + 'px'; }
+
+  /* ------------------------------------------------------------ search -- */
+  /* Every row on every page, found by its label, its page, or words people
+     actually type ("bsb", "due date", "gst"). */
+  const EXTRA = {
+    invoice_terms_days: 'due date terms days', invoice_gst_inclusive: 'gst tax', bank_bsb: 'bank', bank_account: 'bank', bank_name: 'bank',
+    passcode: 'lock pin security', sender_name: 'signature name sign', website_form_url: 'link form url booking', calendar_snap: 'drag',
+    report_disclaimer: 'terms conditions', report_not_checked: 'terms', price_service: 'price quote', price_diagnostic: 'price quote',
+    price_callout: 'price quote', report_inspector: 'name signature', invoice_signoff: 'footer drive safe', business_abn: 'tax',
+  };
+  function searchIndex() {
+    const out = [];
+    ['business', 'payments', 'invoices', 'reports', 'messages', 'calendar', 'ashley', 'gmail', 'passcode', 'storage', 'about'].forEach((pid) => {
+      const m = PAGES[pid]();
+      out.push({ label: m.title, page: pid, flash: '', where: 'Settings', words: m.title });
+      m.groups.forEach((g) => g.rows.forEach((r) => {
+        if (!r.label || r.t === 'info') return;
+        const to = r.t === 'nav' && r.to && /^(edit|choice)\//.test(r.to) ? r.to : r.t === 'action' ? pid : (r.t === 'nav' ? r.to : pid);
+        out.push({ label: r.label, page: to, flash: r.k || '', where: m.title + (g.head ? ' › ' + g.head.charAt(0) + g.head.slice(1).toLowerCase() : ''), words: [r.label, g.head, m.title, EXTRA[r.k] || ''].join(' ') });
+      }));
     });
     return out;
   }
-
-  $('#save').addEventListener('click', async () => {
-    const btn = $('#save');
-    btn.disabled = true; btn.textContent = 'Saving...';
-    const res = await S.save(collect());
-    btn.textContent = 'Save';
-    dirty = false;
-    $('#bar-title').textContent = 'Everything is saved';
-    btn.classList.add('ok');
-    if (res.synced) { $('#bar-sub').textContent = 'Synced to all your devices'; toast('Settings saved', 'ok'); }
-    else { $('#sync-note').hidden = false; $('#bar-sub').textContent = 'Saved on this phone only'; toast('Saved on this phone. Not synced yet.', ''); }
-  });
-
-  window.addEventListener('beforeunload', (e) => { if (dirty) { e.preventDefault(); e.returnValue = ''; } });
-
-  /* ------------------------------------------------------------- status -- */
-
-  const TOK_KEY = 'mmqld_gtok';
-  function gmailState() {
-    try { const o = JSON.parse(localStorage.getItem(TOK_KEY) || 'null'); return !!(o && o.t && Date.now() < o.e); }
-    catch (_) { return false; }
-  }
-  function paintGmail() {
-    const on = gmailState();
-    const pill = $('#gmail-pill');
-    pill.textContent = on ? 'Connected' : 'Not connected';
-    pill.className = 'pill ' + (on ? 'on' : 'off');
-    $('#gmail-btn-label').textContent = on ? 'Reconnect Gmail' : 'Connect Gmail';
-    $('#gmail-sub').textContent = on ? 'Ready to send invoices and replies' : 'Used to send invoices and replies';
+  function runSearch(q) {
+    const wrap = $('#search'); const box = $('#searchResults'); const groups = current.querySelector('.groups');
+    q = q.trim().toLowerCase();
+    wrap.classList.toggle('has', !!q);
+    if (!q) { box.innerHTML = ''; groups.hidden = false; return; }
+    groups.hidden = true;
+    const seen = new Set();
+    const hits = searchIndex()
+      .map((x) => ({ x, w: x.words.toLowerCase(), l: x.label.toLowerCase() }))
+      .filter(({ w }) => w.includes(q))
+      .sort((a, b) => (b.l.startsWith(q) - a.l.startsWith(q)) || (b.w.split(/\s+/).some((t) => t.startsWith(q)) - a.w.split(/\s+/).some((t) => t.startsWith(q))))
+      .map(({ x }) => x)
+      .filter((x) => { const id = x.label + x.where; if (seen.has(id)) return false; seen.add(id); return true; });
+    box.innerHTML = hits.length
+      ? `<div class="group"><div class="list">${hits.slice(0, 30).map((h) => `<button type="button" class="row" data-result="${h.page}" data-flash="${h.flash}"><span class="row__main"><span class="row__label">${esc(h.label)}</span><span class="row__sub">${esc(h.where)}</span></span>${chev}</button>`).join('')}</div></div>`
+      : `<div class="empty">No results for “${esc(q)}”</div>`;
   }
 
-  /* The Google window only opens straight off a tap, which is why this lives on
-     a button rather than running on load. */
-  $('#gmail-connect').addEventListener('click', async () => {
+  /* ----------------------------------------------------------- actions -- */
+  let toastTimer;
+  function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 2400); }
+
+  function clearChat() { if (!confirm('Clear Ashley’s conversation on this phone?')) return; lsDel('mmqld_ashley_log'); toast('Conversation cleared'); }
+  function clearInvDrafts() {
+    const n = invDraftCount();
+    if (!n) return toast('There are no invoice drafts');
+    if (!confirm('Clear ' + n + ' unfinished invoice draft' + (n > 1 ? 's' : '') + ' on this phone? Saved invoices are not affected.')) return;
+    lsDel(INV_DRAFTS); status.invDrafts = 0; repaint(); toast('Invoice drafts cleared');
+  }
+  async function clearRepDrafts() {
+    const n = status.repDrafts || 0;
+    if (!n) return toast('There are no inspection drafts');
+    if (!confirm('Clear ' + n + ' unfinished inspection draft' + (n > 1 ? 's' : '') + ' on this phone? Saved reports are not affected.')) return;
+    await idb('readwrite', (st) => st.clear()); lsDel('mmqld_inspection_drafts_v2');
+    status.repDrafts = 0; repaint(); toast('Inspection drafts cleared');
+  }
+  async function refreshPrices() {
+    try {
+      const r = await fetch(REST + 'products?select=code,name,description,price&active=eq.true&order=name.asc', { headers: H });
+      const rows = await r.json();
+      lsSet('mmqld_products_cache', JSON.stringify(rows.map((x) => ({ code: x.code, desc: x.name, price: x.price == null ? 0 : Number(x.price), note: x.description || '' }))));
+      toast('Price list refreshed, ' + rows.length + ' items');
+    } catch (_) { toast('Could not reach the price list'); }
+  }
+  async function resetAll() {
+    if (!confirm('Put every setting back to how the app started? Business details, bank details and message wording all return to the originals.')) return;
+    await S.reset(); repaint(); toast('Settings reset');
+  }
+  async function connectGmail() {
     try {
       if (typeof google === 'undefined' || !google.accounts) {
-        await new Promise((res, rej) => {
-          const s = document.createElement('script');
-          s.src = 'https://accounts.google.com/gsi/client';
-          s.onload = res; s.onerror = () => rej(new Error('Could not load Google sign-in'));
-          document.head.appendChild(s);
-        });
+        await new Promise((res, rej) => { const s = document.createElement('script'); s.src = 'https://accounts.google.com/gsi/client'; s.onload = res; s.onerror = () => rej(new Error('Could not load Google sign-in')); document.head.appendChild(s); });
       }
       const client = google.accounts.oauth2.initTokenClient({
         client_id: CONFIG.GOOGLE_CLIENT_ID,
         scope: 'https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/gmail.send',
         callback: (r) => {
-          if (r.error) return toast('Google sign-in did not finish', 'err');
-          const exp = Date.now() + ((r.expires_in || 3600) - 60) * 1000;
-          try { localStorage.setItem(TOK_KEY, JSON.stringify({ t: r.access_token, e: exp })); } catch (_) {}
-          paintGmail();
-          toast('Gmail connected', 'ok');
+          if (r.error) return toast('Google sign-in did not finish');
+          lsSet('mmqld_gtok', JSON.stringify({ t: r.access_token, e: Date.now() + ((r.expires_in || 3600) - 60) * 1000 }));
+          repaint(); toast('Gmail connected');
         },
-        error_callback: () => toast('Google sign-in was blocked or closed. If a Google error page appeared, ' + location.origin + ' needs adding to the Google sign-in settings.', 'err'),
+        error_callback: () => toast('Google sign-in was closed or blocked'),
       });
       client.requestAccessToken({ prompt: '' });
-    } catch (e) { toast(String((e && e.message) || e).slice(0, 80), 'err'); }
-  });
-
-  /* ------------------------------------------------------- storage tools -- */
-
-  const DRAFTS_KEY = 'mmqld_invoice_drafts';
-  function draftCount() {
-    try { const d = JSON.parse(localStorage.getItem(DRAFTS_KEY) || '[]'); return Array.isArray(d) ? d.length : 0; }
-    catch (_) { return 0; }
-  }
-  function paintDrafts() {
-    const n = draftCount();
-    $('#drafts-count').textContent = n ? n + (n === 1 ? ' draft kept on this phone' : ' drafts kept on this phone')
-                                       : 'No drafts on this phone';
+    } catch (e) { toast(String((e && e.message) || e).slice(0, 80)); }
   }
 
-  $('#clear-drafts').addEventListener('click', () => {
-    if (!draftCount()) return toast('There are no drafts to clear');
-    if (!confirm('Clear all unfinished invoice drafts on this phone? Saved invoices are not affected.')) return;
-    try { localStorage.removeItem(DRAFTS_KEY); } catch (_) {}
-    paintDrafts(); toast('Drafts cleared', 'ok');
-  });
-
-  $('#clear-chat').addEventListener('click', () => {
-    if (!confirm("Clear Ashley's conversation?")) return;
-    try { localStorage.removeItem('mmqld_ashley_log'); } catch (_) {}
-    toast('Conversation cleared', 'ok');
-  });
-
-  $('#reset-all').addEventListener('click', async () => {
-    if (!confirm('Put every setting on this page back to its starting value?')) return;
-    await S.reset();
-    fill(); dirty = false;
-    $('#bar-title').textContent = 'Everything is saved';
-    $('#save').disabled = true; $('#save').classList.add('ok');
-    toast('Settings reset', 'ok');
-  });
-
-  /* ------------------------------------------------------------- startup -- */
-
-  async function boot() {
-    fill();
-    paintGmail();
-    paintDrafts();
-    $('#foot').textContent = location.host;
-
-    // Does the shared settings table exist?
-    try {
-      const r = await fetch(CONFIG.SUPABASE_URL.replace(/\/+$/, '') + '/rest/v1/app_settings?id=eq.1&select=id',
-        { headers: { apikey: CONFIG.SUPABASE_KEY } });
-      if (r.ok) { $('#bar-sub').textContent = 'Synced to all your devices'; }
-      else { $('#sync-note').hidden = false; $('#bar-sub').textContent = 'Saved on this phone only'; }
-    } catch (_) { $('#bar-sub').textContent = 'Saved on this phone only'; }
-
-    // How many items are in the price list, so the shortcut says something useful.
-    try {
-      const r = await fetch(CONFIG.SUPABASE_URL.replace(/\/+$/, '') + '/rest/v1/products?select=id,price',
-        { headers: { apikey: CONFIG.SUPABASE_KEY } });
-      if (r.ok) {
-        const rows = await r.json();
-        const unpriced = rows.filter((x) => x.price == null || Number(x.price) <= 0).length;
-        $('#price-count').textContent = !rows.length ? 'Not set up yet'
-          : rows.length + ' items' + (unpriced ? ', ' + unpriced + ' still need a price' : ', all priced');
-      } else { $('#price-count').textContent = 'Not set up yet'; }
-    } catch (_) {}
+  /* ----------------------------------------------------------- startup -- */
+  async function loadStatus() {
+    status.invDrafts = invDraftCount();
+    const [sync, prods, reps] = await Promise.all([
+      fetch(REST + 'app_settings?id=eq.1&select=id', { headers: H }).then((r) => r.ok).catch(() => false),
+      fetch(REST + 'products?select=price&active=eq.true', { headers: H }).then((r) => (r.ok ? r.json() : null)).catch(() => null),
+      idb('readonly', (st) => st.count()),
+    ]);
+    status.synced = sync;
+    if (prods) { status.products = prods.length; status.unpriced = prods.filter((p) => p.price == null || Number(p.price) <= 0).length; }
+    status.repDrafts = typeof reps === 'number' ? reps : 0;
+    const a = document.activeElement;
+    const typing = a && (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA');
+    if (current && ['root', 'about', 'storage'].includes(current.dataset.id) && !typing) repaint();
   }
 
-  document.addEventListener('mmqld:settings', () => { if (!dirty) fill(); });
-  boot();
+  document.addEventListener('mmqld:settings', () => {
+    // A change from another device arrived; repaint unless something is being typed.
+    const a = document.activeElement;
+    if (!(a && (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA'))) repaint();
+  });
+
+  show(idFromHash());
+  loadStatus();
 })();
 </script>
 </body>

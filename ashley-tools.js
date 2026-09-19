@@ -414,6 +414,8 @@
      contact details are always exactly right and never have to be sent to the
      model in the first place. */
   function signature() {
+    // The shared signature from Settings (sender name, business, phone, email).
+    if (window.MMQLD_SETTINGS) return MMQLD_SETTINGS.signature();
     const ph = String(CONFIG.BUSINESS_PHONE || '').replace(/^\+?61/, '0').replace(/\s+/g, '');
     const pretty = ph.length === 10 ? ph.slice(0, 4) + ' ' + ph.slice(4, 7) + ' ' + ph.slice(7) : ph;
     return '\n\nThank you,\nAshley\n\n' + CONFIG.BUSINESS_NAME + '\nM: ' + pretty + '\nE: ' + CONFIG.BUSINESS_EMAIL;

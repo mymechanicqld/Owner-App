@@ -68,26 +68,15 @@ const CONFIG = {
 
 /* SMS templates for the "Message" button on a customer. {first} = first name,
    {url} = the website form link. The website-link one is the default. */
+/* Text message templates. The wording lives in Settings > Messages
+   (settings.js), so the owner can change it; prices are read when used, so a
+   changed default price shows straight away. */
+const _tpl = (key, vars) => (window.MMQLD_SETTINGS ? MMQLD_SETTINGS.text(key, vars) : '');
 const MSG_TEMPLATES = {
-  website: {
-    label: 'Website link',
-    price: '',
-    build: (first) =>
-`Hi ${first}, thank you for getting in touch with My Mechanic QLD. So we can provide an accurate quote, please share your vehicle and job details through our online form here: ${CONFIG.WEBSITE_FORM_URL} . We will get back to you shortly. Kind regards, Ashley`,
-  },
-  service: {
-    label: 'Service',
-    price: CONFIG.DEFAULT_SERVICE_PRICE,
-    build: (first, price) =>
-`Hi ${first}, thank you for reaching out to My Mechanic QLD. We can book you in for a standard (regular) service for $${price}, completed mobile at your location. Please reply with your preferred day and address and we will lock it in. Kind regards, Ashley`,
-  },
-  diagnostic: {
-    label: 'Diagnostic',
-    price: CONFIG.DEFAULT_DIAGNOSTIC_PRICE,
-    build: (first, price) =>
-`Hi ${first}, thank you for reaching out to My Mechanic QLD. We can book in a diagnostic for $${price} to find out what needs doing, then quote the repair from there. Please let us know if you would like to proceed. Kind regards, Ashley`,
-  },
-  custom: { label: 'Custom', price: '', build: () => '' },
+  website:    { label: 'Website link', price: '', build: (first) => _tpl('tpl_sms_website', { first_name: first }) },
+  service:    { label: 'Service',    get price() { return CONFIG.DEFAULT_SERVICE_PRICE; },    build: (first, price) => _tpl('tpl_sms_service', { first_name: first, price }) },
+  diagnostic: { label: 'Diagnostic', get price() { return CONFIG.DEFAULT_DIAGNOSTIC_PRICE; }, build: (first, price) => _tpl('tpl_sms_diagnostic', { first_name: first, price }) },
+  custom:     { label: 'Custom', price: '', build: () => '' },
 }
 
 /* Service slug -> display label + Lucide icon. Covers both slug spellings the
@@ -107,50 +96,19 @@ const SERVICES = {
   'general-enquiry':           { label: 'General enquiry',         icon: 'circle-help' },
 }
 
-/* Quick-reply templates. {greeting} and {price} are filled in by the app.
-   These mirror the owner's official wording from the email-assistant rulebook. */
+/* Quick email replies. The wording is edited in Settings > Messages; the
+   greeting goes above it and the shared signature below it. */
+const _sig = () => (window.MMQLD_SETTINGS ? MMQLD_SETTINGS.signature() : '');
 const TEMPLATES = {
   service: {
     label: 'Logbook service',
-    price: CONFIG.DEFAULT_SERVICE_PRICE,
-    build: (g, price) =>
-`${g}
-
-We can book you in for a standard (regular) service for $${price}, completed mobile at your location.
-
-This service includes:
-• Oil and filter change
-• Fluids inspected and topped up as required
-• Brake and safety check
-• Cooling and charging system checks
-• Filter checks
-• Spark plug checks
-• Logbook stamped
-• Labour and mobile service
-
-If you'd like to proceed, please reply with your preferred day and address, and we'll lock in a booking.
-
-Thank you,
-Ashley
-${CONFIG.BUSINESS_NAME}
-M: ${CONFIG.BUSINESS_PHONE}
-E: ${CONFIG.BUSINESS_EMAIL}`,
+    get price() { return CONFIG.DEFAULT_SERVICE_PRICE; },
+    build: (g, price) => g + '\n\n' + _tpl('tpl_reply_service', { price }) + _sig(),
   },
   diagnostic: {
     label: 'Diagnostic',
-    price: CONFIG.DEFAULT_DIAGNOSTIC_PRICE,
-    build: (g, price) =>
-`${g}
-
-We can book it in for diagnosis which is $${price}, find out what needs to be done and go from there.
-
-Please let us know if you'd like to proceed with the booking.
-
-Thank you,
-Ashley
-${CONFIG.BUSINESS_NAME}
-M: ${CONFIG.BUSINESS_PHONE}
-E: ${CONFIG.BUSINESS_EMAIL}`,
+    get price() { return CONFIG.DEFAULT_DIAGNOSTIC_PRICE; },
+    build: (g, price) => g + '\n\n' + _tpl('tpl_reply_diagnostic', { price }) + _sig(),
   },
   custom: {
     label: 'Custom',

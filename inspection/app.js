@@ -88,30 +88,15 @@ const SECTIONS = [
   },
 ];
 
-const DEFAULT_TERMS = {
-  disclaimer: [
-    'It is the responsibility of the buyer to check for any financial interest owing on the vehicle and for any write-off or stolen vehicle before purchasing the vehicle.',
-    'The My Mechanic QLD inspection is not a guarantee or warranty and is valid only at the time of inspection.',
-    'It is the responsibility of the buyer to conduct a visual inspection of the vehicle at the final point of sale as My Mechanic QLD can only advise on the condition of the vehicle at the time of inspection.',
-    'Advice on the vehicle inspected is provided in context of the age and condition of the vehicle at the time inspected.',
-    'The purchaser must take responsibility for the authenticity of the vehicle. VIN and engine numbers are recorded by our inspectors however authenticity cannot be guaranteed.',
-    'The My Mechanic QLD inspection is VISUAL only. No removal of parts or components is undertaken during the inspection process.',
-    'If there is a dispute about the content of this report, the purchaser must refer the vehicle back to My Mechanic QLD prior to proceeding with any repairs.',
-    'This report serves to identify any visually detected problems however dismantling components may be subsequently required to provide a more accurate diagnosis.',
-    'The inspection report is prepared for the person named on the report and not for use by any third party.',
-  ],
-  notChecked: [
-    'Timing belts',
-    'Fuel & oil consumption',
-    'Trip meters / computers',
-    'Alarm / security system',
-    'Navigation equipment / GPS',
-    'Operation of TV, cassette, CD or audio connections',
-    'Automatic switching of wipers and lights',
-    'Compression of engine',
-    'Anti-lock braking system (ABS)',
-  ],
-};
+/* Terms, statement, inspector name and business details come from
+   Settings > Inspection reports; settings.js holds the original wording as
+   its defaults. */
+const MS = window.MMQLD_SETTINGS || null;
+const defaultTerms = () => ({
+  disclaimer: MS ? MS.lines('report_disclaimer') : [],
+  notChecked: MS ? MS.lines('report_not_checked') : [],
+});
+const businessProfile = () => (MS ? MS.business() : BUSINESS);
 
 /* ────────────────────────────────────────────────────────────────────
    Helpers
@@ -177,8 +162,8 @@ function newState() {
     score: null,          // 0 to 100 in tens, drawn as the gauge; null = not scored
     coverImage: null,     // one landscape photo of the whole car for the cover
     overallComments: '',
-    signature: { name: '', date: today(), dataUrl: '' },
-    terms: JSON.parse(JSON.stringify(DEFAULT_TERMS)),
+    signature: { name: MS ? String(MS.get('report_inspector') || '') : '', date: today(), dataUrl: '' },
+    terms: defaultTerms(),
   };
 }
 
@@ -539,7 +524,7 @@ document.addEventListener('click', (e) => {
 
   // Reset terms
   if (e.target.id === 'termsResetBtn') {
-    state.terms = JSON.parse(JSON.stringify(DEFAULT_TERMS));
+    state.terms = defaultTerms();
     $('[data-bind="terms.disclaimer"]').value = state.terms.disclaimer.join('\n');
     $('[data-bind="terms.notChecked"]').value = state.terms.notChecked.join('\n');
     toast('Terms reset to default.');
@@ -1027,7 +1012,7 @@ async function saveInspectionRecord(b64) {
    same file can be rendered and checked outside the browser. */
 function buildReportDoc() {
   return window.MMQLD_REPORT.build(state, {
-    business: BUSINESS,
+    business: businessProfile(),
     sections: SECTIONS,
     logo: window.MMQLD_ASSETS.logoPng,
   });
@@ -1087,16 +1072,11 @@ async function sendToClient(btn) {
   const firstName = (state.client.contact || PREFILL.name || '').split(/\s+/)[0] || 'there';
   const rego = state.inspection.registration || PREFILL.rego || '';
   const filename = 'inspection-' + (rego || 'mmqld') + '.pdf';
-  const subject = 'Your vehicle inspection report';
-  const bodyText =
-`Hi ${firstName},
-
-Please find your vehicle inspection report attached. Happy to talk through anything in it.
-
-Thank you,
-Ashley
-My Mechanic QLD
-0451159954`;
+  // Wording from Settings > Inspection reports, signed with the shared signature.
+  const vars = { first_name: firstName, number: state.reportNumber || '', rego };
+  const subject = MS ? MS.text('email_report_subject', vars) : 'Your vehicle inspection report';
+  const bodyText = MS ? MS.text('email_report_body', vars) + MS.signature()
+    : `Hi ${firstName},\n\nPlease find your vehicle inspection report attached. Happy to talk through anything in it.`;
 
   const original = btn.innerHTML;
   btn.disabled = true;

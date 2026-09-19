@@ -288,26 +288,30 @@ Saved active products feed the invoice's Add items picker on its next refresh. A
 
 ## Settings
 
-Settings are read synchronously from local storage and then refreshed from the single shared `app_settings` row when that table exists.
+Rebuilt on 19 September 2026 in the style of iOS Settings: grouped lists on system grey, coloured icon tiles, pages that slide in and out, a search bar, iOS switches and tick-mark pickers. Every change **saves as it is made**; a green "Saved" tick appears in the top bar. There is no Save button. Each page has its own address (`#/invoices`), so the phone's back gesture works.
 
-The page currently exposes:
+The settings are stored on the phone and, once `app_settings` exists in Supabase, synced to every device. Every default is the wording or value the app used before it was editable.
 
-- business name, phone, email, ABN and website
-- standard service, diagnostic and call-out defaults
-- invoice GST default and payment terms
-- shortcut and status for the price list
-- default calendar duration
-- Ashley visibility
-- optional confirmation before Ashley changes a booking
-- optional client-side app passcode
-- Gmail connection status and connect/reconnect action
-- clear invoice drafts
-- clear Ashley conversation
-- reset settings
+| Page | What it controls | Where it takes effect |
+| --- | --- | --- |
+| Business profile | name, tagline, ABN, phone, email, website, booking link, "Sign as" name | invoice and report PDF headers, the signature on every email and text, Ashley's emails |
+| Payments | show bank details on invoices, account name, BSB, account number, with a live preview | the "How to pay" panel on every invoice |
+| Invoices | prices include GST, payment due (on receipt, 7, 14 or 30 days), default notes, next invoice number, footer sign-off, email subject and message | new invoices, the PDF footer, the Send email |
+| Inspection reports | default inspector name, next report number, sign-off statement, disclaimer, not-checked list, email subject and message | new reports, the PDF sign-off and terms, the Send email |
+| Messages | standard service, diagnostic and call-out prices; service and diagnostic email replies; website-link, service and diagnostic texts | the inquiry Reply and Message sheets |
+| Price list | shortcut with the item count | the price list page |
+| Calendar | default job length, drag snap (15 or 30 minutes), day start and end hours, open in Day or Week | the calendar |
+| Ashley | on or off, ask before changing bookings; emails, texts and deletions always ask (shown locked) | Ashley |
+| Gmail | status, connect or reconnect | all sending |
+| Passcode | optional numeric passcode | the app's opening prompt on this phone |
+| Storage on this phone | invoice and inspection draft counts with clear buttons, refresh the price list, clear Ashley's conversation, reset all settings | this phone only |
+| About | address, sync status, price list size, assistant | information |
 
-Emails, SMS preparation and deletion always require owner confirmation in Ashley and cannot be disabled.
+Message wording is edited on its own page: a text box, buttons that insert placeholders (`{first_name}`, `{price}`, `{business}`, `{sender}`, `{form_link}`, `{number}`, `{rego}`), a live preview with sample values in which a mistyped placeholder shows in red, and **Restore original wording**. Email templates preview with the signature; text templates preview as a message bubble.
 
-See `CURRENT_LIMITATIONS.md` for settings that are displayed but not yet consumed by every generator path.
+Search finds any row on any page by its label or common words ("bsb", "due", "gst", "signature") and opens that page with the row highlighted.
+
+Invoice and report numbers count up separately on each phone; the Next number rows set that phone's next number.
 
 ## Ashley
 

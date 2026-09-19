@@ -23,7 +23,7 @@ const STATE = {
   activeId: null,
   replyTmpl: 'service',
   msgTmpl: 'website',
-  calView: 'day',
+  calView: (window.MMQLD_SETTINGS && MMQLD_SETTINGS.get('calendar_default_view') === 'week') ? 'week' : 'day',
   calRef: null,
   editEventId: null,
   invoices: null,
@@ -483,12 +483,15 @@ function toLocalInput(d) { const x = new Date(d); const p = (n) => String(n).pad
    it to a new time; drag its bottom edge to change how long it runs. Week view
    stays a plain list because seven columns do not fit a phone. */
 const CAL_HOUR_PX = 64;   // height of one hour on the timeline
-const CAL_SNAP_MIN = 15;  // drag and tap both snap to quarter hours
+/* Snap and working hours come from Settings > Calendar. */
+const calSetting = (k, d) => { const v = window.MMQLD_SETTINGS && Number(MMQLD_SETTINGS.get(k)); return Number.isFinite(v) && v >= 0 ? v : d; };
+let CAL_SNAP_MIN = 15;    // drag snaps to this many minutes (15 or 30)
 let CAL_DRAG = null;      // the gesture in progress, if any
 
 function calDayBounds(evs) {
-  // Working hours by default, stretched to fit anything booked outside them.
-  let lo = 6, hi = 20;
+  // Working hours from Settings, stretched to fit anything booked outside them.
+  let lo = calSetting('calendar_day_start', 6), hi = calSetting('calendar_day_end', 20);
+  if (hi <= lo) hi = Math.min(24, lo + 1);
   evs.forEach((e) => {
     const s = new Date(e.starts_at), en = e.ends_at ? new Date(e.ends_at) : new Date(s.getTime() + 3600000);
     lo = Math.min(lo, s.getHours());
@@ -524,6 +527,7 @@ function calLayout(evs) {
 function renderCalendar() {
   // Never repaint under a finger mid-drag; catch up once it is dropped.
   if (CAL_DRAG && CAL_DRAG.active) { CAL_DRAG.pendingRender = true; return; }
+  CAL_SNAP_MIN = calSetting('calendar_snap', 15) === 30 ? 30 : 15;
   if (!STATE.calRef) STATE.calRef = new Date();
   if (STATE.calView === 'week') return renderWeekList();
   const day = startOfDay(STATE.calRef);
@@ -1306,10 +1310,13 @@ async function sendStoredDoc(kind, r) {
     const bucket = isInv ? CONFIG.STORAGE.invoices : CONFIG.STORAGE.inspections;
     const b64 = await fetchPdfBase64(bucket, r.pdf_path);
     const first = firstName(r.customer_name) || 'there';
-    const subject = (isInv ? 'Invoice from ' : 'Inspection report from ') + CONFIG.BUSINESS_NAME;
+    const MS = window.MMQLD_SETTINGS;
+    const vars = { first_name: first, number: r.invoice_number || r.report_number || '' };
     const num = (r.invoice_number || r.report_number || 'mmqld').toString().replace(/[^A-Za-z0-9_-]/g, '');
     const filename = (isInv ? 'invoice-' : 'inspection-') + num + '.pdf';
-    const bodyText = `Hi ${first},\n\nPlease find your ${isInv ? 'invoice' : 'inspection report'} attached. Let me know if you have any questions.\n\nThank you,\nAshley\n${CONFIG.BUSINESS_NAME}\n${CONFIG.BUSINESS_PHONE}`;
+    // Same wording as the generators, from Settings > Invoices / Inspection reports.
+    const subject = MS.text(isInv ? 'email_invoice_subject' : 'email_report_subject', vars);
+    const bodyText = MS.text(isInv ? 'email_invoice_body' : 'email_report_body', vars) + MS.signature();
     const found = await findThread(email, r.vehicle_rego);
     await sendAttachment(email, subject, bodyText, filename, b64, found);
     toast('Sent to client', 'ok');

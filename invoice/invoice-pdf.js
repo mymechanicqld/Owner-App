@@ -154,8 +154,8 @@ function buildInvoiceDoc(t, A) {
         columns: [
           // The friendly sign-off lives in the last page's footer, where it
           // can never be pushed onto a page of its own.
-          currentPage === pageCount
-            ? { text: 'Drive safe, and call us if anything comes up.', color: 'white', fontSize: 9.5, italics: true, alignment: 'left' }
+          currentPage === pageCount && BUSINESS.signoff
+            ? { text: BUSINESS.signoff, color: 'white', fontSize: 9.5, italics: true, alignment: 'left' }
             : { text: BUSINESS.website, color: 'white', fontSize: 10, alignment: 'left' },
           { text: 'Page ' + currentPage + ' of ' + pageCount,
             color: 'white', fontSize: 9, alignment: 'right', opacity: 0.7 },

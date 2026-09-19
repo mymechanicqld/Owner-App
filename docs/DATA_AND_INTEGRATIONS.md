@@ -106,6 +106,8 @@ Price list changes made on 19 September 2026:
 
 Local settings remain usable when this table is missing. The Settings page labels that state as saved on this phone only.
 
+The settings document holds about 40 keys: business profile (`business_*`, `sender_name`, `website_form_url`), bank details (`bank_name`, `bank_bsb`, `bank_account`, `invoice_show_bank`), invoice defaults (`invoice_gst_inclusive`, `invoice_terms_days`, `invoice_default_notes`, `invoice_signoff`), report defaults (`report_inspector`, `report_statement`, `report_disclaimer`, `report_not_checked`), email and message templates (`email_*`, `tpl_reply_*`, `tpl_sms_*`), quote prices (`price_*`), calendar (`calendar_*`), Ashley and the passcode. `settings.js` holds the defaults and the helpers every page uses: `text(key, vars)` fills a template, `signature()` builds the shared email signature, and `business()` returns the details the PDF layouts print.
+
 ## Storage buckets
 
 Two public buckets are used:

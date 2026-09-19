@@ -34,32 +34,19 @@ Fresh environment setup needs the later migrations in addition to this file.
 
 The repository still contains a no-cache service worker, but no current page registers it. Page boot code actively removes previously registered workers. Documentation or future code must not describe the app as offline-capable.
 
-## Settings wiring
+## Settings
 
-### Generator PDF business details are hard-coded
+### Syncing needs one table
 
-`settings.js` updates `CONFIG.BUSINESS_NAME`, phone, email, ABN and website. Ashley and several message paths consume those values.
+Settings are saved on the phone. They follow the owner to other devices only after `app_settings` is created in Supabase (migration 007). Until then each device keeps its own settings, and the Settings page says "This phone only".
 
-The invoice and inspection PDF generators still render their own hard-coded `BUSINESS` objects. Changing business details in Settings does not currently change the business header printed on those PDFs.
+### Numbers are per phone
 
-The bank details printed on every invoice (`BUSINESS.bank` in `invoice/app.js`) are hard-coded too. A change of bank account needs a code change until they are added to Settings.
+Next invoice and report numbers are stored on each phone. Two phones can issue the same visible number on the same day.
 
-### Invoice defaults are displayed but not consumed
+### Changes apply to new documents
 
-Settings exposes:
-
-- `invoice_gst_inclusive`
-- `invoice_terms_days`
-
-`invoice/blankState()` currently starts with GST-inclusive pricing and a due date of today regardless of those values.
-
-### Generator email signatures are hard-coded
-
-The invoice and inspection generator Send actions contain fixed business name and phone text. They do not use all business details from Settings. Ashley's send tool does use the configurable values.
-
-### Clear invoice drafts uses an old key
-
-The current invoice generator stores drafts in `mmqld_invoice_drafts_v2`. The Settings page checks and removes `mmqld_invoice_drafts`, so its draft count and Clear invoice drafts action do not affect current drafts.
+Business details, bank details, terms and wording apply to invoices and reports built after the change. Saved PDFs are unchanged until the document is opened and saved again. An inspection report keeps the terms it was created with.
 
 ## Document lifecycle
 
@@ -78,10 +65,6 @@ The main Records delete path removes the database row first, then makes best-eff
 ### Drag works within one day
 
 A booking can be dragged to a new time or length on the day being viewed. Moving it to another day still means opening it and changing the date.
-
-### Touch drag was verified by simulation
-
-Hold-to-drag, resize, undo and the scroll-versus-drag distinction were tested with simulated touch events and a mouse, not with a finger on a real iPhone.
 
 ### Overlaps are allowed
 

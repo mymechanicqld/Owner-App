@@ -2,6 +2,23 @@
 
 This file records completed owner-app changes, production updates and important verification details. Add new entries at the top.
 
+## 19 September 2026 (later): Settings rebuilt, everything editable
+
+Status: Deployed.
+
+The owner confirmed the calendar drag works on his iPhone.
+
+Problem: Settings showed business details, GST and payment terms that the invoice and inspection PDFs ignored, the bank details and all message wording were hard-coded, and "Clear invoice drafts" cleared the wrong storage key.
+
+Changes:
+
+- `settings/index.html` rebuilt in the style of iOS Settings (see FEATURES.md, Settings): pages for Business profile, Payments, Invoices, Inspection reports, Messages, Calendar, Ashley, Gmail, Passcode, Storage and About, with search, instant saving, pickers and a template editor with placeholders and live preview.
+- `settings.js` gained about 25 keys and three helpers (`text`, `signature`, `business`). Every default equals the previous hard-coded value.
+- Now wired to Settings: invoice and report PDF business details and bank details (`businessProfile()` in both generators), invoice GST default, due date from payment terms, default notes, footer sign-off, the report sign-off statement, terms and default inspector, the email subject and message on all three Send paths, Ashley's signature, the two email reply templates and three text templates in `config.js`, and the calendar's hours, snap and opening view.
+- Storage now counts and clears the real invoice drafts (`mmqld_invoice_drafts_v2`) and inspection drafts (IndexedDB), refreshes the price-list cache and clears Ashley's conversation.
+
+Verification: in the browser, changing the BSB updated the Payments preview and printed on a new invoice PDF; turning the bank toggle off removed the panel; a new invoice's due date followed the 7-day terms; a test inspector name and statement reached a new report and its PDF; a 7am day start moved the calendar's first hour; the service reply and diagnostic text rebuilt from Settings matched the old wording exactly; a mistyped placeholder showed red in the preview; search for "bsb" and "due" found the right rows. All test values were put back.
+
 ## 19 September 2026: Calendar timeline, report and invoice redesign, leave warning, Ashley on Cloudflare
 
 Status: Deployed. Owner app commits `175f47c` and `9fe4857` on `mymechanicqld/Owner-App`; database migration committed as `afa89d9` on both website remotes; Ashley Worker `mmqld-ashley` version `b9246b90`.

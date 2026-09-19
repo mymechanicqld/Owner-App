@@ -483,7 +483,7 @@
     };
   }
 
-  function signOff(state) {
+  function signOff(state, statement) {
     const sig = state.signature || {};
     const line = (w) => ({ canvas: [{ type: 'line', x1: 0, y1: 0, x2: w, y2: 0, lineWidth: 0.6, lineColor: C.faint }] });
     return {
@@ -491,7 +491,7 @@
       margin: [0, 18, 0, 0],
       stack: [
         eyebrow('Sign-off'),
-        { text: 'I confirm I have inspected and road-tested the above vehicle as per the findings of this report.', fontSize: 10, color: C.muted, margin: [0, 5, 0, 6], lineHeight: 1.4 },
+        { text: statement || 'I confirm I have inspected and road-tested the above vehicle as per the findings of this report.', fontSize: 10, color: C.muted, margin: [0, 5, 0, 6], lineHeight: 1.4 },
         {
           columns: [
             { width: 200, stack: [
@@ -610,7 +610,7 @@
         ...SECTIONS.flatMap((sec, i) => sectionBlock(sec, (state.sections || {})[sec.id] || { grades: [] }, i)),
         ...photosBlock(state.images),
         ...verdictBlock(state, stats),
-        signOff(state),
+        signOff(state, business.statement),
         terms(state, business),
       ],
     };

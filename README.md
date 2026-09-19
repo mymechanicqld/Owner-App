@@ -37,7 +37,7 @@ The sidebar groups the complete app:
 - Leave an invoice or inspection with unsaved work only after choosing to keep editing, save a draft or discard.
 - View and manage saved invoice and inspection records.
 - Ask Ashley to look up business information, work across Supabase and Gmail, update routine records, and prepare confirmed customer communications.
-- Manage app defaults, Gmail connection and on-device data from Settings.
+- Edit everything from an iOS-style Settings page: business and bank details, invoice and report defaults, all email and text wording, calendar hours, Ashley, Gmail, passcode and on-phone storage.
 
 ## Architecture at a glance
 
