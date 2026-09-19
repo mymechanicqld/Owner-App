@@ -1,9 +1,9 @@
 /* ============================================================================
    Ashley - the agent loop
    ----------------------------------------------------------------------------
-   Talks to the model through this project's own endpoint in api/ashley.js.
-   The OpenRouter key lives there, on the server, and never reaches the browser:
-   the owner-app repository is public.
+   Talks to the model (GLM 4.7 Flash on Cloudflare Workers AI) through the
+   small Worker in cloudflare/ashley. The Worker uses Cloudflare's built-in AI
+   binding, so there is no model key to protect: the repository is public.
 
    The loop is the same shape that makes coding agents feel quick:
 
@@ -54,6 +54,10 @@ HOW TO WORK, THIS MATTERS
   and the document ids in the same breath, so you do not need a second round trip.
 - Aim to answer in one or two turns. Do not drip one tool call per turn.
 - Only look things up when you actually need them. If he says "thanks", just reply.
+- Calls sent together run at the same time, before you see any result. Never guess an id: use an
+  id only after a tool result has shown it to you. If one call needs an id another call finds or
+  creates, wait for that result and make the dependent call in your next turn.
+- Only claim what the tool results confirm. Use their names, amounts and counts, not your own.
 
 WHAT YOU CAN DO WITHOUT ASKING
 - Any lookup at all.
@@ -75,7 +79,8 @@ WRITING TO CUSTOMERS
 - Warm, natural, like a real person. Short. A few sentences is plenty.
 - Australian spelling. NEVER use a dash as punctuation, not an em-dash and not an en-dash.
   Use a comma or a full stop. No emojis.
-- Never invent a price, a date or a promise. If you are not certain, say you will confirm.
+- Never invent a price, a date, a time or a promise. Use only what he told you and what the tools
+  returned; do not add details such as "today", an arrival time or the job type unless he said them.
 - Write only the message. No greeting sign-off, no name, no business details: the signature is
   attached automatically after you finish.
 
@@ -109,7 +114,7 @@ TALKING TO HIM
       try { msg = (await res.json()).error; } catch (_) {}
       if (res.status === 401) throw new Error('Ashley could not sign in to the assistant service. The app key needs updating.');
       if (res.status === 429) throw new Error(msg || 'Too many messages at once. Give it a few seconds.');
-      if (res.status === 503) throw new Error('Ashley is not switched on yet. The assistant key still has to be added on the website.');
+      if (res.status === 503) throw new Error('Ashley is not switched on yet. Her Cloudflare setup is incomplete.');
       throw new Error(msg || 'Could not reach Ashley just now. Try again in a moment.');
     }
 
@@ -119,7 +124,8 @@ TALKING TO HIM
     const m = choice.message;
     return {
       text: (m.content || '').trim(),
-      raw: { role: 'assistant', content: m.content || null, tool_calls: m.tool_calls },
+      // GLM on Workers AI wants string content on an assistant turn.
+      raw: { role: 'assistant', content: m.content || '', tool_calls: m.tool_calls },
       calls: (m.tool_calls || []).map((c) => ({
         id: c.id,
         name: (c.function && c.function.name) || '',
@@ -151,6 +157,9 @@ TALKING TO HIM
       .concat([{ role: 'user', content: question }]);
 
     const deadline = Date.now() + BUDGET_MS;
+    /* GLM can describe an action as done when the owner said no to it. What
+       actually happened is tracked here, in code, and wins over its wording. */
+    let declined = 0, confirmedRan = 0;
 
     for (let step = 0; step < MAX_STEPS; step++) {
       if (h.signal && h.signal.aborted) return trim(messages);
@@ -162,7 +171,8 @@ TALKING TO HIM
       const turn = await callModel(messages, tools, h.signal);
 
       if (!turn.calls.length) {
-        const answer = turn.text || 'I could not work that one out. Try asking it a different way.';
+        let answer = turn.text || 'I could not work that one out. Try asking it a different way.';
+        if (declined && !confirmedRan) answer = 'Okay, I have left it. Nothing was sent or changed.';
         h.onAnswer(answer);
         messages.push({ role: 'assistant', content: answer });
         return trim(messages);
@@ -179,12 +189,16 @@ TALKING TO HIM
       const results = await Promise.all(turn.calls.map(async (c) => {
         if (!window.ASHLEY_TOOLS.needsConfirm(c.name)) return runOne(c, h);
         const approved = await h.onConfirm(window.ASHLEY_TOOLS.preview(c.name, c.args) || { title: 'Go ahead?', rows: [], confirmLabel: 'Yes' });
-        if (!approved) return { declined: true, note: 'The owner said no. Do not try this again unless he asks. Acknowledge briefly and stop.' };
+        if (!approved) {
+          declined++;
+          return JSON.stringify({ ok: false, done: false, result: 'NOT DONE. The owner pressed No, so nothing was sent, opened or changed. Say so in one short line and do not retry.' });
+        }
+        confirmedRan++;
         return runOne(c, h);
       }));
 
       turn.calls.forEach((c, i) => {
-        messages.push({ role: 'tool', tool_call_id: c.id, content: String(results[i]).slice(0, MAX_RESULT_CHARS) });
+        messages.push({ role: 'tool', tool_call_id: c.id, name: c.name, content: String(results[i]).slice(0, MAX_RESULT_CHARS) });
       });
     }
 

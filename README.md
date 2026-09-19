@@ -6,7 +6,7 @@ The production app is deployed on Vercel at:
 
 - <https://mmqld-app.vercel.app/>
 
-The app is plain HTML, CSS and browser JavaScript. Most business data is read and written directly between the browser and Supabase. Gmail is accessed directly from the browser after Google OAuth. Ashley is the only feature with its own server endpoint, because the OpenRouter key must remain server-side.
+The app is plain HTML, CSS and browser JavaScript. Most business data is read and written directly between the browser and Supabase. Gmail is accessed directly from the browser after Google OAuth. Ashley's model runs on Cloudflare Workers AI (GLM 4.7 Flash) behind a small Worker in `cloudflare/ashley`, which reaches the model through Cloudflare's built-in AI binding, so no model key exists anywhere.
 
 ## Current navigation
 
@@ -57,8 +57,8 @@ Owner's phone
   |-- Google Identity Services and Gmail API
   |     `-- Inbox search, threaded replies and PDF attachments
   |
-  `-- /api/ashley on the same Vercel deployment
-        `-- OpenRouter model request with server-side credentials
+  `-- Ashley Worker on Cloudflare (mmqld-ashley.todo-r2-d1.workers.dev)
+        `-- GLM 4.7 Flash through the Workers AI binding, no key
 ```
 
 The app intentionally does not register a service worker. A controlling service worker caused cross-origin PDF uploads to fail on iOS WebKit. The manifest and Apple touch icons still provide the installed home-screen experience, but the app requires a network connection.
@@ -89,7 +89,7 @@ owner-app/
   ashley-agent.js         Tool-calling loop and system instructions
   ashley-tools.js         Ashley's tool definitions and implementations
   ashley-ui.js            Ashley chat interface and confirmation cards
-  api/ashley.js           Vercel serverless OpenRouter proxy
+  cloudflare/ashley/      Cloudflare Worker that runs Ashley's model (deploy with wrangler)
   invoice/                Invoice form and PDF generator
   inspection/             Inspection form and PDF generator
   prices/                 Supabase-backed product and pricing editor
@@ -111,13 +111,9 @@ owner-app/
 - baseline business details and quick-message defaults
 - storage bucket names
 
-The values are obfuscated to discourage casual copying, but that is not encryption. Never add a Supabase secret key, Google client secret or OpenRouter key to browser code.
+The values are obfuscated to discourage casual copying, but that is not encryption. Never add a Supabase secret key, Google client secret or any Cloudflare API token to browser code.
 
-The Ashley server function requires these Vercel environment variables:
-
-- `OPENROUTER_API_KEY`
-- `ASHLEY_APP_KEY`
-- `ASHLEY_MODEL`, optional, currently defaulting to `google/gemini-3.7-flash`
+Ashley's Worker needs one secret, set with `npx wrangler secret put ASHLEY_APP_KEY` in `cloudflare/ashley`. It must match the handshake in `config.js`. There is no model API key.
 
 ## Security model
 
@@ -127,7 +123,7 @@ This is currently a single-owner internal app, not a multi-user authenticated pr
 - The current owner-app policies allow broad anonymous access to operational tables and document buckets.
 - The optional passcode is a client-side convenience gate, not real database authentication.
 - Gmail access tokens are cached in browser local storage until shortly before expiry.
-- The Ashley browser handshake is not a secret. The OpenRouter key remains server-side.
+- The Ashley browser handshake is not a secret. The model needs no key: the Worker uses Cloudflare's AI binding.
 - Invoice and inspection PDF buckets are public so documents can be opened directly.
 
 Keep the production URL private until proper user authentication and restrictive RLS policies are added.

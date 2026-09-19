@@ -29,23 +29,18 @@ const CONFIG = {
   GOOGLE_CLIENT_ID: _unramble(_RAMBLED.cid),
 
   // --- Ashley, the assistant ----------------------------------------------
-  // This app is a PUBLIC repo, so the OpenRouter key is NOT here. It lives in
-  // this app's own Vercel environment variables, behind api/ashley.js, which
-  // deploys alongside these files. Normal case: the app calls /api/ashley on
-  // its own origin, so there is no cross-site request at all.
+  // Her model runs on Cloudflare Workers AI (GLM 4.7 Flash) behind a small
+  // Worker, cloudflare/ashley in this repo. The Worker reaches the model
+  // through its built-in AI binding, so no model key exists anywhere: not
+  // here, not in Vercel, not in the Worker's settings.
   //
-  // APP_KEY is only a shared handshake so the endpoint ignores random traffic.
+  // APP_KEY is only a shared handshake so the Worker ignores random traffic.
   // It is obscurity, not a secret. If the endpoint is ever abused, change
-  // ASHLEY_APP_KEY in Vercel and re-ramble the new value into _RAMBLED.ash.
+  // the Worker's ASHLEY_APP_KEY secret and re-ramble the new value here.
   ASHLEY: {
     ENDPOINT: (function () {
       try { const o = localStorage.getItem('mmqld_ashley_endpoint'); if (o) return o; } catch (_) {}
-      const h = location.hostname;
-      // The old GitHub Pages copy has no server of its own, so it reaches
-      // across to the Vercel app. Kept working on purpose: the owner may still
-      // have that URL on his home screen.
-      if (h.endsWith('github.io')) return 'https://mmqld-app.vercel.app/api/ashley';
-      return '/api/ashley';
+      return 'https://mmqld-ashley.todo-r2-d1.workers.dev';
     })(),
     APP_KEY: _unramble(_RAMBLED.ash),
   },

@@ -1,7 +1,7 @@
 /* ============================================================================
    Ashley - the tools she can use
    ----------------------------------------------------------------------------
-   Every tool is declared here in OpenAI/OpenRouter function-calling format and
+   Every tool is declared here in OpenAI function-calling format and
    executed here against the same two systems the rest of the app already uses:
    Supabase (enquiries, calendar, invoices, inspection reports) and Gmail
    (via the Google sign-in token in app.js).
@@ -704,7 +704,7 @@
         type: 'object',
         properties: {
           phone: { type: 'string' },
-          message: { type: 'string' },
+          message: { type: 'string', description: 'Only what the owner asked to say, in his words. Add no day, time or job details he did not give.' },
           customer_name: { type: 'string' },
         },
         required: ['phone', 'message'],

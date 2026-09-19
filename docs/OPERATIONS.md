@@ -12,15 +12,18 @@ All non-canonical `*.vercel.app` page loads are redirected to the canonical host
 
 ## Vercel configuration
 
-Required environment variables for the owner-app Vercel project:
+The owner-app Vercel project needs no environment variables. It serves static files only.
 
-| Variable | Required | Purpose |
-| --- | --- | --- |
-| `OPENROUTER_API_KEY` | yes | server-side model provider credential |
-| `ASHLEY_APP_KEY` | yes | must match the browser handshake in `config.js` |
-| `ASHLEY_MODEL` | no | model override, default is `google/gemini-3.7-flash` |
+## Ashley on Cloudflare
 
-Never expose the OpenRouter key through `config.js`, HTML, a committed environment file or browser logs.
+Ashley's model runs on Cloudflare Workers AI through the Worker in `cloudflare/ashley`:
+
+- URL: <https://mmqld-ashley.todo-r2-d1.workers.dev>
+- Model: `@cf/zai-org/glm-4.7-flash`, thinking off, one retry on transient errors
+- Model access: the Worker's AI binding. There is no model API key.
+- Secret: `ASHLEY_APP_KEY`, which must match the handshake in `config.js`
+- Deploy: `npx wrangler deploy` from `cloudflare/ashley`, logged in to the Cloudflare account that owns the Worker
+- Cost: about 17 to 22 neurons per model step, so a normal question costs 35 to 65 neurons. The free allowance is 10,000 neurons a day, resetting at 10am Brisbane time. When it runs out, Ashley says so until the reset.
 
 ## Google OAuth setup
 
@@ -146,7 +149,7 @@ Before calling a release complete:
 - Supabase secret and service-role keys must never be in browser code.
 - Google OAuth client ID may be in browser code.
 - Google OAuth client secret must never be in browser code.
-- OpenRouter key must stay in Vercel environment variables.
+- No model key exists. Keep Cloudflare API tokens out of the repository and out of browser code.
 - The Ashley browser handshake may be rotated but must not be described as a secret.
 - Do not log customer data or upstream model responses from failed requests.
 
@@ -177,7 +180,6 @@ Before calling a release complete:
 ### Ashley is unavailable
 
 - confirm the app is on the canonical deployment
-- check the three Vercel environment variables
-- confirm the browser and Vercel `ASHLEY_APP_KEY` values match
-- check the selected model name and provider availability
-- preserve provider privacy policy when changing model routing
+- confirm the Worker answers: a POST without the key should return 401
+- confirm the Worker's `ASHLEY_APP_KEY` secret matches `config.js`
+- check Workers AI usage in the Cloudflare dashboard; the daily free allowance may be used up

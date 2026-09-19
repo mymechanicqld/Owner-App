@@ -149,20 +149,19 @@ Non-ASCII subject text is encoded with an RFC 2047 encoded word before Gmail sub
 
 Ashley can search message metadata and read a selected full message. Inbox read tools only run when a still-valid cached token exists. If not, Ashley offers a Connect Gmail button so the owner can create the required popup with a direct tap.
 
-## Ashley and OpenRouter
+## Ashley and Cloudflare Workers AI
 
-The browser calls `/api/ashley` on the same deployment. The endpoint:
+The browser calls the `mmqld-ashley` Cloudflare Worker. The Worker:
 
 - validates origin
 - validates the `X-Ashley-Key` handshake
 - applies a coarse per-instance IP rate limit
 - enforces request-size, message-count, tool-count and output limits
-- fixes the model server-side
-- requests a provider with `data_collection: deny`
-- omits optional attribution headers
-- forwards only model output or a sanitised error
+- fixes the model server-side (GLM 4.7 Flash, thinking off)
+- retries once on a transient Workers AI error
+- forwards only model output or a sanitised error, and never logs the conversation
 
-The OpenRouter key is stored only in Vercel environment variables.
+There is no model key: the Worker uses Cloudflare's AI binding.
 
 The system instructions deliberately omit the business name, app name, URL and database identity. Customer or business-operation data still reaches the model when it is needed to answer a request. The signature and business identity are attached in browser code after the model writes the message body.
 
@@ -192,7 +191,7 @@ Because counters are local, two devices can generate the same sequence number on
 - message metadata and full message reads requested by Ashley
 - outgoing email recipients, bodies and PDF attachments
 
-### To OpenRouter's selected provider
+### To Cloudflare Workers AI
 
 - current Ashley system instructions
 - the owner's question and recent conversation text
@@ -203,6 +202,5 @@ Because counters are local, two devices can generate the same sequence number on
 
 - Supabase key
 - Gmail OAuth token
-- OpenRouter key
 - raw invoice or inspection PDF file unless represented in a tool result, which current tools do not do
 - business signature details, because browser code appends them after message generation

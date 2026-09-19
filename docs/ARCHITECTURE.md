@@ -20,7 +20,7 @@ Every page loads `config.js`. Pages that consume owner settings also load `setti
 
 ## Deployment
 
-Vercel serves the static files and the single serverless function at `/api/ashley`.
+Vercel serves the static files. Ashley's model endpoint is a separate Cloudflare Worker, `mmqld-ashley`, built from `cloudflare/ashley`.
 
 Every owner-app page redirects non-canonical Vercel aliases to `mmqld-app.vercel.app`. This is necessary because Google OAuth authorises an exact origin. It also avoids branch aliases that can sit behind Vercel authentication.
 
@@ -70,7 +70,7 @@ Browser UI
   |     `-- send multipart PDF attachments
   |
   `-- same-origin Ashley endpoint
-        `-- OpenRouter chat completion with tool definitions
+        `-- Cloudflare Worker: GLM 4.7 Flash via the Workers AI binding
 ```
 
 The browser performs Ashley's tools itself. The model endpoint never receives Supabase credentials or Gmail tokens. The endpoint receives the conversation, tool definitions and the compact tool results needed to continue the turn.
@@ -169,7 +169,7 @@ Camera and gallery photos are compressed in the browser and uploaded to the `ins
 ```text
 Owner question
   -> browser builds current system instructions
-  -> /api/ashley forwards model request
+  -> the Cloudflare Worker runs one model step
   -> model returns zero or more tool calls
   -> browser runs independent calls in parallel
   -> confirmed actions pause for the owner's button
@@ -203,6 +203,6 @@ As a result:
 - pdfmake and its virtual font bundle on generator pages
 - Google Fonts on generator pages
 - Supabase REST and Storage APIs
-- OpenRouter through the Vercel Ashley endpoint
+- Cloudflare Workers AI through the Ashley Worker
 
 If a CDN dependency fails, only the related part of the app is available. `storage.js`, price list, settings and customer lookup use direct HTTP requests and do not require the Supabase JavaScript library.

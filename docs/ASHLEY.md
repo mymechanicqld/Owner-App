@@ -9,7 +9,7 @@ Ashley is the owner-facing business assistant in the fifth bottom tab. She combi
 | `ashley-ui.js` | chat view, local history, progress text, confirmation cards and shortcut buttons |
 | `ashley-agent.js` | system instructions, model transport, loop, parallel execution and history trimming |
 | `ashley-tools.js` | tool schemas, implementations, confirmation previews and plain-language busy labels |
-| `api/ashley.js` | Vercel proxy that protects the OpenRouter key and fixes provider policy |
+| `cloudflare/ashley/` | Cloudflare Worker that runs GLM 4.7 Flash through the Workers AI binding |
 
 ## Agent loop
 
@@ -97,6 +97,12 @@ Always requires confirmation. It produces an Open in Messages button with the SM
 
 Adds a shortcut button to Dashboard, Inquiries, Calendar, Search, Analytics, Invoices or Inspections. It supplements Ashley's answer rather than replacing it.
 
+## Model notes (GLM 4.7 Flash)
+
+- Thinking is switched off; it only added cost in testing.
+- GLM can describe an action as done after the owner declined it. The agent tracks declines in code: if the owner said no and nothing confirmed ran, his reply is replaced with "Okay, I have left it. Nothing was sent or changed."
+- The system prompt forbids guessing ids across parallel calls and inventing days, times or job details. Drafted messages are always shown in full on the confirmation card before anything is sent.
+
 ## Confirmation policy
 
 Always confirmed:
@@ -142,29 +148,27 @@ The UI and send path also clean dash punctuation. The business signature is dete
 
 ## Privacy design
 
-The system instructions do not name the business, app, site or database. The proxy does not send OpenRouter attribution headers and requests providers that deny data collection.
+The system instructions do not name the business, app, site or database. The model runs inside Cloudflare Workers AI on the business's own Cloudflare account, with no third-party model router.
 
 This reduces unnecessary project disclosure but does not make model calls data-free. Relevant customer details and tool results are sent to the model when the owner's request needs them.
 
 ## Server controls
 
-The Vercel endpoint enforces:
+The Cloudflare Worker enforces:
 
 - POST or OPTIONS only
-- same-origin, known legacy origin or configured localhost origin
+- the production app, legacy GitHub Pages or localhost origins only
 - matching browser handshake
 - 40 requests per minute per in-memory IP bucket
 - 400,000-byte request limit
 - 60-message input limit
 - 30-tool input limit
 - 2,000 output-token ceiling
-- 50-second upstream timeout
-- server-selected model
-- `provider.data_collection = deny`
+- server-selected model with thinking off
 
 The browser normally asks for 1,600 output tokens and uses temperature 0.3.
 
-The IP limit is a speed bump, not a durable global quota, because serverless instances do not share the in-memory map.
+The IP limit is a speed bump, not a durable global quota, because Worker isolates do not share the in-memory map.
 
 ## What Ashley cannot currently do
 

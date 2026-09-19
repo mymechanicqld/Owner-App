@@ -1,0 +1,11 @@
+{
+  // Ashley's model endpoint. Deploy from this folder: npx wrangler deploy
+  // The handshake key is a secret: npx wrangler secret put ASHLEY_APP_KEY
+  "$schema": "https://unpkg.com/wrangler/config-schema.json",
+  "name": "mmqld-ashley",
+  "main": "src/index.js",
+  "compatibility_date": "2026-06-01",
+  "workers_dev": true,
+  "ai": { "binding": "AI" },
+  "observability": { "enabled": false }
+}
