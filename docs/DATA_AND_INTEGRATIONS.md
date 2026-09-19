@@ -11,10 +11,10 @@ Do not add a Supabase secret or service-role key to this repository.
 | Table | Purpose | Read paths | Write paths |
 | --- | --- | --- | --- |
 | `quote_submissions` | Website inquiries and customer source data | Dashboard, Inquiries, Search, autocomplete, Ashley | status and notes updates, email reply status advancement |
-| `calendar_events` | Owner booking calendar | Calendar, Ashley | create, update, reorder and delete |
+| `calendar_events` | Owner booking calendar | Calendar, customer autocomplete, document email lookup, Ashley | create, update, drag to a new time or length, delete |
 | `invoices` | Searchable invoice log plus full generator state | Records, autocomplete, invoice edit, Ashley | create, edit, payment update and delete |
 | `inspection_reports` | Searchable inspection log plus full generator state | Records, inspection edit, Ashley | create, edit and delete |
-| `products` | Invoice products, parts and jobs | Price list, invoice Saved items, Settings count | price list upsert and delete |
+| `products` | Invoice products, parts and jobs | Price list, invoice Add items picker, Settings count | price list upsert and delete, new items created from an invoice |
 | `app_settings` | One shared settings JSON document | shared settings and Settings status | row `id = 1` upsert |
 
 ### Inquiry fields consumed by the owner app
@@ -44,6 +44,7 @@ The app currently relies on:
 - `title`
 - `starts_at`, `ends_at`, `all_day`
 - `customer_name`, `customer_phone`
+- `customer_email`, added 19 September 2026 by migration 008. The migration backfilled existing bookings from the linked inquiry, then the newest inquiry with the same rego, then the newest invoice with the same rego; 40 of the 46 bookings then held an email
 - `vehicle_rego`
 - `suburb`, `address`
 - `service`, `notes`, `status`
@@ -53,7 +54,9 @@ The app currently relies on:
 
 The list and Ashley use searchable columns such as invoice number, customer, business, email, rego, vehicle, odometer, dates, status, totals, items, signer, notes and PDF path.
 
-The `state` JSON column is the lossless editing source. It stores the full generator form including receipt rows and signature data.
+The `state` JSON column is the lossless editing source. It stores the full generator form including receipt rows and signature data. Each item in `state.items` (and the searchable `items` column) is `{ id, desc, qty, price }` plus an optional `details` string, the text printed under that line.
+
+`status` is `paid` or `outstanding`. Older rows may hold `partial`; the generator opens those as outstanding.
 
 `submission_id` links a generated invoice back to the source inquiry when the invoice was opened from that inquiry.
 
@@ -61,7 +64,11 @@ The `state` JSON column is the lossless editing source. It stores the full gener
 
 The report log stores report number, customer details, vehicle, odometer, rating, date, structured sections, comments, PDF path and source inquiry ID.
 
-The `state` JSON column stores the complete editable report including images, signature and terms.
+The `state` JSON column stores the complete editable report including images, signature and terms. Fields added on 19 September 2026:
+
+- `coverImage`: `{ id, path, thumbPath, width, height, bytes, mime }` for the cover photo, stored in the `inspections` bucket like the other photos
+- `score`: 0 to 100 in steps of 10, or `null` when not scored
+- grades are `Good`, `Fair`, `Poor` or `NA`. Rows saved before then may hold `Repair`, which the form and PDF read as `Poor`; the `overall_rating` column likewise holds `Repair` on older rows and `Poor` on new ones
 
 ### Product fields used by the page
 
@@ -73,7 +80,15 @@ The `state` JSON column stores the complete editable report including images, si
 - `active`
 - `sort_order`
 
-The invoice picker only requests active products. It displays products by name and preserves descriptions for display in the picker, while the added invoice line currently uses the product name and price.
+The invoice picker requests active products (`id, code, name, description, price`). Adding a product copies its name and price to the line and its description to the line's printed `details`.
+
+New items created from the invoice get a `code` made from the name (a time suffix is added if that code exists) and are upserted with `on_conflict=code`.
+
+Price list changes made on 19 September 2026:
+
+- `general-service` became `standard-service`: name **Standard Service**, price $369, description holding the service record and 19-point checklist
+- `standard-regular-service` ("Standard/Regular Service", $369) was deleted
+- the table now holds 44 products, 22 priced
 
 ### Settings row
 
@@ -178,7 +193,8 @@ The system instructions deliberately omit the business name, app name, URL and d
 | `mmqld_invoice_counter` | next local invoice sequence | persistent per browser |
 | `mmqld_invoice_drafts_v2` | up to 30 invoice drafts | until deleted or site data is cleared |
 | `mmqld_report_counter` | next local report sequence | persistent per browser |
-| `mmqld_inspection_drafts_v2` | up to five inspection drafts | until deleted or site data is cleared |
+| IndexedDB `mmqld-owner`, store `inspection-drafts` | up to five inspection drafts, photos included | until deleted or site data is cleared |
+| `mmqld_inspection_drafts_v2` | legacy local-storage drafts, moved into IndexedDB on first open | removed after migration |
 | `mmqld_sw_removed` | one-session reload guard after worker removal | current browser session |
 
 Because counters are local, two devices can generate the same sequence number on the same date. The database row ID and unique PDF timestamp still differ, but the human invoice or report number can collide.
@@ -192,6 +208,8 @@ Because counters are local, two devices can generate the same sequence number on
 - outgoing email recipients, bodies and PDF attachments
 
 ### To Cloudflare Workers AI
+
+Cloudflare runs the model in Workers AI under the Cloudflare account signed in as gursahib99888@gmail.com; there is no third-party model router in between.
 
 - current Ashley system instructions
 - the owner's question and recent conversation text

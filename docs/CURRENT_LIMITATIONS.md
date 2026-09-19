@@ -1,6 +1,6 @@
 # Current limitations
 
-This file records verified gaps in the current owner-app code as of 17 September 2026. It is intended to prevent future work from trusting stale comments or UI descriptions.
+This file records verified gaps in the current owner-app code as of 19 September 2026. It is intended to prevent future work from trusting stale comments or UI descriptions.
 
 ## Security and access
 
@@ -22,7 +22,7 @@ The Gmail access token is kept in local storage. It expires quickly, but any scr
 
 ### `supabase-schema.sql` is not a complete fresh setup
 
-It covers calendar events, invoice records, inspection records and two storage buckets. It does not create:
+It covers calendar events (including the `customer_email` column), invoice records, inspection records and two storage buckets. It does not create:
 
 - `quote_submissions`
 - `products`
@@ -41,6 +41,8 @@ The repository still contains a no-cache service worker, but no current page reg
 `settings.js` updates `CONFIG.BUSINESS_NAME`, phone, email, ABN and website. Ashley and several message paths consume those values.
 
 The invoice and inspection PDF generators still render their own hard-coded `BUSINESS` objects. Changing business details in Settings does not currently change the business header printed on those PDFs.
+
+The bank details printed on every invoice (`BUSINESS.bank` in `invoice/app.js`) are hard-coded too. A change of bank account needs a code change until they are added to Settings.
 
 ### Invoice defaults are displayed but not consumed
 
@@ -69,45 +71,51 @@ When editing an existing record, a failed new upload leaves the older `pdf_path`
 
 ### Main-screen document deletion may leave an object
 
-The main Records delete path removes the database row first, then makes a best-effort Storage delete. The Storage request includes the publishable key as both `apikey` and a Bearer token, while the storage helper correctly treats the current publishable key as non-JWT. A failed object deletion is swallowed, so an orphaned public PDF can remain.
+The main Records delete path removes the database row first, then makes best-effort Storage deletes for the PDF and, for reports, every photo, thumbnail and the cover photo. A failed object deletion is swallowed, so an orphaned public file can remain.
 
-### Ashley deletion removes the row only
+### Calendar
 
-`delete_record` deletes invoice or inspection rows but does not delete their PDF objects.
+### Drag works within one day
 
-### Local document counters can collide
+A booking can be dragged to a new time or length on the day being viewed. Moving it to another day still means opening it and changing the date.
 
-Invoice and report counters are stored per browser. Two phones or a cleared browser profile can generate the same visible number on the same date.
+### Touch drag was verified by simulation
 
-## Gmail
+Hold-to-drag, resize, undo and the scroll-versus-drag distinction were tested with simulated touch events and a mouse, not with a finger on a real iPhone.
 
-### Token refresh is interactive browser OAuth
+### Overlaps are allowed
 
-There is no server-side refresh token. When the cached access token expires, the app asks Google for another browser access token. Existing consent should avoid the full consent screen, but popup rules still apply.
+Dropping a booking onto another is allowed on purpose (two jobs at one address). The confirmation message mentions the overlap; nothing prevents it.
 
-### Main and generator Gmail implementations are duplicated
+## Leaving a form
 
-The main shell has its own Gmail helpers and the generator pages use `gmail-send.js`. Behaviour is intentionally aligned but changes must currently be made in both places.
+### Browser limits on the warning
 
-## Price list
+Closing or reloading the tab only shows the browser's own "leave site?" prompt; browsers forbid a custom window there, and iOS often shows nothing at all. The in-app logo and the back gesture show the full three-button window.
 
-### Deletion is optimistic
-
-The price list removes a row from the page immediately after confirmation and starts the database delete without waiting for success. If deletion fails, the item reappears after reload.
-
-### Product details are copied, not linked
-
-A product's description is copied into the invoice line's printed details when it is added. Editing the price list later does not change invoices already made, which is intended, but it also means an old draft keeps the old wording.
+The back-gesture handling keeps one extra browser history entry. It was verified in a desktop browser; behaviour in the installed iPhone app should be confirmed on the phone.
 
 ## Ashley
 
+### GLM 4.7 Flash is a small model
+
+It is fast and cheap, but in testing it described a declined action as done, and it added details such as "today" to a drafted message. Declines are now enforced in code; drafted messages rely on the owner reading the confirmation card. Bulk judgement across long lists (for example deciding which of many records to change) is its weakest area, so such work should be written as a tool in code rather than left to the model.
+
+### Daily allowance
+
+Workers AI gives 10,000 free neurons a day, about 150 to 250 Ashley questions. When that is used up, Ashley stops answering until 10am Brisbane time. The app does not count usage itself; the Cloudflare dashboard shows it.
+
+### The Worker lives on a personal Cloudflare account
+
+`mmqld-ashley` is deployed on the Cloudflare account signed in as gursahib99888@gmail.com, on that account's `todo-r2-d1.workers.dev` subdomain. Deploying or changing it needs that login. Moving it to a business-owned account would change the endpoint URL in `config.js`.
+
 ### Privacy minimisation is not anonymisation
 
-The model request omits project identity and attribution headers, but relevant customer details and tool results still go to the selected model provider.
+The system instructions omit the business and app identity, but relevant customer details and tool results still go to Cloudflare Workers AI when a question needs them.
 
-### Rate limiting is instance-local
+### Rate limiting is per isolate
 
-The per-IP map lives in one serverless instance. It limits accidental bursts but is not a durable cross-instance quota.
+The per-IP map lives in one Worker isolate. It limits accidental bursts but is not a durable global quota. The handshake key is public in the app code, so anyone who reads it can call the Worker and spend the daily allowance; rotating the key is the remedy.
 
 ### Mixed confirmation batches need care
 

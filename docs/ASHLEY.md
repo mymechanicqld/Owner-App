@@ -67,7 +67,7 @@ Reads one Gmail message by the ID returned from search. It walks the MIME tree, 
 
 #### `save_booking`
 
-Creates or updates a calendar booking. Confirmation is controlled by the owner's Settings preference.
+Creates or updates a calendar booking, including the customer's email when known. Confirmation is controlled by the owner's Settings preference. Booking lookups return the stored email too.
 
 #### `update_inquiry`
 
@@ -75,7 +75,7 @@ Changes inquiry status or notes without confirmation.
 
 #### `update_invoice`
 
-Changes payment status, amount paid or notes. Marking an invoice Paid fills the total as paid when no explicit amount was supplied, then recalculates the balance.
+Changes payment status (`paid` or `outstanding`; partial was removed on 19 September), amount paid or notes. Marking an invoice Paid fills the total as paid when no explicit amount was supplied, then recalculates the balance.
 
 ### Confirmed tools
 
@@ -97,10 +97,26 @@ Always requires confirmation. It produces an Open in Messages button with the SM
 
 Adds a shortcut button to Dashboard, Inquiries, Calendar, Search, Analytics, Invoices or Inspections. It supplements Ashley's answer rather than replacing it.
 
+## Model and cost
+
+Ashley runs on **GLM 4.7 Flash** (`@cf/zai-org/glm-4.7-flash`) on Cloudflare Workers AI, since 19 September 2026. Before that she used a Gemini model through OpenRouter; that proxy and all its configuration have been removed.
+
+Measured in live testing on 19 September:
+
+| Question | Model calls | Neurons | Time |
+| --- | --- | --- | --- |
+| "How's my week looking?" | 2 (overview, answer) | about 39 | 3.7 s |
+| "Text Michael Rodgers I'm running 15 minutes late" (declined) | 3 (customer, draft text, answer) | about 58 | 2.9 s |
+
+Each model step costs about 17 to 22 neurons, mostly because the 15 tool definitions travel with every call. The Workers AI free allowance is 10,000 neurons a day, roughly 150 to 250 questions, resetting at 00:00 UTC (10am Brisbane). When it runs out, Ashley says so until the reset.
+
 ## Model notes (GLM 4.7 Flash)
 
 - Thinking is switched off; it only added cost in testing.
 - GLM can describe an action as done after the owner declined it. The agent tracks declines in code: if the owner said no and nothing confirmed ran, his reply is replaced with "Okay, I have left it. Nothing was sent or changed."
+- A declined action returns a plain-text "NOT DONE" result to the model. Before 19 September it was passed as an object and reached the model as the text `[object Object]`, so the model never saw the refusal.
+- GLM can add details to messages it writes. In testing it put "today" into a text the owner had not dated. The prompt and the `draft_sms` message description forbid adding days, times or job details, and the confirmation card shows the full text before anything is sent.
+- The Worker sends every assistant turn with string content and every tool result with its tool name, which GLM on Workers AI expects.
 - The system prompt forbids guessing ids across parallel calls and inventing days, times or job details. Drafted messages are always shown in full on the confirmation card before anything is sent.
 
 ## Confirmation policy
@@ -148,7 +164,7 @@ The UI and send path also clean dash punctuation. The business signature is dete
 
 ## Privacy design
 
-The system instructions do not name the business, app, site or database. The model runs inside Cloudflare Workers AI on the business's own Cloudflare account, with no third-party model router.
+The system instructions do not name the business, app, site or database. The model runs in Cloudflare Workers AI under the Cloudflare account signed in as gursahib99888@gmail.com, with no third-party model router in between.
 
 This reduces unnecessary project disclosure but does not make model calls data-free. Relevant customer details and tool results are sent to the model when the owner's request needs them.
 

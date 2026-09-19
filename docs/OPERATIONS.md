@@ -6,7 +6,11 @@ Canonical owner app:
 
 - <https://mmqld-app.vercel.app/>
 
-Legacy GitHub Pages copies may still exist on an installed phone. `config.js` directs a GitHub Pages copy to the canonical Vercel Ashley endpoint because GitHub Pages cannot host the server function.
+Ashley's model endpoint, on Cloudflare:
+
+- <https://mmqld-ashley.todo-r2-d1.workers.dev>
+
+Legacy GitHub Pages copies may still exist on an installed phone. They use the same Cloudflare endpoint, which accepts the GitHub Pages origin.
 
 All non-canonical `*.vercel.app` page loads are redirected to the canonical host with path, query and hash preserved.
 
@@ -22,7 +26,10 @@ Ashley's model runs on Cloudflare Workers AI through the Worker in `cloudflare/a
 - Model: `@cf/zai-org/glm-4.7-flash`, thinking off, one retry on transient errors
 - Model access: the Worker's AI binding. There is no model API key.
 - Secret: `ASHLEY_APP_KEY`, which must match the handshake in `config.js`
-- Deploy: `npx wrangler deploy` from `cloudflare/ashley`, logged in to the Cloudflare account that owns the Worker
+- Account: the Cloudflare account signed in as gursahib99888@gmail.com (account ID `7b9aacaaa3e2edf9947a8da986f1ba38`). The `todo-r2-d1` part of the URL is that account's workers.dev subdomain, not this project.
+- Deploy: `npx wrangler deploy` from `cloudflare/ashley` while `npx wrangler whoami` shows that account. `wrangler` is installed in `~/Documents/MyProjects/CloudFare-Setup`.
+- Rotate the handshake: `npx wrangler secret put ASHLEY_APP_KEY`, then re-ramble the same value into `_RAMBLED.ash` in `config.js`.
+- Quick health check without spending allowance: a POST with no `X-Ashley-Key` must return `401 Not authorised`.
 - Cost: about 17 to 22 neurons per model step, so a normal question costs 35 to 65 neurons. The free allowance is 10,000 neurons a day, resetting at 10am Brisbane time. When it runs out, Ashley says so until the reset.
 
 ## Google OAuth setup
@@ -48,6 +55,15 @@ Common failure meanings:
 - repeated consent: ensure token requests use an empty prompt and the owner has granted access
 
 ## Supabase setup
+
+Schema changes live as numbered SQL files in the website repository under `supabase/migrations/`. The ones this app depends on:
+
+| File | Adds | State |
+| --- | --- | --- |
+| `20260629_005_add_address.sql` | `address` on inquiries and bookings | applied |
+| `20260824_006_products.sql` | `products`, the price list | applied |
+| `20260824_007_app_settings.sql` | `app_settings`, cross-device settings | not applied yet (optional) |
+| `20260919_008_calendar_customer_email.sql` | `customer_email` on `calendar_events`, backfilled from inquiries and invoices | applied 19 Sep 2026 |
 
 The original `supabase-schema.sql` creates:
 
@@ -99,7 +115,7 @@ If a record exists without a PDF:
 
 Vercel serves HTML, JavaScript, CSS and JSON with immediate revalidation. Image files use a one-year immutable cache.
 
-Asset query strings are currently versioned as `v=36`. When a script or stylesheet changes, update its query string on every page that loads it. This remains useful for browser and home-screen cache separation even with Vercel's revalidation headers.
+Every script and stylesheet is loaded with a `?v=` query string. When a file changes, raise its number on every page that loads it. The numbers now differ per file and per page; for example the main page loads `config.js?v=44` and `ashley-agent.js?v=45`, while the invoice page loads `invoice-pdf.js?v=43`. Pick any number higher than the one the page currently uses. This matters most on an installed iPhone app, which holds on to old files longer than Safari does.
 
 The head script unregisters old workers and clears old Cache Storage. A session guard prevents endless reload after removal.
 
@@ -116,13 +132,14 @@ Core smoke check:
 1. Dashboard loads current inquiry totals.
 2. Inquiries can be filtered and one detail sheet opens.
 3. Search finds a known rego.
-4. Calendar moves between Day and Week and opens an existing booking.
+4. Calendar Day view shows the hour timeline, the week strip moves days, the date title opens a date picker, and Week view opens an existing booking.
 5. Invoice and inspection record lists load.
-6. New Invoice loads products in Saved items.
-7. New Inspection exposes separate camera and gallery controls.
-8. Price list loads current Supabase rows.
-9. Settings reports whether cross-device sync exists.
-10. Ashley renders starters and accepts a harmless lookup.
+6. New Invoice: Add items opens the picker, typing ranks names that start with the text first, and a tapped item lands on the invoice.
+7. New Inspection shows the cover photo card, separate camera and gallery controls, and the score slider in Overall rating.
+8. Changing an invoice or inspection and tapping the logo shows Keep editing, Save draft and leave, Discard and leave.
+9. Price list loads current Supabase rows.
+10. Settings reports whether cross-device sync exists.
+11. Ashley renders starters and accepts a harmless lookup. Each question uses Workers AI allowance, so keep it to one or two.
 
 Do not send email, delete records or save test records during a smoke check unless the test plan includes explicit cleanup.
 
@@ -138,7 +155,7 @@ Before calling a release complete:
 6. Test Supabase row creation separately from PDF upload.
 7. Test Google connection from Settings.
 8. Test a threaded inquiry reply.
-9. Test one invoice and one inspection PDF visually.
+9. Test one invoice and one inspection PDF visually. The layouts are in `invoice/invoice-pdf.js` and `inspection/report-pdf.js`; both run in Node with pdfmake 0.2.10, so real saved rows can be rendered and checked before release.
 10. Test Ashley's overview, customer lookup, Gmail-connect card, confirmed send preview and declined action.
 11. Remove any test rows, test PDFs and test emails that are safe to remove.
 12. Confirm the deployed commit rather than relying only on a successful build.
@@ -176,6 +193,12 @@ Before calling a release complete:
 - use Settings to reconnect Gmail from a direct tap
 - check that the GIS script loaded
 - do not add a client secret to the app
+
+### A booking drag did not stick
+
+- the move saves straight away; a red "Could not move it" message means the save failed and the booking was put back
+- check the phone has signal, then drag again
+- the Undo button on the confirmation reverses the last move
 
 ### Ashley is unavailable
 

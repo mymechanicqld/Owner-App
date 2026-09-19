@@ -10,9 +10,9 @@ The PWA has five independent browser entry points:
 
 | Entry point | Purpose | Main scripts |
 | --- | --- | --- |
-| `/` | Main owner console | `app.js`, Ashley scripts |
-| `/invoice/` | Invoice generator | `invoice/app.js` |
-| `/inspection/` | Inspection generator | `inspection/app.js` |
+| `/` | Main owner console | `app.js`, `customers.js`, Ashley scripts |
+| `/invoice/` | Invoice generator | `invoice/app.js`, `invoice/invoice-pdf.js`, `leave-guard.js` |
+| `/inspection/` | Inspection generator | `inspection/app.js`, `inspection/report-pdf.js`, `leave-guard.js` |
 | `/prices/` | Price catalogue editor | inline page script |
 | `/settings/` | App settings and connections | inline page script |
 
@@ -20,13 +20,15 @@ Every page loads `config.js`. Pages that consume owner settings also load `setti
 
 ## Deployment
 
-Vercel serves the static files. Ashley's model endpoint is a separate Cloudflare Worker, `mmqld-ashley`, built from `cloudflare/ashley`.
+Two independent deployments:
+
+- **Vercel** serves the static app from the `mymechanicqld/Owner-App` repository, redeploying on every push to `main`. `.vercelignore` keeps `cloudflare/` and `docs/` off the public site.
+- **Cloudflare Workers** runs `mmqld-ashley`, Ashley's model endpoint, from `cloudflare/ashley`. It is deployed by hand with `wrangler deploy`; a push to GitHub does not update it.
 
 Every owner-app page redirects non-canonical Vercel aliases to `mmqld-app.vercel.app`. This is necessary because Google OAuth authorises an exact origin. It also avoids branch aliases that can sit behind Vercel authentication.
 
 `vercel.json` provides:
 
-- a 60-second maximum duration for the Ashley function
 - no-cache revalidation for HTML, JavaScript, CSS and JSON
 - long immutable caching for image assets
 - noindex headers
@@ -69,8 +71,8 @@ Browser UI
   |     |-- send threaded plain-text replies
   |     `-- send multipart PDF attachments
   |
-  `-- same-origin Ashley endpoint
-        `-- Cloudflare Worker: GLM 4.7 Flash via the Workers AI binding
+  `-- Ashley Worker on Cloudflare (cross-origin, X-Ashley-Key handshake)
+        `-- GLM 4.7 Flash via the Workers AI binding
 ```
 
 The browser performs Ashley's tools itself. The model endpoint never receives Supabase credentials or Gmail tokens. The endpoint receives the conversation, tool definitions and the compact tool results needed to continue the turn.
@@ -95,7 +97,7 @@ It mutates selected `CONFIG` properties so downstream code can keep reading its 
 
 ### `customers.js`
 
-Loads up to 400 recent inquiries and 200 invoices in parallel. It normalises them into one customer shape, sorts newest first, de-duplicates by person or business plus rego, and backfills missing fields from older records.
+Used by the invoice and inspection generators and by the main app's booking sheet. Loads up to 400 recent inquiries, 200 invoices and 200 calendar bookings in parallel (bookings with `select=*`, so an older table without `customer_email` still loads). It normalises them into one customer shape, sorts newest first, de-duplicates by person or business plus rego, and backfills missing fields from older records.
 
 Autocomplete ranking is:
 
@@ -127,15 +129,38 @@ New PDF object names include date, rego, document identifier where applicable, a
 
 Database inserts and patches can strip an unknown column named by PostgREST and retry. This lets old databases accept newer app rows without losing the entire save.
 
+### `leave-guard.js`
+
+Shared by the invoice and inspection pages. Each page passes `isDirty()`, `saveDraft()` and a back URL. The page records a snapshot of its state when it is loaded, started, restored from a draft or saved; anything different counts as unsaved. The inspection snapshot leaves out photo bodies, whose ids already change.
+
+It intercepts the logo link in the capture phase, keeps one extra history entry so the phone's back gesture lands on the page first (re-pushing it and asking when dirty, carrying on back when clean), and sets `beforeunload` for closing or reloading. It injects its own styles and dialog markup.
+
+### PDF layout modules
+
+`invoice/invoice-pdf.js` and `inspection/report-pdf.js` hold the whole printed layout and build a pdfmake document definition from plain state. Neither touches the DOM, so the same files render in Node with pdfmake 0.2.10. That is how real saved invoices and reports were rendered and inspected during the 19 September redesign. The form pages keep a thin `buildInvoiceDoc` / `buildReportDoc` that passes state, totals, business details and the logo.
+
+Two pdfmake rules both layouts depend on:
+
+- a filled table cell that splits across a page gets its background painted on the wrong page, so filled panels are unbreakable or live in rows that cannot break
+- separate `canvas` nodes in the page background stack one below another, so anything positioned from the page corner, such as the invoice footer strip, needs `absolutePosition`
+
+## Calendar flow
+
+1. `loadEvents()` reads every `calendar_events` row; the 60-second refresh reloads them.
+2. `renderCalendar()` draws Day view as a timeline. `calDayBounds()` sets the hour range and `calLayout()` assigns overlapping bookings to side-by-side columns.
+3. A booking drag is tracked in `CAL_DRAG`. Touch needs a 380 ms hold before it lifts; movement before then cancels so the page scrolls. While a drag is active the background refresh does not repaint.
+4. On release, `commitCalDrag()` updates the booking in memory, repaints, then updates `starts_at` and `ends_at` in Supabase. On failure the old times are restored. Undo writes the previous times back.
+5. Saving the booking sheet writes `customer_email`. If the database lacked that column, the row is saved without it and the owner is told the email was not kept.
+
 ## Invoice flow
 
 ### New from scratch
 
 1. `blankState()` creates the initial form state.
 2. The page loads products cache-first and refreshes from Supabase.
-3. The owner enters customer, vehicle, items, tax, payments and signature.
+3. The owner enters customer, vehicle, items (through the Add items sheet, which can also upsert a new product), line details, tax, payments and signature.
 4. `compute()` is the single source for subtotal, GST, total, paid and outstanding.
-5. pdfmake builds the document definition and PDF in the browser.
+5. `invoice-pdf.js` builds the document definition and pdfmake renders the PDF in the browser.
 6. Save writes a local draft and then calls `storage.js`.
 
 ### Prefilled from an inquiry or booking
@@ -162,20 +187,28 @@ Its section definitions are data-driven. The same `SECTIONS` structure controls:
 - searchable JSON saved to Supabase
 - PDF section pages
 
-Camera and gallery photos are compressed in the browser and uploaded to the `inspections` bucket under `images/<report folder>/`. The saved state keeps paths, dimensions and captions, not image bodies, and the PDF downloads the masters only when a report is opened, saved or sent. The PDF layout is built by `report-pdf.js`, separate from the form code.
+Camera and gallery photos are compressed in the browser and uploaded to the `inspections` bucket under `images/<report folder>/`. The cover photo (`state.coverImage`) is stored the same way. The saved state keeps paths, dimensions and captions, not image bodies, and the PDF downloads the masters only when a report is opened, saved or sent. Any photo without stored dimensions is measured first, because photo rows are sized from each photo's proportions.
+
+`normaliseState()` runs whenever the form renders: it turns old "Repair" grades into "Poor" and adds the `score` and `coverImage` fields to older reports.
+
+The PDF layout is built by `report-pdf.js`. Photos are laid out in justified rows: a row grows until it overfills the page width, then keeps whichever of "with" or "without" the last photo lands closer to the target height of 172 points, capped so no row towers. Every photo in a row shares its height.
+
+Deleting a report from Records removes its PDF, photos, thumbnails and cover photo.
 
 ## Ashley flow
 
 ```text
 Owner question
   -> browser builds current system instructions
-  -> the Cloudflare Worker runs one model step
+  -> the Cloudflare Worker runs one GLM 4.7 Flash step
   -> model returns zero or more tool calls
   -> browser runs independent calls in parallel
   -> confirmed actions pause for the owner's button
   -> compact results go back to the model
   -> final plain-language answer is rendered and saved locally
 ```
+
+If the owner declines a confirmation and nothing confirmed ran, the final answer is replaced in code with "Okay, I have left it. Nothing was sent or changed."
 
 Only user messages and final assistant text survive into the next turn's history. Tool calls and tool results are not persisted in conversation history.
 

@@ -30,10 +30,11 @@ The sidebar groups the complete app:
 - Read, search and update website inquiries.
 - Reply to an inquiry in its existing Gmail thread.
 - Call or prepare an SMS for a customer.
-- Create, edit, reorder and delete calendar bookings.
-- Create editable invoice PDFs, record payments, save drafts, send invoices and reopen saved invoices.
-- Create detailed vehicle inspection PDFs with grades, comments, camera or gallery images, signatures and editable terms.
-- Maintain the parts and job price list that feeds the invoice item picker.
+- Plan the day on a Google Calendar style timeline: drag bookings to new times, drag to resize, tap an empty slot to book, jump to any date. Bookings keep the customer's email.
+- Create editable invoice PDFs with one searchable "Add items" picker, printed service checklists, bank payment details, recorded payments, drafts and Gmail sending.
+- Create detailed vehicle inspection PDFs with a cover photo, Good/Fair/Poor grades, photos, a 0 to 100 score gauge, signatures and editable terms.
+- Maintain the parts and job price list that feeds the invoice item picker; new items can also be created from an invoice.
+- Leave an invoice or inspection with unsaved work only after choosing to keep editing, save a draft or discard.
 - View and manage saved invoice and inspection records.
 - Ask Ashley to look up business information, work across Supabase and Gmail, update routine records, and prepare confirmed customer communications.
 - Manage app defaults, Gmail connection and on-device data from Settings.
@@ -71,8 +72,9 @@ The app intentionally does not register a service worker. A controlling service 
 - [Ashley agent harness](docs/ASHLEY.md)
 - [Operations and deployment](docs/OPERATIONS.md)
 - [Current limitations](docs/CURRENT_LIMITATIONS.md)
+- [Work log](docs/WORKLOG.md), newest changes first
 
-These documents describe the code as it exists on 17 September 2026. `CURRENT_LIMITATIONS.md` records places where the UI wording or older setup files are ahead of the actual wiring.
+These documents describe the code as it exists on 19 September 2026. `CURRENT_LIMITATIONS.md` records places where the UI wording or older setup files are ahead of the actual wiring.
 
 ## Repository map
 
@@ -83,20 +85,22 @@ owner-app/
   styles.css              Main shell and Ashley styling
   config.js               Public browser configuration and message templates
   settings.js             Shared local and Supabase-backed settings layer
-  customers.js            Shared recent-customer autocomplete
+  customers.js            Shared recent-customer autocomplete (inquiries, invoices, bookings)
   storage.js              Record-first document saving and PDF storage uploads
   gmail-send.js           Shared Gmail sender for generator pages
+  leave-guard.js          Unsaved-work warning shared by the invoice and inspection pages
   ashley-agent.js         Tool-calling loop and system instructions
   ashley-tools.js         Ashley's tool definitions and implementations
   ashley-ui.js            Ashley chat interface and confirmation cards
   cloudflare/ashley/      Cloudflare Worker that runs Ashley's model (deploy with wrangler)
-  invoice/                Invoice form and PDF generator
-  inspection/             Inspection form and PDF generator
+  invoice/                Invoice form (app.js) and printed layout (invoice-pdf.js)
+  inspection/             Inspection form (app.js) and printed layout (report-pdf.js)
   prices/                 Supabase-backed product and pricing editor
   settings/               Owner-facing settings page
   manifest.json           Installed-app metadata and icons
-  vercel.json             Function limits, caching and security headers
-  supabase-schema.sql     Original calendar/document setup SQL
+  vercel.json             Caching and security headers (static site, no functions)
+  .vercelignore           Keeps cloudflare/ and docs/ out of the public site
+  supabase-schema.sql     Original calendar/document setup SQL (plus the booking email column)
   sw.js                   Legacy no-cache service worker, not registered
   docs/                   Current technical and product documentation
 ```
@@ -136,7 +140,7 @@ Serve this folder through HTTP rather than opening files directly:
 python3 -m http.server 8771
 ```
 
-Then open <http://127.0.0.1:8771/>. Localhost is accepted by the Ashley proxy only for the configured development origins. Gmail OAuth also requires the exact origin to be listed in the Google OAuth web client.
+Then open <http://127.0.0.1:8771/>. The Ashley Worker accepts `localhost:8771` and `127.0.0.1:8771` as development origins, and every Ashley question uses real Workers AI allowance. Gmail OAuth also requires the exact origin to be listed in the Google OAuth web client.
 
 Before shipping changes, verify at minimum:
 
@@ -145,6 +149,8 @@ Before shipping changes, verify at minimum:
 3. Invoice Save, Open and Send.
 4. Inspection Save, Open and Send.
 5. Gmail connection from Settings and from Ashley.
-6. Ashley read, write and confirmation paths.
-7. Installed-app icon and iPhone home-screen launch.
-8. No service worker controls any owner-app page.
+6. Ashley read, write and confirmation paths, including a declined confirmation.
+7. Calendar drag, resize and undo on a real phone.
+8. The unsaved-work warning on the invoice and inspection pages.
+9. Installed-app icon and iPhone home-screen launch.
+10. No service worker controls any owner-app page.

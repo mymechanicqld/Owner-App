@@ -2,6 +2,84 @@
 
 This file records completed owner-app changes, production updates and important verification details. Add new entries at the top.
 
+## 19 September 2026: Calendar timeline, report and invoice redesign, leave warning, Ashley on Cloudflare
+
+Status: Deployed. Owner app commits `175f47c` and `9fe4857` on `mymechanicqld/Owner-App`; database migration committed as `afa89d9` on both website remotes; Ashley Worker `mmqld-ashley` version `b9246b90`.
+
+### 1. Calendar
+
+Problem: Day view was a plain list grouped by date. There was no way to see a day's shape, move a job by touch, or jump to a date, and bookings had nowhere to keep a customer's email, so invoices for phone bookings could not be emailed.
+
+Changes (`app.js`, `styles.css`, `customers.js`, `index.html`):
+
+- Day view is a Google Calendar style timeline with hour labels, bookings drawn to scale, overlapping bookings side by side, a current-time line and a pinned header with date, arrows, Today and a week strip.
+- Hold a booking to lift it and drag to a new time; drag its bottom edge to change its length. 15-minute snapping, edge auto-scroll, save on release, Undo, overlap notice, restore on failure.
+- Tap an empty slot to book at that half hour. Tap the date title for the phone's date picker. Week view stays a list and its day headings open the timeline.
+- The booking sheet gained an Email field and past-customer autocomplete (inquiries, invoices and bookings, by name or rego) that fills email, phone, rego, suburb and address.
+- The email travels to invoices and inspections started from a booking, and the Records Send button falls back to a booking's email.
+- Ashley's `save_booking` stores the email and booking lookups return it.
+
+Database: `supabase/migrations/20260919_008_calendar_customer_email.sql` in the website repository adds `calendar_events.customer_email` and backfills it. The owner ran it on 19 September; 40 of 46 bookings then had an email. `supabase-schema.sql` includes the column.
+
+Verification: a test booking on an empty future day was dragged 1 pm to 4 pm and resized to 6 pm with the mouse, moved by a simulated hold-and-drag, undone, and checked in Supabase after each step. A quick simulated swipe left the booking alone. Tapping 9:40 opened a new booking at 9:30. Autocomplete filled Nolan Murray's email from his invoice. Both test rows were deleted (46 bookings before and after).
+
+### 2. Inspection reports
+
+Problem: the latest report (Elena Sirena, Mazda MX5) ran to 26 pages. The cover's title was hidden under a tinted block, a tint covered page 2's header, and a comments box sat alone on page 3. Photo pages held one or two photos with large gaps, and upright photos stood twice as tall as landscape ones.
+
+Cause of the broken cover: pdfmake paints a filled table cell's background onto the wrong page when that cell splits across pages.
+
+Changes:
+
+- New layout module `inspection/report-pdf.js`, pure and renderable in Node. The old builder in `inspection/app.js` was removed.
+- Cover: title with a "REGO" plate (grey N/A when not recorded), report reference line, Prepared for and Vehicle cards, the cover photo at a fixed height, uncropped and centred, and an at-a-glance table of each section's counts and Poor items.
+- Sections flow continuously; a section's title repeats if it runs over a page and its notes travel with it.
+- Photos in justified rows sharing one height; no forced page breaks.
+- Conclusion always on a new page: half-moon gauge of the 0 to 100 score, verdict, Poor items by section, sign-off. Terms on the final page.
+- Gold accent added to the navy design; subtle green, amber and red grade chips; footer shows the rego.
+- Form: cover photo card first (camera, gallery, retake, remove), score slider that sets the rating, "Repair" renamed "Poor" everywhere with automatic conversion of old reports.
+- Fixed: the Overall rating buttons never showed which one was selected.
+- Photos without stored dimensions are measured before building the PDF; deleting a report also removes its cover photo.
+
+Results: the Mazda MX5 report with 47 photos went from 26 pages to 11, and Daniel Archer's Hilux with 61 photos from 33 to 12. Section-number circles were measured at 300 dpi and centred to within a quarter of a point. Real reports were only rendered locally; no saved report or PDF was changed.
+
+### 3. Invoices
+
+Changes:
+
+- One **Add items** button replaces Add item and Saved items. Tap to add, tap again for more, prefix-first search ranking, and **Add a new item** that also saves to the price list.
+- Line **details**: a product's description prints under its line; plain lines as bullets, a line ending in ":" as a ticked checklist in columns. Editable per invoice.
+- Price list: General Service became **Standard Service**, $369, with the owner's service record and 19-point checklist; Standard/Regular Service was deleted. 44 products remain.
+- Partial payment removed from the invoice form and from Ashley.
+- Bank details (My Mechanic Qld, BSB 484-799, account 506731007, invoice number as reference) print on every invoice.
+- New layout module `invoice/invoice-pdf.js`: shorter navy header with a gold rule, tinted table heading, How to pay beside the totals, navy Total bar, paid or amount-due line, notes at full width, sign-off in the last page's footer.
+- Fixed: the navy footer strip had never drawn. Separate background canvases stack in pdfmake and pushed it off the page; it now uses `absolutePosition`.
+- Removed made-up bank details from the Notes placeholder and a dash from the sign-off.
+
+Verification: a test item created through the picker was confirmed in Supabase and in search, then deleted. Simon Gonzalez Bravo's invoice was rendered paid and owing with a Standard Service line, and a dummy invoice (Standard Service plus Front Brake Pads and Labour, $748) was rendered; all fit on one page. Nothing was saved to real invoices.
+
+### 4. Leave warning
+
+`leave-guard.js`, shared by both generators. With unsaved work, the logo, the phone's back gesture and closing the tab ask first: Keep editing, Save draft and leave, Discard and leave. Verified: logo and back both showed the window on a changed invoice; Save draft and leave stored the draft and returned to the main app; Discard and leave on an inspection returned without saving; an untouched form left without asking.
+
+### 5. Ashley moved to Cloudflare Workers AI
+
+Changes:
+
+- New Worker `cloudflare/ashley`, deployed as `mmqld-ashley.todo-r2-d1.workers.dev`. It runs GLM 4.7 Flash through the Workers AI binding, so no model key exists. It keeps the old proxy's origin filter, handshake, size, count and rate limits, fixes the model and output ceiling, switches thinking off and retries once.
+- `api/ashley.js` and its OpenRouter call were deleted; `vercel.json` has no functions; `config.js` points at the Worker.
+- Fixed: a declined confirmation reached the model as `[object Object]`. It is now plain text, and a declined action with nothing confirmed produces a fixed "Nothing was sent or changed" reply in code.
+- Prompt rules for GLM against guessing ids across parallel calls and adding details the owner did not give.
+
+Verification (frugal, about 160 neurons in total): 401 without the handshake, 403 from an unknown origin, correct CORS for the production origin; "How's my week looking?" answered correctly in 3.7 s for about 39 neurons; a declined text message now reports that nothing was sent.
+
+Follow-ups for the owner: remove `OPENROUTER_API_KEY` from the mmqld-app Vercel project, revoke that OpenRouter key, and keep the Cloudflare API token shared in chat private or delete it.
+
+### Housekeeping
+
+- `.gitignore` now excludes `output/`, which held a customer's PDF. `.vercelignore` keeps `cloudflare/` and `docs/` off the public site.
+- Documentation under `docs/` and the README were brought up to date and stale statements removed.
+
 ## 17 September 2026: Inspection image and report performance overhaul
 
 Status: Resolved, migrated and deployed

@@ -56,27 +56,47 @@ The Message action offers Website link, Service, Diagnostic and Custom templates
 
 ## Calendar
 
-The Calendar screen reads `calendar_events` and supports Day and Week views.
+The Calendar screen reads `calendar_events`. It opens in **Day** view; **Week** is a list of the seven days.
 
-Bookings include:
+### Day view
 
-- title and job type
-- date, start time and duration
-- customer name and phone
-- rego, suburb and full address
-- notes
+A Google Calendar style timeline:
 
-Job types are colour-coded. A legend appears for the job types visible in the current date range.
+- hours down the left, 64 points per hour, from 6 am to 8 pm, stretched to fit anything booked earlier or later
+- each booking drawn to scale with its time, title, customer and suburb, coloured by job type
+- bookings that overlap sit side by side in columns so none is hidden
+- a red line marks the current time on today's timeline
+- all-day bookings sit in a strip above the hours
 
-The owner can:
+Getting around:
 
-- add a booking manually
-- create one from an inquiry
-- edit or delete a booking
-- swap a booking with the one before or after it on the same day while preserving each duration
-- call, message, invoice or inspect the customer from an existing booking
+- the date, arrows and a Monday to Sunday strip stay pinned at the top while the hours scroll; the strip shows up to three dots per busy day
+- Previous and Next move one day; Today returns to today
+- tapping the date title opens the phone's own date picker to jump to any date
+- on opening, the view scrolls to the current hour for today, otherwise to the first booking
 
-New bookings default to the duration configured in Settings. If no setting is available, the default is 60 minutes.
+Changing bookings with a finger:
+
+- **move**: press and hold a booking for about a third of a second until it lifts, then drag. A quick swipe that starts on a booking still scrolls the page
+- **resize**: drag the handle along a booking's bottom edge
+- times snap to 15 minutes; the booking shows its new time range while held; holding near the top or bottom edge scrolls the timeline
+- the change saves to Supabase on release. A message confirms the new time with an **Undo** button, and says when the booking now overlaps another. A failed save puts the booking back
+- with a mouse, dragging starts straight away
+- tapping a booking opens it; tapping empty time starts a new booking at that half hour
+
+### Week view
+
+The seven days of the week as a list, with a job-type legend. Each day heading opens that day's timeline. Bookings can still be swapped with the one before or after on the same day, keeping each duration.
+
+### The booking sheet
+
+Bookings hold title, job type, date, start time, duration, customer, **email**, phone, rego, suburb, address and notes.
+
+- typing in Customer suggests past customers from inquiries, invoices and bookings, matching by name or rego; picking one fills email, phone, rego, suburb and address, never overwriting anything already typed
+- the email is checked for a sensible format
+- the + button starts a booking at 9 am on the day being viewed
+- an existing booking offers Call, Message, Invoice and Inspection shortcuts; Invoice and Inspection carry the email and the linked inquiry across
+- new bookings default to the duration in Settings, otherwise 60 minutes
 
 ## Search
 
@@ -116,7 +136,7 @@ Each row shows customer, total, rego and payment status. Actions are:
 - Send the stored PDF after confirmation
 - Delete the database row and attempt to remove its PDF
 
-If a saved invoice has no email, the app tries its linked inquiry and then the most recent inquiry with the same rego.
+If a saved invoice has no email, the app tries its linked inquiry, then the most recent inquiry with the same rego, then the most recent calendar booking with that rego.
 
 ## Invoice generator
 
@@ -133,7 +153,7 @@ The invoice generator lives in `invoice/` and creates PDFs in the browser with p
 - Year
 - Odometer
 
-Typing a person or business name opens a recent-customer picker built from website inquiries and past invoices. Picking a result fills the known customer and vehicle data.
+Typing a person or business name opens a recent-customer picker built from website inquiries, past invoices and calendar bookings. Picking a result fills the known customer and vehicle data.
 
 ### Invoice body
 
@@ -142,16 +162,48 @@ Typing a person or business name opens a recent-customer picker built from websi
 - any number of line items
 - editable quantity, unit price and line amount
 - GST-inclusive or GST-exclusive calculation
-- Paid or Outstanding status (partial payments are not offered; older partial invoices open as Outstanding)
+- Paid or Outstanding status (see Payment below)
 - one or more payment records with date, method and amount
 - optional notes
 - optional customer name and drawn signature
 
-Marking an invoice Paid adds a payment for the remaining balance when needed.
+### Adding items
 
-Items are added through one **Add items** button. It opens a searchable list of active `products` (cached on the phone, refreshed from Supabase). Tapping a row puts it on the invoice at once; tapping again raises its quantity. Search ranks names that start with the typed text first, then names with a word starting with it, then names containing it, then description matches, and every typed word must match. If nothing fits, "Add a new item" takes a name, price, quantity and optional description, adds the line, and by default saves it to `products` so it appears in search next time. Unpriced items are added at zero. A product's description travels with it as the line's **printed details**, editable on the invoice (any line can also get details with "Add details for the customer"). On the PDF the details print as a full-width row under the line: plain lines become bullet points, and a line ending in a colon starts a checklist laid out in columns with ticks. The Standard Service item uses this for its service checklist.
+Items are added through one **Add items** button, which opens a sheet listing the active `products` (cached on the phone, refreshed from Supabase):
 
-Every invoice prints a **Payment details** block with the bank transfer details (account name, BSB, account number) and the invoice number as the reference. When money is owing it shows the amount and due date; when paid it says so. The bank details live in `BUSINESS.bank` in `invoice/app.js`. The printed layout itself is in `invoice/invoice-pdf.js`, which has no DOM access and can be rendered outside the browser.
+- tapping a row puts it on the invoice at once; the empty starter line is reused, and tapping the same item again raises its quantity
+- added items show a green tick and "On invoice ×2", and the Done button counts what was added
+- search ranks names that **start** with the typed text first, then names with a **word** starting with it, then names merely **containing** it, then description matches. Every typed word must match somewhere, and Enter adds the top result
+- at the bottom there is always **Add "…" as a new item**, prefilled with the search text. It takes a name, price, quantity and optional description, adds the line, and with **Save to my price list** (ticked by default) upserts it to `products` so it appears in search next time
+- unpriced items are added at zero for the owner to price on the invoice
+
+### Printed details under a line
+
+A product's description travels with it as the line's **details**, shown in an editable box under the line on the form. Any line can get details with **+ Add details for the customer**. On the PDF the details print as a full-width row under the line:
+
+- plain lines print as points with a gold bullet
+- a line ending in a colon starts a checklist, printed in up to three columns with navy ticks
+
+**Standard Service** ($369) uses this for its record of work: oil and filter replaced with full synthetic, under-bonnet and underbody inspection, fluids topped up, then a 19-point "Inspected the following" checklist.
+
+### Payment
+
+The status is **Paid** or **Outstanding**. Partial payments are not offered; older invoices saved as partial open as Outstanding, and Ashley can no longer set partial. Marking an invoice Paid adds a payment for the remaining balance when needed.
+
+### The PDF
+
+The layout is in `invoice/invoice-pdf.js`, which has no DOM access and can be rendered outside the browser. Top to bottom:
+
+- navy header band with logo and contact details, a gold rule beneath it and the watermark behind the page
+- Bill to and vehicle card on the left, Tax invoice number and dates on the right
+- items table with a tinted heading row; each line's details sit directly under it
+- **How to pay** beside the totals: bank transfer to My Mechanic Qld, BSB 484-799, account 506731007, with the invoice number as the reference. The bank details are `BUSINESS.bank` in `invoice/app.js`
+- totals ending in a solid navy **Total** bar with a gold edge. Paid shows "Paid in full <date> by <method>. Thank you."; owing shows the outstanding amount in red and "Please pay by <due date>"
+- a payments table only when there is more than one payment
+- notes at full width, then the customer signature when signed
+- navy footer strip on every page; the last page's footer carries "Drive safe, and call us if anything comes up."
+
+A typical invoice, including a Standard Service with its full checklist, fits on one page.
 
 ### Invoice actions
 
@@ -171,13 +223,13 @@ The inspection generator lives in `inspection/` and also uses pdfmake.
 
 The form includes:
 
-- cover photo: one landscape shot of the whole car, printed large on page one
+- cover photo: one shot of the whole car, taken first. The card at the top of the form has Take photo (rear camera) and Gallery buttons, shows the photo whole at its real proportions, and offers Retake and Remove. It is stored at up to 1,600 pixels
 - report number and report date
 - appointment date and time window
 - client contact, phone, email and address
 - rego, make/model, year, location, date and odometer
 - Interior, Exterior, Engine Bay, Tyres Wheels and Brakes, and Road Test assessments
-- overall score slider from 0 to 100 in tens, which also suggests the overall rating
+- overall score slider from 0 to 100 in tens. It starts as "Not scored"; moving it sets the overall rating (75 and above Good, 45 to 74 Fair, below 45 Poor), which can still be changed by hand. Clear returns it to not scored
 - overall rating (Good, Fair, Poor or NA) and comments
 - sign-off name, date and drawn signature
 - editable disclaimer and not-checked lists
@@ -190,27 +242,39 @@ Images can be added through two distinct controls, camera capture and gallery se
 
 The layout lives in `inspection/report-pdf.js`, which has no DOM access so it can also be rendered in Node while being tuned. The report runs:
 
-1. Cover: the vehicle with its rego plate (N/A when none was recorded), customer details then vehicle details, the cover photo at a fixed height with its own proportions and never cropped, and an at-a-glance table of each section with what needs attention.
+1. Cover: the vehicle title with a "REGO" plate (a grey N/A plate when none was recorded), the report number and inspection date, then the **Prepared for** and **Vehicle** cards side by side, then the cover photo at a fixed 222 point height with its own proportions, never cropped and centred, then an at-a-glance table showing each section's Good, Fair and Poor counts and what needs attention. The table can continue onto page two for a car with many faults.
 2. Inspection results: the five sections flowing continuously. A section's title repeats if it runs over a page, and its inspector notes stay with it.
 3. Inspection photos: justified rows in which every photo shares the row's height, so an upright photo never stands taller than a landscape beside it. Rows flow without forced page breaks.
-4. Overall assessment: a half-moon gauge of the score, the verdict, every item graded Poor grouped by section, then the sign-off.
-5. Terms and conditions.
+4. Overall assessment, **always starting on a new page**: a half-moon gauge of ten coloured segments lit up to the score with a needle, the verdict and general comments, every item graded Poor listed by section, then the sign-off. With no score, the verdict shows without a gauge.
+5. Terms and conditions, on their own page.
+
+Every page has the navy header with a gold rule and a footer reading "Vehicle inspection report" with the rego. Grades print as subtle chips: green Good, amber Fair, red Poor, grey N/A. Section numbers sit in navy circles.
+
+Typical sizes: the Mazda MX5 report with 47 photos went from 26 pages to 11, and a Hilux report with 61 photos from 33 to 12.
 
 Filled panels are always unbreakable. pdfmake paints a filled cell's background onto the wrong page when that cell splits, which is what used to leave tinted blocks over headers.
 
-Inspection drafts are stored on the phone in IndexedDB.
+Inspection drafts are stored on the phone in IndexedDB, up to five.
+
+Older reports keep their old PDF until they are opened and saved again. Photos saved without their dimensions are measured before the PDF is built so they are not squashed.
 
 Save, Open, Send and edit behaviour follows the same model as invoices.
 
 ## Leaving a form with unsaved work
 
-The invoice and inspection pages use `leave-guard.js`. When the form differs from how it was last loaded or saved, tapping the logo, using the phone's back gesture or button, or closing the tab asks first. The window offers **Keep editing**, **Save draft and leave** and **Discard and leave**. An untouched form leaves without asking.
+The invoice and inspection pages use `leave-guard.js`. When the form differs from how it was last loaded, saved or started, leaving asks first in a window centred on the screen:
+
+- **Keep editing**: the main button; closes the window. Tapping outside it or pressing Escape does the same
+- **Save draft and leave**: keeps a draft on the phone (the folder icon lists drafts), then returns to the main app. If the draft cannot be saved, the owner stays on the page
+- **Discard and leave**: returns to the main app without saving
+
+It catches the logo link, the phone's back gesture or button, and closing or reloading the tab. The last only shows the browser's own prompt, because browsers do not allow a custom one there. An untouched form leaves without asking.
 
 ## Price list
 
 The price list is a mobile-first editor for `products`.
 
-It currently starts from 46 items carried over from the owner's previous app. The screen can:
+It holds 44 items, 22 priced, originally carried over from the owner's previous app. Items created from an invoice's Add items sheet are added here too. The screen can:
 
 - search by name or description
 - filter all, need a price, priced or changed items
@@ -220,7 +284,7 @@ It currently starts from 46 items carried over from the owner's previous app. Th
 - keep an unfinished draft on the phone
 - upsert changed rows to Supabase by stable product code
 
-Saved active products automatically feed the invoice Saved items picker on its next refresh.
+Saved active products feed the invoice's Add items picker on its next refresh. A product's description becomes the printed details of any invoice line it is added to.
 
 ## Settings
 
@@ -244,6 +308,10 @@ The page currently exposes:
 Emails, SMS preparation and deletion always require owner confirmation in Ashley and cannot be disabled.
 
 See `CURRENT_LIMITATIONS.md` for settings that are displayed but not yet consumed by every generator path.
+
+## Ashley
+
+Ashley is the assistant in the fifth tab. Her model is GLM 4.7 Flash on Cloudflare Workers AI. She looks things up, updates routine records, and prepares emails, texts and deletions that always wait for the owner's confirmation. See `ASHLEY.md`.
 
 ## Installed app behaviour
 
