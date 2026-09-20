@@ -205,14 +205,15 @@ function buildInvoiceDoc(t, A) {
       /* ─── Line items table ─── */
       itemsTable(),
 
-      /* ─── How to pay (left) beside the totals (right). The bank card is a
-             fixed small size, so sitting beside the totals is safe; long
-             notes still get the full width below. ─── */
+      /* ─── Notes (left) beside the totals (right). The notes are what the
+             customer most needs to read, so they sit in the strongest spot on
+             the page. Long notes go full width underneath instead, where they
+             can cross pages safely. ─── */
       {
         margin: [0, 12, 0, 0],
         unbreakable: true,
         columns: [
-          { width: '*', stack: [paymentDetails(t)] },
+          { width: '*', stack: [notesCard()] },
           {
             width: 222,
             stack: totalsStack(t, status),
@@ -221,14 +222,16 @@ function buildInvoiceDoc(t, A) {
         columnGap: 18,
       },
 
-      /* ─── Notes flow at full width so long text can cross pages safely ─── */
-      ...notesSection(),
+      ...(notesFitBeside() ? [] : notesSection()),
 
       /* ─── Receipts table + subtle status pill (only when there are receipts) ─── */
       paymentSection(status, t),
 
       /* ─── Customer signature block (only when signed) ─── */
       ...signatureBlock(),
+
+      /* ─── How to pay, at the foot of the invoice ─── */
+      paymentDetails(t),
 
 
     ],
@@ -419,6 +422,33 @@ function itemsTable() {
   };
 }
 
+/* Short notes ride beside the totals; anything longer keeps the full width
+   below, so a page break can never strand half a sentence. */
+const NOTES_BESIDE_MAX = 320;
+function notesText() { return String(state.notes || '').trim(); }
+function notesFitBeside() { const n = notesText(); return n && n.length <= NOTES_BESIDE_MAX; }
+
+function notesCard() {
+  if (!notesFitBeside()) return { text: '' };
+  return {
+    table: {
+      widths: ['*'],
+      body: [[{
+        stack: [
+          { text: 'PLEASE NOTE', style: 'eyebrow', color: COLOR.danger },
+          { text: notesText(), fontSize: 10.5, color: COLOR.ink, margin: [0, 5, 0, 0], lineHeight: 1.45 },
+        ],
+        fillColor: '#FFF6F5', margin: [14, 11, 12, 11], border: [false, false, false, false],
+      }]],
+    },
+    layout: {
+      defaultBorder: false, hLineWidth: () => 0,
+      vLineWidth: (i) => (i === 0 ? 3 : 0), vLineColor: () => COLOR.danger,
+      paddingLeft: () => 0, paddingRight: () => 0, paddingTop: () => 0, paddingBottom: () => 0,
+    },
+  };
+}
+
 function notesSection() {
   const notes = (state.notes || '').trim();
   if (!notes) return [];
@@ -457,7 +487,7 @@ function notesSection() {
           { type: 'line', x1: 0, y1: 0, x2: 515, y2: 0, lineWidth: 1, lineColor: COLOR.hairline },
         ],
       },
-      { text: 'NOTES', style: 'eyebrow', margin: [0, 10, 0, 0] },
+      { text: 'PLEASE NOTE', style: 'eyebrow', color: COLOR.danger, margin: [0, 10, 0, 0] },
       { text: first.text, color: COLOR.muted, fontSize: 9.5, margin: [0, 5, 0, 0], lineHeight: 1.3 },
     ],
   }];
@@ -631,26 +661,33 @@ function paymentSection(status, t) {
 function paymentDetails(t) {
   const b = BUSINESS.bank;
   if (!b) return { text: '' };
-  const row = (k, v) => ({
-    columns: [
-      { width: 82, text: k, fontSize: 8.5, color: COLOR.subtle, margin: [0, 1, 0, 0] },
-      { width: '*', text: v, fontSize: 10, bold: true, color: COLOR.ink, characterSpacing: 0.3 },
+  // Across one row at the foot of the invoice: label above value, so the
+  // account number is easy to read off while typing it into a banking app.
+  const field = (k, v, w) => ({
+    width: w,
+    stack: [
+      { text: k, fontSize: 7.5, bold: true, characterSpacing: 0.9, color: COLOR.subtle },
+      { text: v, fontSize: 12, bold: true, color: COLOR.ink, characterSpacing: 0.4, margin: [0, 3, 0, 0] },
     ],
-    margin: [0, 0, 0, 4],
   });
   return {
+    unbreakable: true,
+    margin: [0, 20, 0, 0],
     table: {
       widths: ['*'],
       body: [[{
         stack: [
-          { text: 'HOW TO PAY', style: 'eyebrow' },
-          { text: 'Bank transfer', fontSize: 11.5, bold: true, color: COLOR.ink, margin: [0, 3, 0, 8] },
-          row('Account name', b.name),
-          row('BSB', b.bsb),
-          row('Account number', b.account),
-          row('Reference', state.invoice.number || 'Invoice number'),
+          { columns: [
+            { width: '*', text: 'HOW TO PAY', style: 'eyebrow' },
+            { width: 'auto', text: 'Bank transfer', fontSize: 9.5, color: COLOR.muted },
+          ], margin: [0, 0, 0, 9] },
+          { columns: [
+            field('ACCOUNT NAME', b.name, '*'),
+            field('BSB', b.bsb, 90),
+            field('ACCOUNT NUMBER', b.account, 120),
+          ], columnGap: 12 },
         ],
-        fillColor: COLOR.soft, margin: [14, 11, 12, 8], border: [false, false, false, false],
+        fillColor: COLOR.soft, margin: [16, 13, 14, 13], border: [false, false, false, false],
       }]],
     },
     layout: {

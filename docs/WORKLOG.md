@@ -2,6 +2,35 @@
 
 This file records completed owner-app changes, production updates and important verification details. Add new entries at the top.
 
+## 20 September 2026: Owner feedback after first use
+
+Status: Deployed.
+
+The owner used the app and sent feedback. Every point below is his, except the date bug, which his report of "Canadian time" led to.
+
+### Date bug: documents dated a day early
+
+`today()` in both generators built the date from `toISOString()`, which is UTC. In Brisbane, UTC is still on the previous day until 10am, so any invoice or report started before 10am was dated **yesterday**. Both now build the date from the phone's own clock.
+
+Bookings were never affected: they are stored as UTC instants and shown in the phone's timezone. Confirmed against the data (his 9:45am booking is stored as 23:45 UTC, correct) and by running the booking code under `TZ=Australia/Brisbane`.
+
+### Invoices
+
+- Standard Service checklist: the heading is now "Inspected the following visually only (wherever applicable)", with **Spark plugs** and **Air & pollen filter** added at the top (21 items). Updated in Supabase and in the price list seed.
+- The due date follows the issue date and only stops once it is set by hand. Settings > Payment due now defaults to "On receipt"; a phone still holding the old 7-day default is migrated.
+- Notes moved up beside the totals into a red-edged "Please note" card. Notes over 320 characters still take the full width below.
+- "How to pay" moved to the foot of the invoice, across one row, and the reference line (the invoice number) was removed.
+
+### Inspection reports
+
+- The sign-off section is gone from the PDF and the form, along with its settings (statement, inspector name) and the progress credit for signing.
+- The score slider no longer sets the Good/Fair/Poor rating; they are independent.
+- The email wording lost "Happy to talk through anything in it." A phone holding the old default is migrated.
+
+### Verification
+
+A new invoice's due date followed the issue date, then stayed put once set by hand. Standard Service printed the new heading and the two new items at the top. Notes printed beside the totals; How to pay printed at the foot with no reference. A report PDF built with no sign-off. Setting the score to 90 left the rating on Fair. The report email read "Please find your vehicle inspection report attached." with the signature.
+
 ## 19 September 2026 (later): Settings rebuilt, everything editable
 
 Status: Deployed.

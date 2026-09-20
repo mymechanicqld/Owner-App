@@ -48,15 +48,13 @@
 
     // Invoices
     invoice_gst_inclusive: true,
-    invoice_terms_days: '7',
+    invoice_terms_days: '0',      // due on the issue date unless he sets one
     invoice_default_notes: '',
     invoice_signoff: 'Drive safe, and call us if anything comes up.',
     email_invoice_subject: 'Invoice from {business}',
     email_invoice_body: 'Hi {first_name},\n\nPlease find your invoice attached. Let me know if you have any questions.',
 
     // Inspection reports
-    report_inspector: '',
-    report_statement: 'I confirm I have inspected and road-tested the above vehicle as per the findings of this report.',
     report_disclaimer: [
       'It is the responsibility of the buyer to check for any financial interest owing on the vehicle and for any write-off or stolen vehicle before purchasing the vehicle.',
       'The My Mechanic QLD inspection is not a guarantee or warranty and is valid only at the time of inspection.',
@@ -74,7 +72,7 @@
       'Automatic switching of wipers and lights', 'Compression of engine', 'Anti-lock braking system (ABS)',
     ].join('\n'),
     email_report_subject: 'Your vehicle inspection report',
-    email_report_body: 'Hi {first_name},\n\nPlease find your vehicle inspection report attached. Happy to talk through anything in it.',
+    email_report_body: 'Hi {first_name},\n\nPlease find your vehicle inspection report attached.',
 
     // Quick replies to website enquiries. The greeting ("Hi Sam,") goes above
     // and the signature below automatically.
@@ -98,6 +96,14 @@
 
     // Security
     passcode: '',                     // empty = no lock
+  };
+
+  /* Wording that used to be a default and has since been improved. A phone
+     still holding the old text is moved on; anything the owner typed himself
+     is left alone. */
+  const SUPERSEDED = {
+    email_report_body: ['Hi {first_name},\n\nPlease find your vehicle inspection report attached. Happy to talk through anything in it.'],
+    invoice_terms_days: ['7'],
   };
 
   let S = Object.assign({}, DEFAULTS);
@@ -151,7 +157,6 @@
       website: val('business_website'),
       abn: val('business_abn'),
       signoff: S.invoice_signoff === '' ? '' : val('invoice_signoff'),
-      statement: val('report_statement'),
       bank: null,
     };
     const showBank = S.invoice_show_bank === undefined ? DEFAULTS.invoice_show_bank : (S.invoice_show_bank === true || S.invoice_show_bank === 'true');
@@ -165,9 +170,16 @@
   function readLocal() {
     try {
       const raw = JSON.parse(localStorage.getItem(LS_KEY) || 'null');
-      if (raw && typeof raw === 'object') S = Object.assign({}, DEFAULTS, raw);
+      if (raw && typeof raw === 'object') S = Object.assign({}, DEFAULTS, migrate(raw));
     } catch (_) {}
     applyToConfig();
+  }
+
+  function migrate(raw) {
+    Object.keys(SUPERSEDED).forEach((k) => {
+      if (SUPERSEDED[k].some((old) => String(raw[k]) === old)) delete raw[k];
+    });
+    return raw;
   }
 
   function writeLocal() {
@@ -187,7 +199,7 @@
       const remote = rows && rows[0] && rows[0].data;
       if (!remote || typeof remote !== 'object' || !Object.keys(remote).length) return false;
       const before = JSON.stringify(S);
-      S = Object.assign({}, DEFAULTS, remote);
+      S = Object.assign({}, DEFAULTS, migrate(remote));
       applyToConfig();
       writeLocal();
       const changed = before !== JSON.stringify(S);

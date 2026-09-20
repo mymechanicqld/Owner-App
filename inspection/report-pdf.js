@@ -483,33 +483,6 @@
     };
   }
 
-  function signOff(state, statement) {
-    const sig = state.signature || {};
-    const line = (w) => ({ canvas: [{ type: 'line', x1: 0, y1: 0, x2: w, y2: 0, lineWidth: 0.6, lineColor: C.faint }] });
-    return {
-      unbreakable: true,
-      margin: [0, 18, 0, 0],
-      stack: [
-        eyebrow('Sign-off'),
-        { text: statement || 'I confirm I have inspected and road-tested the above vehicle as per the findings of this report.', fontSize: 10, color: C.muted, margin: [0, 5, 0, 6], lineHeight: 1.4 },
-        {
-          columns: [
-            { width: 200, stack: [
-              sig.dataUrl ? { image: sig.dataUrl, fit: [190, 44], margin: [0, 4, 0, 4] } : { text: ' ', fontSize: 11, margin: [0, 34, 0, 4] },
-              line(190), { text: 'Signature', fontSize: 7.5, color: C.subtle, margin: [0, 4, 0, 0] }] },
-            { width: 160, stack: [
-              { text: clean(sig.name) || ' ', fontSize: 11, bold: true, color: C.ink, margin: [0, 34, 0, 4] },
-              line(150), { text: 'Inspector', fontSize: 7.5, color: C.subtle, margin: [0, 4, 0, 0] }] },
-            { width: '*', stack: [
-              { text: fmtDate(sig.date) || ' ', fontSize: 11, bold: true, color: C.ink, margin: [0, 34, 0, 4] },
-              line(120), { text: 'Date', fontSize: 7.5, color: C.subtle, margin: [0, 4, 0, 0] }] },
-          ],
-          columnGap: 16,
-        },
-      ],
-    };
-  }
-
   function terms(state, business) {
     const t = state.terms || { disclaimer: [], notChecked: [] };
     return {
@@ -610,7 +583,6 @@
         ...SECTIONS.flatMap((sec, i) => sectionBlock(sec, (state.sections || {})[sec.id] || { grades: [] }, i)),
         ...photosBlock(state.images),
         ...verdictBlock(state, stats),
-        signOff(state, business.statement),
         terms(state, business),
       ],
     };

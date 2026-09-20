@@ -101,7 +101,12 @@ const businessProfile = () => (MS ? MS.business() : BUSINESS);
 /* ────────────────────────────────────────────────────────────────────
    Helpers
    ─────────────────────────────────────────────────────────────────── */
-const today = () => new Date().toISOString().slice(0, 10);
+/* The phone's own date, not UTC. toISOString() would date a Brisbane
+   morning as yesterday, because UTC is still on the previous day until 10am. */
+const today = () => {
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+};
 const uid   = () => crypto.randomUUID();
 const $ = (s, r) => (r || document).querySelector(s);
 const $$ = (s, r) => Array.from((r || document).querySelectorAll(s));
@@ -162,7 +167,7 @@ function newState() {
     score: null,          // 0 to 100 in tens, drawn as the gauge; null = not scored
     coverImage: null,     // one landscape photo of the whole car for the cover
     overallComments: '',
-    signature: { name: MS ? String(MS.get('report_inspector') || '') : '', date: today(), dataUrl: '' },
+    signature: { name: '', date: today(), dataUrl: '' },
     terms: defaultTerms(),
   };
 }
@@ -385,10 +390,9 @@ function countFlags(secId) {
 function updateProgress() {
   // Progress = fraction of sections that have been touched
   const touched = SECTIONS.filter(s => state.sections[s.id].touched).length;
-  const total = SECTIONS.length + 3; // sections + vehicle + signature + images (loose)
+  const total = SECTIONS.length + 2; // sections + vehicle + images (loose)
   let extras = 0;
   if (state.inspection.registration || state.inspection.makeModel) extras++;
-  if (state.signature.dataUrl) extras++;
   if (state.images.length > 0) extras++;
   const pct = Math.min(100, Math.round(((touched + extras) / total) * 100));
   $('#progressBar').style.width = pct + '%';
@@ -424,10 +428,8 @@ document.addEventListener('input', (e) => {
   }
 
   if (t.id === 'scoreRange') {
+    // The score and the Good/Fair/Poor rating are set separately on purpose.
     state.score = Math.round(Number(t.value) / 10) * 10;
-    // The score suggests the verdict; he can still tap a different one.
-    state.overall = window.MMQLD_REPORT.scoreGrade(state.score);
-    renderOverall();
     renderScore();
     return;
   }

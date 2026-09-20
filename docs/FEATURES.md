@@ -158,7 +158,7 @@ Typing a person or business name opens a recent-customer picker built from websi
 ### Invoice body
 
 - automatic invoice number
-- issue and due date
+- issue date, with the due date following it unless set by hand (Settings > Invoices > Payment due)
 - any number of line items
 - editable quantity, unit price and line amount
 - GST-inclusive or GST-exclusive calculation
@@ -184,7 +184,7 @@ A product's description travels with it as the line's **details**, shown in an e
 - plain lines print as points with a gold bullet
 - a line ending in a colon starts a checklist, printed in up to three columns with navy ticks
 
-**Standard Service** ($369) uses this for its record of work: oil and filter replaced with full synthetic, under-bonnet and underbody inspection, fluids topped up, then a 19-point "Inspected the following" checklist.
+**Standard Service** ($369) uses this for its record of work: oil and filter replaced with full synthetic, under-bonnet and underbody inspection, fluids topped up, then a 21-point "Inspected the following visually only (wherever applicable)" checklist, starting with spark plugs and the air and pollen filter.
 
 ### Payment
 
@@ -197,10 +197,10 @@ The layout is in `invoice/invoice-pdf.js`, which has no DOM access and can be re
 - navy header band with logo and contact details, a gold rule beneath it and the watermark behind the page
 - Bill to and vehicle card on the left, Tax invoice number and dates on the right
 - items table with a tinted heading row; each line's details sit directly under it
-- **How to pay** beside the totals: bank transfer to My Mechanic Qld, BSB 484-799, account 506731007, with the invoice number as the reference. The bank details are `BUSINESS.bank` in `invoice/app.js`
+- **Please note**: the invoice notes in a red-edged card beside the totals, where the customer will read them. Notes longer than 320 characters take the full width underneath instead, so a page break cannot strand half a sentence
 - totals ending in a solid navy **Total** bar with a gold edge. Paid shows "Paid in full <date> by <method>. Thank you."; owing shows the outstanding amount in red and "Please pay by <due date>"
-- a payments table only when there is more than one payment
-- notes at full width, then the customer signature when signed
+- a payments table only when there is more than one payment, then the customer signature when signed
+- **How to pay** across the foot of the invoice: account name, BSB and account number, from Settings > Payments
 - navy footer strip on every page; the last page's footer carries "Drive safe, and call us if anything comes up."
 
 A typical invoice, including a Standard Service with its full checklist, fits on one page.
@@ -229,9 +229,8 @@ The form includes:
 - client contact, phone, email and address
 - rego, make/model, year, location, date and odometer
 - Interior, Exterior, Engine Bay, Tyres Wheels and Brakes, and Road Test assessments
-- overall score slider from 0 to 100 in tens. It starts as "Not scored"; moving it sets the overall rating (75 and above Good, 45 to 74 Fair, below 45 Poor), which can still be changed by hand. Clear returns it to not scored
+- overall score slider from 0 to 100 in tens, independent of the rating. It starts as "Not scored"; Clear returns it there
 - overall rating (Good, Fair, Poor or NA) and comments
-- sign-off name, date and drawn signature
 - editable disclaimer and not-checked lists
 
 Each inspection criterion defaults to Fair and can be changed to Good, Fair, Poor or NA. A complete section can be bulk-set to one grade. Reports saved when the grade was called "Repair" are converted to "Poor" whenever they are opened.
@@ -245,7 +244,7 @@ The layout lives in `inspection/report-pdf.js`, which has no DOM access so it ca
 1. Cover: the vehicle title with a "REGO" plate (a grey N/A plate when none was recorded), the report number and inspection date, then the **Prepared for** and **Vehicle** cards side by side, then the cover photo at a fixed 222 point height with its own proportions, never cropped and centred, then an at-a-glance table showing each section's Good, Fair and Poor counts and what needs attention. The table can continue onto page two for a car with many faults.
 2. Inspection results: the five sections flowing continuously. A section's title repeats if it runs over a page, and its inspector notes stay with it.
 3. Inspection photos: justified rows in which every photo shares the row's height, so an upright photo never stands taller than a landscape beside it. Rows flow without forced page breaks.
-4. Overall assessment, **always starting on a new page**: a half-moon gauge of ten coloured segments lit up to the score with a needle, the verdict and general comments, every item graded Poor listed by section, then the sign-off. With no score, the verdict shows without a gauge.
+4. Overall assessment, **always starting on a new page**: a half-moon gauge of ten coloured segments lit up to the score with a needle, the verdict and general comments, then every item graded Poor listed by section. With no score, the verdict shows without a gauge. The score and the Good/Fair/Poor rating are set separately; neither changes the other. There is no sign-off section.
 5. Terms and conditions, on their own page.
 
 Every page has the navy header with a gold rule and a footer reading "Vehicle inspection report" with the rego. Grades print as subtle chips: green Good, amber Fair, red Poor, grey N/A. Section numbers sit in navy circles.
@@ -296,8 +295,8 @@ The settings are stored on the phone and, once `app_settings` exists in Supabase
 | --- | --- | --- |
 | Business profile | name, tagline, ABN, phone, email, website, booking link, "Sign as" name | invoice and report PDF headers, the signature on every email and text, Ashley's emails |
 | Payments | show bank details on invoices, account name, BSB, account number, with a live preview | the "How to pay" panel on every invoice |
-| Invoices | prices include GST, payment due (on receipt, 7, 14 or 30 days), default notes, next invoice number, footer sign-off, email subject and message | new invoices, the PDF footer, the Send email |
-| Inspection reports | default inspector name, next report number, sign-off statement, disclaimer, not-checked list, email subject and message | new reports, the PDF sign-off and terms, the Send email |
+| Invoices | prices include GST, payment due (on receipt by default, or 7, 14 or 30 days), default notes, next invoice number, footer sign-off, email subject and message | new invoices, the PDF footer, the Send email |
+| Inspection reports | next report number, disclaimer, not-checked list, email subject and message | new reports, the PDF terms, the Send email |
 | Messages | standard service, diagnostic and call-out prices; service and diagnostic email replies; website-link, service and diagnostic texts | the inquiry Reply and Message sheets |
 | Price list | shortcut with the item count | the price list page |
 | Calendar | default job length, drag snap (15 or 30 minutes), day start and end hours, open in Day or Week | the calendar |

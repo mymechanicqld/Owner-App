@@ -56,7 +56,12 @@ function bumpInvoiceCounter() {
 /* ────────────────────────────────────────────────────────────────────
    State
    ─────────────────────────────────────────────────────────────────── */
-const today = () => new Date().toISOString().slice(0, 10);
+/* The phone's own date, not UTC. toISOString() would date a Brisbane
+   morning as yesterday, because UTC is still on the previous day until 10am. */
+const today = () => {
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+};
 const uid   = () => crypto.randomUUID();
 
 const blankItem    = () => ({ id: uid(), desc: '', qty: 1, price: 0 });
@@ -133,11 +138,14 @@ function sampleState() {
   };
 }
 
-/* New invoices start from Settings > Invoices: GST mode, payment terms (the
-   due date) and any standing note. */
-function dueFromTerms() {
+/* New invoices start from Settings > Invoices: GST mode, payment terms and
+   any standing note. Payment terms default to "On receipt", so the due date
+   matches the issue date until it is changed by hand. */
+function dueFromTerms(from) {
   const days = MS ? MS.num('invoice_terms_days') : 0;
-  const d = new Date(); d.setDate(d.getDate() + days);
+  const d = from ? new Date(from + 'T00:00:00') : new Date();
+  if (isNaN(d)) return today();
+  d.setDate(d.getDate() + days);
   return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
 }
 function blankState() {
@@ -375,6 +383,13 @@ document.addEventListener('input', (e) => {
   // Top-level fields
   if (t.dataset.bind) {
     setByPath(state, t.dataset.bind, t.value);
+    // The due date follows the issue date until he sets one himself.
+    if (t.dataset.bind === 'invoice.due') state.invoice.dueTouched = true;
+    if (t.dataset.bind === 'invoice.date' && !state.invoice.dueTouched) {
+      state.invoice.due = dueFromTerms(t.value);
+      const dueIn = $('#invDue');
+      if (dueIn && document.activeElement !== dueIn) dueIn.value = state.invoice.due;
+    }
     return;
   }
 

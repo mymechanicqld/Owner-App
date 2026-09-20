@@ -44,6 +44,10 @@ Settings are saved on the phone. They follow the owner to other devices only aft
 
 Next invoice and report numbers are stored on each phone. Two phones can issue the same visible number on the same day.
 
+### Long notes move below the totals
+
+Invoice notes up to 320 characters print beside the totals. Longer notes print at full width underneath instead, because a tall column beside the totals cannot break across pages safely.
+
 ### Changes apply to new documents
 
 Business details, bank details, terms and wording apply to invoices and reports built after the change. Saved PDFs are unchanged until the document is opened and saved again. An inspection report keeps the terms it was created with.

@@ -189,8 +189,8 @@
 <main id="stack"></main>
 <div class="toast" id="toast"></div>
 
-<script src="../config.js?v=46"></script>
-<script src="../settings.js?v=46"></script>
+<script src="../config.js?v=47"></script>
+<script src="../settings.js?v=47"></script>
 <script src="../invoice/assets.js?v=40"></script>
 <script>
 (function () {
@@ -259,7 +259,6 @@
     invoice_signoff: { title: 'Footer sign-off', parent: 'invoices', kind: 'line', vars: [], note: 'Printed in the navy footer of an invoice’s last page. Leave empty for none.' },
     email_report_subject: { title: 'Email subject', parent: 'reports', kind: 'line', vars: ['business', 'rego'] },
     email_report_body: { title: 'Email message', parent: 'reports', kind: 'email', vars: ['first_name', 'rego', 'business'], note: 'Your signature is added underneath automatically.' },
-    report_statement: { title: 'Sign-off statement', parent: 'reports', kind: 'plain', vars: [], note: 'Printed above the inspector’s signature.' },
     report_disclaimer: { title: 'Disclaimer', parent: 'reports', kind: 'list', vars: [], note: 'One point per line. Used by new reports; each report can still be edited on its own.' },
     report_not_checked: { title: 'Not checked', parent: 'reports', kind: 'list', vars: [], note: 'One item per line, printed under "does not check the following".' },
     tpl_reply_service: { title: 'Service reply', parent: 'messages', kind: 'reply', vars: ['price', 'business'], price: 'price_service', note: 'Your reply to a website enquiry. "Hi Sam," goes above it and your signature below.' },
@@ -372,11 +371,9 @@
       title: 'Inspection reports',
       groups: [
         { head: 'New reports', rows: [
-          text('report_inspector', 'Inspector', { placeholder: 'Name for the sign-off' }),
           { t: 'counter', key: REP_COUNTER, base: '65', label: 'Next number', prefix: 'RPT_…_' },
-        ], foot: 'The inspector’s name is filled into the sign-off of every new report.' },
+        ], foot: 'Report numbers count up separately on each phone.' },
         { head: 'On the PDF', rows: [
-          tpl('report_statement', 'Sign-off statement'),
           tpl('report_disclaimer', 'Disclaimer', { value: () => S.lines('report_disclaimer').length + ' points' }),
           tpl('report_not_checked', 'Not checked', { value: () => S.lines('report_not_checked').length + ' items' }),
         ] },
@@ -782,7 +779,7 @@
     invoice_terms_days: 'due date terms days', invoice_gst_inclusive: 'gst tax', bank_bsb: 'bank', bank_account: 'bank', bank_name: 'bank',
     passcode: 'lock pin security', sender_name: 'signature name sign', website_form_url: 'link form url booking', calendar_snap: 'drag',
     report_disclaimer: 'terms conditions', report_not_checked: 'terms', price_service: 'price quote', price_diagnostic: 'price quote',
-    price_callout: 'price quote', report_inspector: 'name signature', invoice_signoff: 'footer drive safe', business_abn: 'tax',
+    price_callout: 'price quote', invoice_signoff: 'footer drive safe', business_abn: 'tax',
   };
   function searchIndex() {
     const out = [];
