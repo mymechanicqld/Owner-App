@@ -256,6 +256,8 @@ A typical invoice, including a Standard Service with its full checklist, fits on
 ### Invoice actions
 
 - Save: keeps a local draft, creates or updates the Supabase record, then attempts to upload the PDF.
+- Save also fills gaps in the customer's own records from what is on the invoice: email, address, rego and car on their website enquiry and their calendar bookings. Gaps only, nothing already on file is overwritten. A second message says what was added, for example "Added the customer's email to their booking". The same happens when sending, since sending saves first.
+- Which records count as the customer's: the ones the picked suggestion was built from, the inquiry or booking the invoice was opened from, or, when the name was typed without picking, records with exactly the same name and rego. If the name is changed to someone else after picking, the first customer's records are left alone. A customer typed in fresh, with no enquiry or booking, gets no new enquiry; the invoice itself becomes their record and the lookup reads it next time, address included.
 - Open: opens a newly generated PDF without saving.
 - Send: gets Gmail access first, generates and emails the PDF, then saves or updates the invoice record.
 
@@ -305,7 +307,7 @@ Inspection drafts are stored on the phone in IndexedDB, up to five.
 
 Older reports keep their old PDF until they are opened and saved again. Photos saved without their dimensions are measured before the PDF is built so they are not squashed.
 
-Save, Open, Send and edit behaviour follows the same model as invoices.
+Save, Open, Send and edit behaviour follows the same model as invoices, including filling gaps in the customer's enquiry and bookings (the report also carries a phone number).
 
 ## Leaving a form with unsaved work
 

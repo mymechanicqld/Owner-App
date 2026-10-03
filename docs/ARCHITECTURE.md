@@ -108,6 +108,10 @@ Autocomplete ranking is:
 
 Recency breaks ties.
 
+Each customer carries `refs`: every inquiry and booking it was built from. Invoice rows contribute the customer address by selecting `addr:state->customer->>address` from the saved state.
+
+`saveBack(details, { refs, submissionId, bookingId })` runs after an invoice or report saves. It reads each target row and PATCHes only empty columns (`quote_submissions`: full_name, email, phone, address, vehicle_rego, vehicle_year, and vehicle_make when make and model are both empty; `calendar_events`: customer_name, customer_email, customer_phone, address, vehicle_rego). With no explicit link it falls back to an exact name + rego match. `describe()` turns the result into the owner's message. The booking sheet passes `booking=<id>` to the generators so a document started from a booking links back to it.
+
 ### `email.js`
 
 The Email tab. Loaded after `app.js` and uses its globals (`gFetch`, `getToken`, `cachedGToken`, `STATE`, `sb`, `esc`, `toast`, `setView`, `openDetail`, `encHeader`, `u8b64`, `b64url`). Exposes `renderEmail()` for `render()` and `MMQLD_MAIL` (`openFor(email)`, `openThread(id)`, `refresh()`, `isOpen()`, `close()`).

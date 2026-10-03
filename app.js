@@ -898,7 +898,7 @@ function openEvent(ev) {
   if (isEdit) {
     $('#ev-del').addEventListener('click', () => deleteEvent(ev.id));
     // Quick actions reuse the booking's own customer data.
-    const evParams = () => new URLSearchParams({ name: ev.customer_name || '', email: ev.customer_email || '', phone: ev.customer_phone || '', suburb: ev.suburb || '', address: ev.address || '', rego: ev.vehicle_rego || '', id: ev.submission_id || '' }).toString();
+    const evParams = () => new URLSearchParams({ name: ev.customer_name || '', email: ev.customer_email || '', phone: ev.customer_phone || '', suburb: ev.suburb || '', address: ev.address || '', rego: ev.vehicle_rego || '', id: ev.submission_id || '', booking: ev.id || '' }).toString();
     const eMsg = $('#ev-msg'); if (eMsg) eMsg.addEventListener('click', () => openMessageFor(ev.customer_name, ev.customer_phone, () => openEvent(ev)));
     const eInv = $('#ev-invoice'); if (eInv) eInv.addEventListener('click', () => { location.href = 'invoice/index.html?' + evParams(); });
     const eIns = $('#ev-inspection'); if (eIns) eIns.addEventListener('click', () => { location.href = 'inspection/index.html?' + evParams(); });

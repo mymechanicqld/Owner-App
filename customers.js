@@ -43,7 +43,8 @@
       // select=* on bookings so an older table without customer_email still loads.
       const [subs, invs, bks] = await Promise.all([
         getJson('quote_submissions?select=id,full_name,email,phone,suburb,address,vehicle_rego,vehicle_make,vehicle_model,vehicle_year,created_at&order=created_at.desc&limit=400'),
-        getJson('invoices?select=customer_name,business_name,customer_email,vehicle_rego,vehicle,created_at&order=created_at.desc&limit=200'),
+        // The address only lives inside the saved invoice state, so pull just that key.
+        getJson('invoices?select=customer_name,business_name,customer_email,vehicle_rego,vehicle,created_at,addr:state->customer->>address&order=created_at.desc&limit=200'),
         getJson('calendar_events?select=*&order=starts_at.desc&limit=200'),
       ]);
 
@@ -61,18 +62,20 @@
         submissionId: s.id || '',
         when: s.created_at || '',
         src: 'inquiry',
+        refs: s.id ? [{ t: 'quote_submissions', id: s.id }] : [],
       }));
       invs.forEach((v) => all.push({
         name: (v.customer_name || '').trim(),
         business: (v.business_name || '').trim(),
         email: (v.customer_email || '').trim(),
-        phone: '', address: '', suburb: '',
+        phone: '', address: (v.addr || '').trim(), suburb: '',
         rego: (v.vehicle_rego || '').trim(),
         make: (v.vehicle || '').trim(),
         year: '',
         submissionId: '',
         when: v.created_at || '',
         src: 'invoice',
+        refs: [],
       }));
 
       bks.forEach((b) => all.push({
@@ -87,6 +90,7 @@
         submissionId: b.submission_id || '',
         when: b.updated_at || b.created_at || '',
         src: 'booking',
+        refs: b.id ? [{ t: 'calendar_events', id: b.id }] : [],
       }));
       // Newest first, then keep the first sighting of each person+vehicle and
       // backfill any blanks from their older records.
@@ -98,7 +102,11 @@
         if (!c.name && !c.business) return;
         const key = norm(c.business || c.name) + '|' + plate(c.rego);
         const prev = seen.get(key);
-        if (prev) { FILL.forEach((k) => { if (!prev[k] && c[k]) prev[k] = c[k]; }); return; }
+        if (prev) {
+          FILL.forEach((k) => { if (!prev[k] && c[k]) prev[k] = c[k]; });
+          prev.refs = prev.refs.concat(c.refs);   // every record this customer was built from
+          return;
+        }
         seen.set(key, c);
         list.push(c);
       });
@@ -230,6 +238,98 @@
     });
   }
 
+  /* ------------------------------------------------------------------
+     Save back. When an invoice or report is saved, any detail the
+     customer's own records were missing (email, address, rego, phone,
+     car) is filled in from what was just typed. Gaps only: a value that
+     is already on file is never overwritten, and only that customer's
+     own records are touched:
+       - the records the picked suggestion was built from
+       - the inquiry and booking the page was opened from
+       - when the name was typed without picking, records with exactly
+         the same name and rego
+     Returns [{ table, fields }] for each record that changed.
+     ------------------------------------------------------------------ */
+  const MAP = {
+    quote_submissions: { name: 'full_name', email: 'email', phone: 'phone', address: 'address', rego: 'vehicle_rego', year: 'vehicle_year' },
+    calendar_events: { name: 'customer_name', email: 'customer_email', phone: 'customer_phone', address: 'address', rego: 'vehicle_rego' },
+  };
+  const LABEL = { name: 'name', email: 'email', phone: 'phone', address: 'address', rego: 'rego', make: 'car', year: 'year' };
+  const blank = (v) => v == null || String(v).trim() === '';
+
+  function clean(d) {
+    const out = {};
+    const t = (v) => String(v == null ? '' : v).trim();
+    if (t(d.name)) out.name = t(d.name);
+    if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(t(d.email))) out.email = t(d.email);
+    if (t(d.phone).replace(/\D/g, '').length >= 8) out.phone = t(d.phone);
+    if (t(d.address).length >= 4) out.address = t(d.address);
+    if (plate(d.rego).length >= 2) out.rego = t(d.rego).toUpperCase();
+    if (t(d.make)) out.make = t(d.make);
+    if (/^(19|20)\d{2}$/.test(t(d.year))) out.year = t(d.year);
+    return out;
+  }
+
+  async function targetsFor(d, ctx) {
+    const seen = new Set(), out = [];
+    const add = (t, id) => { if (!id || !MAP[t]) return; const k = t + ':' + id; if (!seen.has(k)) { seen.add(k); out.push({ t, id }); } };
+    (ctx.refs || []).forEach((r) => add(r.t, r.id));
+    add('quote_submissions', ctx.submissionId);
+    add('calendar_events', ctx.bookingId);
+    if (!out.length && d.name && d.rego) {
+      // Typed by hand: only an exact name and rego match counts as the same customer.
+      const list = await load(true);
+      list.filter((c) => norm(c.business || c.name) === norm(d.name) || norm(c.name) === norm(d.name))
+        .filter((c) => plate(c.rego) && plate(c.rego) === plate(d.rego))
+        .forEach((c) => (c.refs || []).forEach((r) => add(r.t, r.id)));
+    }
+    return out;
+  }
+
+  async function saveBack(details, ctx) {
+    const d = clean(details || {});
+    if (!Object.keys(d).length) return [];
+    const targets = await targetsFor(d, ctx || {});
+    const changed = [];
+    for (const { t, id } of targets) {
+      try {
+        const cols = Object.values(MAP[t]).concat(t === 'quote_submissions' ? ['vehicle_make', 'vehicle_model'] : []);
+        const rows = await getJson(t + '?id=eq.' + encodeURIComponent(id) + '&select=' + cols.join(','));
+        const row = rows[0];
+        if (!row) continue;
+        const patch = {}, fields = [];
+        Object.keys(MAP[t]).forEach((k) => {
+          const col = MAP[t][k];
+          if (d[k] && blank(row[col])) { patch[col] = d[k]; fields.push(LABEL[k]); }
+        });
+        // The inquiry keeps make and model apart; only fill when both are empty.
+        if (t === 'quote_submissions' && d.make && blank(row.vehicle_make) && blank(row.vehicle_model)) {
+          patch.vehicle_make = d.make; fields.push(LABEL.make);
+        }
+        if (!fields.length) continue;
+        const r = await fetch(rest() + t + '?id=eq.' + encodeURIComponent(id), {
+          method: 'PATCH',
+          headers: { ...headers(), 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+          body: JSON.stringify(patch),
+        });
+        if (r.ok) changed.push({ table: t, fields });
+        else console.warn('[customers] save back failed', t, r.status);
+      } catch (e) { console.warn('[customers] save back failed', t, e); }
+    }
+    if (changed.length) cache = null;   // next lookup sees the new details
+    return changed;
+  }
+
+  /* "Saved the customer's email and address to their booking." */
+  function describe(changed) {
+    if (!changed || !changed.length) return '';
+    const fields = [...new Set(changed.flatMap((c) => c.fields))];
+    const where = [...new Set(changed.map((c) => (c.table === 'calendar_events' ? 'booking' : 'enquiry')))];
+    const list = fields.length > 1 ? fields.slice(0, -1).join(', ') + ' and ' + fields[fields.length - 1] : fields[0];
+    const place = where.length > 1 ? 'enquiry and booking' : where[0] + (changed.length > 1 ? 's' : '');
+    return 'Added the customer\'s ' + list + ' to their ' + place;
+  }
+
   /* Merge a street address with its suburb without repeating it. */
   function fullAddress(c) {
     let a = (c.address || '').trim();
@@ -281,5 +381,5 @@
   }
   injectCss();
 
-  window.MMQLD_CUSTOMERS = { load, search, attach, fullAddress };
+  window.MMQLD_CUSTOMERS = { load, search, attach, fullAddress, saveBack, describe };
 })();

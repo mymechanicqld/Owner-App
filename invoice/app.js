@@ -824,6 +824,28 @@ function toast(msg, kind) {
    Never blocks export/send; failure just shows a soft toast.
    ─────────────────────────────────────────────────────────────────── */
 const isUuid = (v) => typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
+/* Fill any gaps in this customer's enquiry and bookings from the invoice
+   just saved. Never overwrites, never blocks the save. */
+async function saveCustomerBack(isBiz) {
+  if (!window.MMQLD_CUSTOMERS || !MMQLD_CUSTOMERS.saveBack) return;
+  try {
+    // If the name was changed to someone else after the form was filled,
+    // the linked records belong to the first person: leave them alone.
+    const n = (v) => String(v || '').trim().toLowerCase().replace(/\s+/g, ' ');
+    const linked = !PREFILL.name || !state.customer.name || n(PREFILL.name) === n(state.customer.name);
+    const changed = await MMQLD_CUSTOMERS.saveBack({
+      name: isBiz ? (state.customer.business || state.customer.name) : state.customer.name,
+      email: state.customer.email,
+      address: state.customer.address,
+      rego: state.vehicle.rego,
+      make: state.vehicle.makeModel,
+      year: state.vehicle.year,
+    }, linked ? { submissionId: isUuid(PREFILL.id) ? PREFILL.id : '', bookingId: isUuid(PREFILL.booking) ? PREFILL.booking : '', refs: PREFILL.refs || [] } : {});
+    const msg = MMQLD_CUSTOMERS.describe(changed);
+    if (msg) setTimeout(() => toast(msg, 'success'), 1600);
+  } catch (e) { console.warn('[invoice] customer save back skipped', e); }
+}
+
 async function saveInvoiceRecord(b64) {
   if (!window.MMQLD_STORE) { toast('Records helper not loaded, please refresh the page'); return; }
   try {
@@ -865,6 +887,7 @@ async function saveInvoiceRecord(b64) {
       toast('This invoice has been saved', 'success');
     }
     markClean();
+    await saveCustomerBack(isBiz);
     return true;
   } catch (err) {
     console.error(err);
@@ -901,7 +924,7 @@ function applyPrefill() {
   const year    = get('year');
 
   // Keep the original inquiry values for sending and record linkage.
-  PREFILL = { email, phone, rego, name, id: get('id') };
+  PREFILL = { email, phone, rego, name, id: get('id'), booking: get('booking') };
 
   if (name) setByPath(state, 'customer.name', name);
   if (email) setByPath(state, 'customer.email', email);
@@ -1120,6 +1143,7 @@ function fillFromCustomer(c, mode, picked) {
     rego: c.rego || '',
     name: c.name || '',
     id: c.submissionId || '',
+    refs: c.refs || [],
   };
   if (state.signature && !state.signature.name) {
     state.signature.name = state.customer.name || '';

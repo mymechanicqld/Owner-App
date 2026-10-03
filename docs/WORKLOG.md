@@ -2,6 +2,18 @@
 
 This file records completed owner-app changes, production updates and important verification details. Add new entries at the top.
 
+## 4 October 2026: Saving an invoice or report fills gaps in the customer's records
+
+Status: Deployed.
+
+The owner asked that when an invoice is saved, any basic detail missing from the customer's records is saved from the invoice. There is no customers table: a customer is assembled from their enquiry, invoices and bookings, so the gaps are filled in those records.
+
+- Invoice and inspection Save (and Send, which saves first) fill empty email, address, rego, phone (reports) and car on the customer's own enquiry and bookings. Nothing already on file is overwritten.
+- The customer lookup now also picks up the address from past invoices.
+- Bookings pass their id to the invoice and report pages, so a document started from a booking links back to it.
+- Found for testing: 8 phone bookings had no email (Troy, Jeremiah Sami, Kelly Kaur, Cameron Burness and others), Pat Lally Plumbing had no email or address, Damien Beechey no rego. Website enquiries were complete apart from spam.
+- Checked by pressing the real Save button on the local copy with database writes captured: Troy's booking got only its email (his address was on file and kept), Pat Lally's booking got email and address, a report for Jeremiah Sami filled his email, and changing the name after picking wrote nothing. The real rows were confirmed unchanged afterwards.
+
 ## 4 October 2026: New website service categories
 
 Status: Deployed.
