@@ -156,10 +156,12 @@
       : opts.subject;
     const head = ['To: ' + opts.to, 'Subject: ' + encHeader(subj), 'MIME-Version: 1.0', 'Content-Type: multipart/mixed; boundary="' + boundary + '"'];
     if (opts.thread && opts.thread.messageId) { head.push('In-Reply-To: ' + opts.thread.messageId); head.push('References: ' + (opts.thread.references || opts.thread.messageId)); }
+    // Plain text plus HTML with a unique ending, so Gmail never folds the signature (mail-mime.js).
+    const alt = MMQLD_MIME.alternative(opts.bodyText);
     const body = [
       '--' + boundary,
-      'Content-Type: text/plain; charset="UTF-8"', 'Content-Transfer-Encoding: base64', '',
-      u8b64(opts.bodyText), '',
+      'Content-Type: ' + alt.type, '',
+      alt.body,
       '--' + boundary,
       'Content-Type: application/pdf; name="' + opts.filename + '"',
       'Content-Transfer-Encoding: base64',

@@ -190,7 +190,7 @@
 <div class="toast" id="toast"></div>
 
 <script src="../config.js?v=48"></script>
-<script src="../settings.js?v=47"></script>
+<script src="../settings.js?v=48"></script>
 <script src="../invoice/assets.js?v=40"></script>
 <script>
 (function () {
@@ -330,14 +330,15 @@
         { head: 'Signing off', rows: [
           text('sender_name', 'Sign as', { placeholder: 'Ashley' }),
           { t: 'signature' },
-        ], foot: 'Every email and text is signed with this name, then the business name, phone and email.' },
+          toggle('email_reply_signature', 'Sign Email tab replies'),
+        ], foot: 'Every email and text is signed with this name, then the business name, phone and email. Replies from the Email tab can skip it: switch it here or with the Signature switch above the reply box.' },
       ],
     }),
 
     payments: () => ({
       title: 'Payments',
       groups: [
-        { rows: [toggle('invoice_show_bank', 'Show on invoices')], foot: 'A "How to pay" panel sits beside the totals on every invoice, paid or not, with the invoice number as the payment reference.' },
+        { rows: [toggle('invoice_show_bank', 'Show on invoices')], foot: 'A "How to pay" panel with these bank details sits at the foot of every invoice, paid or not.' },
         { head: 'Bank transfer', rows: [
           text('bank_name', 'Account name'),
           text('bank_bsb', 'BSB', { mono: true, inputmode: 'numeric', placeholder: '000-000' }),

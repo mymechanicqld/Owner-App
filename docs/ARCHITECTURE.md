@@ -122,6 +122,10 @@ The Email tab. Loaded after `app.js` and uses its globals (`gFetch`, `getToken`,
 - Repaint safety: `app.js` repaints the active view every minute. `renderEmail()` only builds what is missing, and the reply text is kept in memory and in `mmqld_mail_v1`, so a background repaint never loses a half-written reply.
 - `body.mail-thread` gives an open conversation the whole area above the nav, like `ash-mode` for Ashley; `setView()` clears it on other tabs.
 
+### `mail-mime.js`
+
+Builds every outgoing email body: `MMQLD_MIME.alternative(text)` returns the Content-Type and encoded body of a `multipart/alternative` part (plain text + HTML with a unique invisible ending, so Gmail does not fold the repeated signature). Loaded before `app.js` on the main page and before `gmail-send.js` on the generator pages.
+
 ### `gmail-send.js`
 
 Provides generator-page Gmail access. It waits for and can re-inject Google Identity Services, caches a short-lived token, searches for an existing conversation, and sends a multipart PDF attachment.

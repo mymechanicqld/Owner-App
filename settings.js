@@ -34,6 +34,7 @@
     business_website: 'www.mymechanicqld.com.au',
     website_form_url: 'https://mymechanicqld.com.au/book/',
     sender_name: 'Ashley',            // the name every email and text is signed with
+    email_reply_signature: true,      // Email tab replies end with the signature (toggled in the reply bar)
 
     // Payments, printed on every invoice
     bank_name: 'My Mechanic Qld',

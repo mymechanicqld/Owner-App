@@ -134,7 +134,7 @@ Each conversation is one Gmail thread. Nothing is copied into Supabase; Gmail st
 
 ### Replying
 
-- The reply bar sits above the bottom nav. It shows who it goes to and that the signature is added automatically (Settings > Business > sender name).
+- The reply bar sits above the bottom nav. It shows who it goes to and a **Signature** switch: on, the reply ends with the standard signature ("Signed as Ashley"); off, it goes without. The choice is remembered and also sits in Settings > Business > Signing off > Sign Email tab replies.
 - The reply is sent into the same Gmail thread (`threadId`), with the conversation's own subject, `In-Reply-To` the newest message and the full `References` chain. The owner sees it in the same thread in Gmail; the customer's mail app shows it in the same conversation.
 - It goes to the customer: the newest message not written by the business (the Reply-To on the website notification), skipping bounces.
 - A half-written reply survives the app's one-minute refresh, switching tabs and closing the app.

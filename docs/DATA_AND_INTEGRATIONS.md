@@ -192,7 +192,9 @@ Opening a conversation removes Gmail's `UNREAD` label from it (`threads.modify`,
 
 ### Message formats
 
-Inquiry replies are plain-text MIME messages. Invoice and inspection sends are multipart messages with a PDF attachment.
+Every email the app sends (Email tab, Reply sheet, invoices, reports, Ashley) has its text built by `mail-mime.js` as `multipart/alternative`: the plain text as written, plus the same text as simple HTML ending in a short invisible reference that is unique per email. Invoice and report sends wrap that in `multipart/mixed` with the PDF.
+
+Why: Gmail folds a repeated ending in a conversation into a grey "..." button. Every reply ends with the same signature, so from the second reply on the customer saw the signature folded away (seen in the 3 October live test). A unique ending leaves nothing repeated to fold.
 
 Non-ASCII subject text is encoded with an RFC 2047 encoded word before Gmail submission.
 

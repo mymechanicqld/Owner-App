@@ -2,6 +2,17 @@
 
 This file records completed owner-app changes, production updates and important verification details. Add new entries at the top.
 
+## 4 October 2026: Signature no longer folded by Gmail, signature switch
+
+Status: Deployed; the Gmail side needs one more real reply to confirm.
+
+The live test of the Email tab passed: enquiry (Vishal Verma, QBC123), owner reply, customer answer and a further owner reply all sat in one thread in the app and in the customer's Gmail. It showed one problem: on the customer's side, Gmail folded the signature of the second reply into "...", because it repeated the first reply's ending.
+
+- Every email the app sends now goes out as plain text plus simple HTML, ending in a short invisible reference unique to that email (`mail-mime.js`), so there is no repeated ending for Gmail to fold. Covers Email tab replies, the Reply sheet, invoice and report emails, and Ashley.
+- The reply bar's "Signed as Ashley automatically" note is now a switch. Off sends the reply without the signature. Remembered, and mirrored in Settings > Business > Signing off.
+- Settings > Payments footnote no longer mentions the removed payment reference.
+- Checked locally: four messages built (Email tab with and without signature, Reply sheet, invoice with PDF) are well-formed, each with its own ending.
+
 ## 4 October 2026: Saving an invoice or report fills gaps in the customer's records
 
 Status: Deployed.

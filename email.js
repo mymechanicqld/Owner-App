@@ -499,17 +499,18 @@
       const base = cleanSubject(msgs[0].subject) || 'Your enquiry';
       const refs = (last.references ? last.references.split(/\s+/) : []).concat(last.messageId ? [last.messageId] : []).filter(Boolean);
       const MS = window.MMQLD_SETTINGS;
-      const text = body + (MS ? MS.signature() : '');
+      const text = body + (MS && sigOn() ? MS.signature() : '');
       const head = [
         'To: ' + addrHeader(to),
         'Subject: ' + encHeader('Re: ' + base),
         'MIME-Version: 1.0',
-        'Content-Type: text/plain; charset="UTF-8"',
-        'Content-Transfer-Encoding: base64',
       ];
+      // Plain text plus HTML with a unique ending, so Gmail never folds the signature (mail-mime.js).
+      const alt = MMQLD_MIME.alternative(text);
+      head.push('Content-Type: ' + alt.type);
       if (last.messageId) head.push('In-Reply-To: ' + last.messageId);
       if (refs.length) head.push('References: ' + refs.slice(-20).join(' '));
-      const raw = b64url(head.join('\r\n') + '\r\n\r\n' + u8b64(text));
+      const raw = b64url(head.join('\r\n') + '\r\n\r\n' + alt.body);
       await gm('/users/me/messages/send', { method: 'POST', body: JSON.stringify({ raw, threadId: id }) });
       delete MAIL.drafts[id];
       persistDrafts();
@@ -787,9 +788,14 @@
     const keep = document.getElementById('mail-compose');
     const val = keep ? keep.value : (MAIL.drafts[id] || '');
     const MS = window.MMQLD_SETTINGS;
-    const sender = MS ? MS.get('sender_name') : 'Ashley';
+    const sender = (MS && MS.get('sender_name')) || 'Ashley';
+    const on = sigOn();
     box.innerHTML = `
-      <div class="mc-to">${target ? `To <b>${esc(target.email)}</b>` : 'Loading...'}<span>Signed as ${esc(sender || 'Ashley')} automatically</span></div>
+      <div class="mc-to">${target ? `<span class="mc-addr">To <b>${esc(target.email)}</b></span>` : '<span class="mc-addr">Loading...</span>'}
+        <button type="button" class="mc-sig ${on ? 'on' : ''}" id="mail-sig" role="switch" aria-checked="${on}" title="Add the signature to this reply">
+          <span>${on ? 'Signed as ' + esc(sender) : 'No signature'}</span><i class="mc-switch"></i>
+        </button>
+      </div>
       <div class="mc-row">
         <textarea id="mail-compose" rows="1" placeholder="Write a reply..." ${MAIL.sending || !MAIL.thread ? 'disabled' : ''}></textarea>
         <button class="mc-send" id="mail-send" aria-label="Send reply" ${MAIL.sending || !MAIL.thread ? 'disabled' : ''}>${MAIL.sending ? '<span class="spin"></span>' : '<i data-lucide="send"></i>'}</button>
@@ -805,6 +811,23 @@
     });
     icons();
   }
+  /* Signature on Email tab replies: on unless switched off, remembered on
+     this phone (and synced with Settings > Business > Signing off). */
+  function sigOn() {
+    const MS = window.MMQLD_SETTINGS;
+    if (!MS) return true;
+    const v = MS.get('email_reply_signature');
+    return !(v === false || v === 'false');
+  }
+  function toggleSig() {
+    const MS = window.MMQLD_SETTINGS;
+    if (!MS) return;
+    const next = !sigOn();
+    MS.save({ email_reply_signature: next });
+    paintComposer();
+    toast(next ? 'Signature on' : 'Signature off for replies');
+  }
+
   function grow(ta) { ta.style.height = 'auto'; ta.style.height = Math.min(ta.scrollHeight, 180) + 'px'; }
 
   /* --------------------------------------------------------------- wire -- */
@@ -831,6 +854,7 @@
     if (e.target.closest('#mt-back')) return closeThread(false);
     if (e.target.closest('#mt-retry')) { MAIL.threadErr = ''; paintThread(true); return loadThread(MAIL.open, true); }
     if (e.target.closest('#mail-send')) return sendReply();
+    if (e.target.closest('#mail-sig')) return toggleSig();
     const q = e.target.closest('[data-quoted]');
     if (q) { MAIL.showQuoted[q.dataset.quoted] = !MAIL.showQuoted[q.dataset.quoted]; const log = document.getElementById('mt-log'); const y = log.scrollTop; log.innerHTML = threadHtml(replyTarget()); log.scrollTop = y; icons(); return; }
     const att = e.target.closest('[data-att]');

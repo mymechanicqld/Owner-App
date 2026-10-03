@@ -1303,10 +1303,11 @@ async function latestInThread(found) {
 async function sendThreaded(to, body, found) {
   let subject = found && found.subject ? found.subject : 'Your enquiry with ' + CONFIG.BUSINESS_NAME;
   if (!/^re:/i.test(subject)) subject = 'Re: ' + subject;
-  const lines = ['To: ' + to, 'Subject: ' + encHeader(subject), 'MIME-Version: 1.0',
-    'Content-Type: text/plain; charset="UTF-8"', 'Content-Transfer-Encoding: base64'];
+  // Plain text plus HTML with a unique ending, so Gmail never folds the signature (mail-mime.js).
+  const alt = MMQLD_MIME.alternative(body);
+  const lines = ['To: ' + to, 'Subject: ' + encHeader(subject), 'MIME-Version: 1.0', 'Content-Type: ' + alt.type];
   if (found && found.messageId) { lines.push('In-Reply-To: ' + found.messageId); lines.push('References: ' + (found.references || found.messageId)); }
-  const raw = b64url(lines.join('\r\n') + '\r\n\r\n' + u8b64(body));
+  const raw = b64url(lines.join('\r\n') + '\r\n\r\n' + alt.body);
   const payload = { raw };
   if (found && found.threadId) payload.threadId = found.threadId;
   return gFetch('/users/me/messages/send', { method: 'POST', body: JSON.stringify(payload) });
@@ -1328,8 +1329,9 @@ async function sendAttachment(to, subject, bodyText, filename, pdfBase64, found)
   let subj = found && found.subject ? (/^re:/i.test(found.subject) ? found.subject : 'Re: ' + found.subject) : subject;
   const head = ['To: ' + to, 'Subject: ' + encHeader(subj), 'MIME-Version: 1.0', 'Content-Type: multipart/mixed; boundary="' + boundary + '"'];
   if (found && found.messageId) { head.push('In-Reply-To: ' + found.messageId); head.push('References: ' + (found.references || found.messageId)); }
+  const alt = MMQLD_MIME.alternative(bodyText);
   const body = [
-    '--' + boundary, 'Content-Type: text/plain; charset="UTF-8"', 'Content-Transfer-Encoding: base64', '', u8b64(bodyText), '',
+    '--' + boundary, 'Content-Type: ' + alt.type, '', alt.body,
     '--' + boundary, 'Content-Type: application/pdf; name="' + filename + '"', 'Content-Transfer-Encoding: base64',
     'Content-Disposition: attachment; filename="' + filename + '"', '', pdfBase64, '', '--' + boundary + '--', '',
   ];
