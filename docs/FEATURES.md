@@ -35,9 +35,9 @@ Archived inquiries are hidden from this screen. Each row shows the customer, sta
 
 The detail sheet can:
 
-- show phone, email, suburb, address, vehicle, service, requested date, notes and submission time
+- show phone, email, suburb, address, vehicle, service with its website category, requested date, notes and submission time
 - change status between New, Contacted, Quoted, Booked, Won, Lost and Archived
-- reply by email
+- reply by email; the reply sheet starts on the template that fits the service (Logbook service quote for servicing, Diagnostic for diagnosis, a blank reply for everything else)
 - open the whole email conversation with the customer on the Email tab (Emails button, shown when there is an email address)
 - call the customer
 - prepare an SMS

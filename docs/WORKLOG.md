@@ -2,6 +2,22 @@
 
 This file records completed owner-app changes, production updates and important verification details. Add new entries at the top.
 
+## 4 October 2026: New website service categories
+
+Status: Deployed.
+
+The website's quote form now groups services into Standard servicing, Diagnosis, Pre-purchase inspections and Maintenance, with new choices (general servicing, fault diagnosis, brake pads, pads and rotors, alternator, starter motor). Website migration 009 added `service_category`; the owner ran it and the column is confirmed live, null on older rows.
+
+Without a change the app would have shown new choices as raw text ("brake pads and rotors") with a generic icon and grey calendar colour. Now:
+
+- every new choice has a label, icon and calendar colour; the older choices keep theirs for old inquiries and bookings
+- the inquiry sheet shows the category under the service
+- the booking job-type picker offers only the current services, grouped like the website (an older choice appears only on a booking that already uses it)
+- Analytics has a "By category" chart; inquiries from before the regroup are counted as "Earlier form choices"
+- the reply sheet starts on the matching template instead of always the service quote
+- Search customers also matches the category; Ashley sees the category and the new slugs
+- the category is read from `service_category`, or worked out from the service when that is empty
+
 ## 3 October 2026: Email tab
 
 Status: Built and tested locally against recorded real Gmail data; live end-to-end test pending.

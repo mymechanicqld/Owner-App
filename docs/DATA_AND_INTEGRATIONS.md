@@ -17,6 +17,19 @@ Do not add a Supabase secret or service-role key to this repository.
 | `products` | Invoice products, parts and jobs | Price list, invoice Add items picker, Settings count | price list upsert and delete, new items created from an invoice |
 | `app_settings` | One shared settings JSON document | shared settings and Settings status | row `id = 1` upsert |
 
+### Services and categories
+
+Since 3 October 2026 the website's quote form groups services into four categories. `SERVICES` and `SERVICE_CATEGORIES` in `config.js` mirror `lib/quote-services.ts` in the website repo:
+
+| Category | Services (slug) |
+| --- | --- |
+| Standard servicing | `logbook-servicing`, `general-servicing` |
+| Diagnosis | `diagnosis` |
+| Pre-purchase inspections | `pre-purchase-inspection` |
+| Maintenance | `brake-pads`, `brake-pads-and-rotors`, `alternator-replacement`, `starter-motor-replacement`, `radiator-water-pump` |
+
+The earlier slugs (`brake-repair`, `alternator-starter`, `battery-replacement`, `warning-light-diagnostics`, `steering-suspension`, `emergency-breakdown`, `not-sure`, and the older `alternator-starter-motor`, `general-enquiry`) stay in `SERVICES` with `legacy: true`. They still label old inquiries and bookings but are not offered for new bookings, and they have no category. A new website slug must be added to `SERVICES` (and a colour to `JOB_COLORS` in `app.js`), or it shows as plain text with a grey colour.
+
 ### Inquiry fields consumed by the owner app
 
 The app currently relies on:
@@ -33,6 +46,7 @@ The app currently relies on:
 - `vehicle_model`
 - `vehicle_year`
 - `service_needed`
+- `service_category` (added by website migration 009 on 3 Oct 2026; null on older rows, so the app works it out from `service_needed` when it is empty)
 - `symptoms`
 - `preferred_date`
 - `status`

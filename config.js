@@ -81,19 +81,40 @@ const MSG_TEMPLATES = {
 
 /* Service slug -> display label + Lucide icon. Covers both slug spellings the
    form has used. */
+/* Service slugs as stored in quote_submissions.service_needed and
+   calendar_events.service. Mirrors lib/quote-services.ts on the website.
+
+   The website's quote form was regrouped on 3 Oct 2026 into four categories
+   (`cat`). Slugs stay stored data forever, so the older choices are kept with
+   `legacy: true`: they still label old inquiries and bookings, but are no
+   longer offered when making a booking. */
+const SERVICE_CATEGORIES = {
+  'standard-servicing':      { label: 'Standard servicing',       icon: 'wrench' },
+  'diagnosis':               { label: 'Diagnosis',                icon: 'gauge' },
+  'pre-purchase-inspection': { label: 'Pre-purchase inspections', icon: 'clipboard-check' },
+  'maintenance':             { label: 'Maintenance',              icon: 'cog' },
+};
 const SERVICES = {
-  'brake-repair':              { label: 'Brake repair',            icon: 'disc-3' },
-  'alternator-starter':        { label: 'Alternator & starter',    icon: 'battery-charging' },
-  'alternator-starter-motor':  { label: 'Alternator & starter',    icon: 'battery-charging' },
-  'radiator-water-pump':       { label: 'Radiator & water pump',   icon: 'thermometer' },
-  'logbook-servicing':         { label: 'Logbook & servicing',     icon: 'wrench' },
-  'pre-purchase-inspection':   { label: 'Pre-purchase inspection', icon: 'clipboard-check' },
-  'battery-replacement':       { label: 'Battery replacement',     icon: 'battery' },
-  'warning-light-diagnostics': { label: 'Diagnostics',             icon: 'gauge' },
-  'steering-suspension':       { label: 'Steering & suspension',   icon: 'car-front' },
-  'emergency-breakdown':       { label: 'Emergency / breakdown',   icon: 'triangle-alert' },
-  'not-sure':                  { label: 'General enquiry',         icon: 'circle-help' },
-  'general-enquiry':           { label: 'General enquiry',         icon: 'circle-help' },
+  // Current form, in the website's order.
+  'logbook-servicing':         { label: 'Logbook servicing',       icon: 'wrench',           cat: 'standard-servicing' },
+  'general-servicing':         { label: 'General servicing',       icon: 'wrench',           cat: 'standard-servicing' },
+  'diagnosis':                 { label: 'Fault diagnosis',         icon: 'gauge',            cat: 'diagnosis' },
+  'pre-purchase-inspection':   { label: 'Pre-purchase inspection', icon: 'clipboard-check',  cat: 'pre-purchase-inspection' },
+  'brake-pads':                { label: 'Brake pads',              icon: 'disc-3',           cat: 'maintenance' },
+  'brake-pads-and-rotors':     { label: 'Brake pads & rotors',     icon: 'disc-3',           cat: 'maintenance' },
+  'alternator-replacement':    { label: 'Alternator',              icon: 'battery-charging', cat: 'maintenance' },
+  'starter-motor-replacement': { label: 'Starter motor',           icon: 'zap',              cat: 'maintenance' },
+  'radiator-water-pump':       { label: 'Radiator & water pump',   icon: 'thermometer',      cat: 'maintenance' },
+  // Earlier form choices (before 3 Oct 2026).
+  'brake-repair':              { label: 'Brake repair',            icon: 'disc-3',           legacy: true },
+  'alternator-starter':        { label: 'Alternator & starter',    icon: 'battery-charging', legacy: true },
+  'alternator-starter-motor':  { label: 'Alternator & starter',    icon: 'battery-charging', legacy: true },
+  'battery-replacement':       { label: 'Battery replacement',     icon: 'battery',          legacy: true },
+  'warning-light-diagnostics': { label: 'Warning-light diagnostics', icon: 'gauge',          legacy: true },
+  'steering-suspension':       { label: 'Steering & suspension',   icon: 'car-front',        legacy: true },
+  'emergency-breakdown':       { label: 'Emergency / breakdown',   icon: 'triangle-alert',   legacy: true },
+  'not-sure':                  { label: 'General enquiry',         icon: 'circle-help',      legacy: true },
+  'general-enquiry':           { label: 'General enquiry',         icon: 'circle-help',      legacy: true },
 }
 
 /* Quick email replies. The wording is edited in Settings > Messages; the

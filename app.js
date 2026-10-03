@@ -43,6 +43,12 @@ const svc = (slug) => SERVICES[slug] || { label: slug ? slug.replace(/-/g, ' ') 
 /* Colour per job type for the calendar, keyed by service slug. Lets the owner
    see at a glance what kind of work each booking is. */
 const JOB_COLORS = {
+  'general-servicing': '#3B82F6',
+  'diagnosis': '#EA580C',
+  'brake-pads': '#DC2626',
+  'brake-pads-and-rotors': '#B91C1C',
+  'alternator-replacement': '#D97706',
+  'starter-motor-replacement': '#CA8A04',
   'brake-repair': '#DC2626',
   'alternator-starter': '#D97706',
   'alternator-starter-motor': '#D97706',
@@ -67,11 +73,24 @@ function svcKey(v) {
 }
 function svcColor(v) { return JOB_COLORS[svcKey(v)] || JOB_COLOR_DEFAULT; }
 function svcLabel(v) { const k = svcKey(v); return k ? SERVICES[k].label : (v || ''); }
-/* De-duplicated [slug,label] list for the job-type picker (some labels share). */
-function jobTypeOptions() {
-  const seen = new Set(); const out = [];
-  Object.keys(SERVICES).forEach((k) => { const l = SERVICES[k].label; if (!seen.has(l)) { seen.add(l); out.push([k, l]); } });
-  return out;
+/* The website's category for an inquiry: the stored column when it is there,
+   otherwise worked out from the service, so it also works before migration
+   009 runs. Older choices have none. */
+function svcCategory(row) {
+  const c = (row && row.service_category) || ((SERVICES[svcKey(row && row.service_needed)] || {}).cat) || '';
+  return SERVICE_CATEGORIES[c] ? c : '';
+}
+function svcCategoryLabel(row) { const c = svcCategory(row); return c ? SERVICE_CATEGORIES[c].label : ''; }
+/* Job-type picker for bookings: today's services grouped like the website's
+   form. An older choice only appears when the booking already uses it. */
+function jobTypeOptionsHtml(cur) {
+  const opt = (k) => `<option value="${k}" ${k === cur ? 'selected' : ''}>${esc(SERVICES[k].label)}</option>`;
+  let html = Object.keys(SERVICE_CATEGORIES).map((c) => {
+    const ks = Object.keys(SERVICES).filter((k) => SERVICES[k].cat === c);
+    return `<optgroup label="${esc(SERVICE_CATEGORIES[c].label)}">${ks.map(opt).join('')}</optgroup>`;
+  }).join('');
+  if (cur && SERVICES[cur] && SERVICES[cur].legacy) html += `<optgroup label="Earlier choices">${opt(cur)}</optgroup>`;
+  return html;
 }
 const carDesc = (s) => [s.vehicle_year, s.vehicle_make, s.vehicle_model].filter(Boolean).join(' ') || s.vehicle_make || '';
 const firstName = (n) => (n || '').trim().split(/\s+/)[0] || 'there';
@@ -247,7 +266,7 @@ function renderSearch() {
   let results = [];
   if (q) {
     results = STATE.rows.filter((r) =>
-      [r.full_name, r.email, r.phone, r.suburb, r.vehicle_rego, r.vehicle_make, r.vehicle_model, svc(r.service_needed).label]
+      [r.full_name, r.email, r.phone, r.suburb, r.vehicle_rego, r.vehicle_make, r.vehicle_model, svc(r.service_needed).label, svcCategoryLabel(r)]
         .some((v) => (v || '').toString().toLowerCase().includes(q))
     );
   }
@@ -317,6 +336,11 @@ function renderAnalytics() {
   inWin.forEach((r) => { const sv = svc(r.service_needed); jc[sv.label] = jc[sv.label] || { c: 0, icon: sv.icon }; jc[sv.label].c++; });
   const jobs = Object.entries(jc).map(([l, o]) => [l, o.c, o.icon]).sort((a, b) => b[1] - a[1]).slice(0, 6);
 
+  // the website form's categories; inquiries from before the regroup have none
+  const cc = {};
+  inWin.forEach((r) => { const c = svcCategory(r); const k = c ? SERVICE_CATEGORIES[c].label : 'Earlier form choices'; cc[k] = cc[k] || { c: 0, icon: c ? SERVICE_CATEGORIES[c].icon : 'history' }; cc[k].c++; });
+  const cats = Object.entries(cc).map(([l, o]) => [l, o.c, o.icon]).sort((a, b) => (a[0] === 'Earlier form choices') - (b[0] === 'Earlier form choices') || b[1] - a[1]);
+
   // suburbs
   const sc = {};
   inWin.forEach((r) => { const s = (r.suburb || 'Unknown').trim(); sc[s] = (sc[s] || 0) + 1; });
@@ -330,6 +354,7 @@ function renderAnalytics() {
     <div class="seg">${periods.map(([k, l]) => `<button class="${STATE.period === k ? 'active' : ''}" data-period="${k}">${l}</button>`).join('')}</div>
     <div class="chart-card"><h3>Inquiries over time</h3><div class="cap">${winLabel}</div>${vbars(trend)}</div>
     <div class="chart-card"><h3>Busiest day of week</h3><div class="cap">${winLabel}</div>${vbars(dowTrend)}</div>
+    <div class="chart-card"><h3>By category</h3><div class="cap">${winLabel}</div>${hbars(cats, true)}</div>
     <div class="chart-card"><h3>Most common job type</h3><div class="cap">${winLabel}</div>${hbars(jobs, true)}</div>
     <div class="chart-card"><h3>Top suburbs</h3><div class="cap">${winLabel}</div>${hbars(subs, false)}</div>
   `;
@@ -358,7 +383,7 @@ function openDetail(id) {
     ${field('map-pin', 'Suburb', esc(s.suburb))}
     ${field('home', 'Address', esc(s.address))}
     ${field('car-front', 'Vehicle', [esc(carDesc(s)), s.vehicle_rego ? `<span class="rego">${esc(s.vehicle_rego)}</span>` : ''].filter(Boolean).join(' '))}
-    ${field('wrench', 'Service', esc(sv.label))}
+    ${field('wrench', 'Service', esc(sv.label) + (svcCategoryLabel(s) ? `<div class="fsub">${esc(svcCategoryLabel(s))}</div>` : ''))}
     <div class="field"><div class="fic"><i data-lucide="calendar-days"></i></div>
       <div style="flex:1"><div class="fl">Preferred date</div><div class="fv">${s.preferred_date ? fmtDate(s.preferred_date) : 'Not specified'}</div></div>
       <button class="addcal" id="act-addcal"><i data-lucide="calendar-plus"></i>Add</button>
@@ -416,16 +441,21 @@ function openReply(id) {
   const s = STATE.rows.find((r) => r.id === id);
   if (!s) return;
   STATE.activeId = id;
-  STATE.replyTmpl = 'service';
+  // Start on the template that fits the job: a service quote for servicing,
+  // the diagnostic price for diagnosis, and a blank reply for everything else.
+  const cat = svcCategory(s), key = svcKey(s.service_needed);
+  STATE.replyTmpl = cat === 'standard-servicing' || key === 'logbook-servicing' ? 'service'
+    : cat === 'diagnosis' || key === 'warning-light-diagnostics' ? 'diagnostic' : 'custom';
+  const t0 = STATE.replyTmpl;
   $('#sheet-title').textContent = 'Reply to ' + firstName(s.full_name);
   $('#sheet-sub').innerHTML = `Sends a threaded reply via Gmail`;
   const tmplKeys = ['service', 'diagnostic', 'custom'];
   $('#sheet-body').innerHTML = `
     <button class="btn ghost" id="reply-back" style="margin-bottom:14px;width:auto;display:inline-flex"><i data-lucide="chevron-left"></i>Back</button>
     <div class="reply-to">To <b>${esc(s.email || 'no email on file')}</b></div>
-    <div class="tmpl-seg" id="tmpl-seg">${tmplKeys.map((k) => `<button data-tmpl="${k}" class="${k === 'service' ? 'active' : ''}">${TEMPLATES[k].label}</button>`).join('')}</div>
-    <div class="price-row" id="price-row"><label>Price</label><div class="pin"><span>$</span><input id="price-in" type="number" inputmode="numeric" value="${TEMPLATES.service.price}" /></div></div>
-    <textarea class="composer" id="composer">${esc(buildReplyText('service', s, TEMPLATES.service.price))}</textarea>
+    <div class="tmpl-seg" id="tmpl-seg">${tmplKeys.map((k) => `<button data-tmpl="${k}" class="${k === t0 ? 'active' : ''}">${TEMPLATES[k].label}</button>`).join('')}</div>
+    <div class="price-row" id="price-row" style="display:${t0 === 'custom' ? 'none' : 'flex'}"><label>Price</label><div class="pin"><span>$</span><input id="price-in" type="number" inputmode="numeric" value="${TEMPLATES[t0].price || ''}" /></div></div>
+    <textarea class="composer" id="composer">${esc(buildReplyText(t0, s, TEMPLATES[t0].price))}</textarea>
     <div class="actions"><button class="btn primary full" id="send-reply"><i data-lucide="send"></i>Send reply</button></div>
     <p style="font-size:12px;color:var(--subtle);margin-top:10px;text-align:center">Sent in the customer's existing email thread, so the whole conversation stays together in Gmail.</p>
   `;
@@ -822,7 +852,7 @@ function openEvent(ev) {
   const durOpts = DURS.map(([v, l]) => `<option value="${v}" ${v === durMin ? 'selected' : ''}>${l}</option>`).join('')
     + (DURS.some(([v]) => v === durMin) ? '' : `<option value="${durMin}" selected>${durMin} min</option>`);
   const curType = svcKey(ev && ev.service);
-  const typeOpts = `<option value="">Select job type</option>` + jobTypeOptions().map(([k, l]) => `<option value="${k}" ${k === curType ? 'selected' : ''}>${esc(l)}</option>`).join('');
+  const typeOpts = `<option value="">Select job type</option>` + jobTypeOptionsHtml(curType);
   $('#sheet-body').innerHTML = `
     <label class="form-field"><span>Title</span><input id="ev-title" type="text" value="${esc((ev && ev.title) || '')}" placeholder="e.g. Logbook service - Toyota" /></label>
     <label class="form-field"><span>Job type</span><select id="ev-type" class="form-sel">${typeOpts}</select></label>

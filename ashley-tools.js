@@ -62,7 +62,7 @@
   const slimInquiry = (r) => ({
     id: r.id, received: niceWhen(r.created_at), name: r.full_name, email: r.email, phone: r.phone,
     suburb: r.suburb, address: r.address, vehicle: car(r), rego: r.vehicle_rego,
-    job: svcLabel(r.service_needed) || r.service_needed, status: r.status,
+    job: svcLabel(r.service_needed) || r.service_needed, category: svcCategoryLabel(r) || null, status: r.status,
     what_they_said: clip(r.symptoms, 400), preferred_date: r.preferred_date || null,
   });
   const slimBooking = (r) => ({
@@ -514,7 +514,7 @@
         properties: {
           since_hours: { type: 'number', description: 'How far back to look, in hours. Default 48.' },
           status: { type: 'string', enum: ['new', 'contacted', 'quoted', 'booked', 'won', 'lost', 'archived'] },
-          job_type: { type: 'string', description: 'Filter to one job type, e.g. brake-repair' },
+          job_type: { type: 'string', description: 'Filter to one job type slug, e.g. brake-pads, general-servicing, diagnosis (older inquiries also use brake-repair, not-sure)' },
           limit: { type: 'number' },
         },
       },
@@ -589,7 +589,7 @@
         properties: {
           id: { type: 'string', description: 'Only when changing an existing booking' },
           title: { type: 'string', description: 'Short label, e.g. Logbook service - Toyota Corolla' },
-          job_type: { type: 'string', description: 'Slug such as brake-repair, logbook-servicing, pre-purchase-inspection' },
+          job_type: { type: 'string', description: 'Slug: logbook-servicing, general-servicing, diagnosis, pre-purchase-inspection, brake-pads, brake-pads-and-rotors, alternator-replacement, starter-motor-replacement, radiator-water-pump' },
           date: { type: 'string', description: 'YYYY-MM-DD' },
           time: { type: 'string', description: 'HH:MM, 24 hour' },
           duration_minutes: { type: 'number' },
