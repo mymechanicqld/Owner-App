@@ -18,7 +18,7 @@ The dashboard gives a compact operating snapshot:
 - the most common job type in the last seven days
 - the five most recent inquiries
 
-Tapping a recent inquiry opens the same detail sheet used by Inquiries and Search.
+Tapping a recent inquiry opens the same detail sheet used by Inquiries and Search customers.
 
 ## Inquiries
 
@@ -38,6 +38,7 @@ The detail sheet can:
 - show phone, email, suburb, address, vehicle, service, requested date, notes and submission time
 - change status between New, Contacted, Quoted, Booked, Won, Lost and Archived
 - reply by email
+- open the whole email conversation with the customer on the Email tab (Emails button, shown when there is an email address)
 - call the customer
 - prepare an SMS
 - open a prefilled invoice
@@ -98,7 +99,54 @@ Bookings hold title, job type, date, start time, duration, customer, **email**, 
 - an existing booking offers Call, Message, Invoice and Inspection shortcuts; Invoice and Inspection carry the email and the linked inquiry across
 - new bookings default to the duration in Settings, otherwise 60 minutes
 
-## Search
+## Email
+
+The Email tab (bottom navigation, and Day to day in the sidebar) shows the business Gmail's customer conversations, so the owner can read and answer them without opening Gmail. Code: `email.js`.
+
+Each conversation is one Gmail thread. Nothing is copied into Supabase; Gmail stays the record.
+
+### The list
+
+- **Customers** (default): threads whose subject is a website enquiry ("New booking"), an invoice ("Invoice from") or a report ("inspection report"), plus anything from someone who enquired in the last 45 days. Replies stay in their thread, so they are included automatically.
+- **All inbox**: the Gmail Primary inbox, for customers who email directly.
+- The search box searches Gmail itself within the chosen list (name, rego, email, any word).
+- Each row shows the customer (the name typed on the website form for enquiries), the service and rego, the last message and its time, the message count, and tags: Enquiry, Invoice, Report, **Needs reply** (the customer spoke last) and **Not delivered** (our last email bounced).
+- For an enquiry nobody has answered yet, the preview line shows what the customer wrote on the form rather than the notification's labels.
+- Unread conversations are bold with a blue dot, and the tab and sidebar show an unread count.
+- 25 conversations per page; "Load older" fetches the next page.
+
+### Refresh
+
+- **Refresh** on the page (and the header refresh button while on Email) asks Gmail what changed. Only threads Gmail reports as changed are re-read, so a refresh with nothing new is one request.
+- Opening the tab also catches up quietly when the last check is over a minute old.
+- There is no push: Gmail push needs a Google Cloud Pub/Sub topic and a server to receive it. Manual refresh was the agreed scope.
+
+### A conversation
+
+- Opens full screen under the header with the bottom nav still visible. Back arrow or the phone's back gesture returns to the list.
+- In order, oldest first, with a date divider per day.
+- The website notification is shown as a **Website enquiry** card from the customer: phone, address, suburb, rego, service, car, preferred date and "What they said".
+- Owner messages are navy bubbles on the right; customer messages are white on the left. Quoted history inside a reply is folded behind a "..." button.
+- Bounces show as a red "Email not delivered" line and are never treated as the customer.
+- Attachments (invoice and report PDFs, photos) open in a new tab.
+- Opening a conversation marks it read in Gmail, as Gmail itself does.
+- Shortcuts: Open enquiry (the inquiry detail sheet) and Call, when the conversation matches an inquiry; Open in Gmail (top right).
+
+### Replying
+
+- The reply bar sits above the bottom nav. It shows who it goes to and that the signature is added automatically (Settings > Business > sender name).
+- The reply is sent into the same Gmail thread (`threadId`), with the conversation's own subject, `In-Reply-To` the newest message and the full `References` chain. The owner sees it in the same thread in Gmail; the customer's mail app shows it in the same conversation.
+- It goes to the customer: the newest message not written by the business (the Reply-To on the website notification), skipping bounces.
+- A half-written reply survives the app's one-minute refresh, switching tabs and closing the app.
+- A first reply moves a New inquiry to Contacted.
+
+### Connecting Gmail
+
+If the phone has no current Gmail sign-in, the page shows a Connect Gmail card. The tap opens Google's sign-in, the same one used for sending invoices.
+
+## Search customers
+
+Search customers is in the sidebar (Day to day). It moved off the bottom navigation to make room for Email.
 
 Search works across the already-loaded inquiry data. It matches:
 

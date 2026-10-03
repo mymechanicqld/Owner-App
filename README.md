@@ -15,12 +15,12 @@ The five bottom tabs are:
 1. Dashboard
 2. Inquiries
 3. Calendar
-4. Search
+4. Email
 5. Ashley
 
 The sidebar groups the complete app:
 
-- Day to day: Dashboard, Ashley, Inquiries, Calendar, Search
+- Day to day: Dashboard, Ashley, Inquiries, Calendar, Email, Search customers
 - Create: New invoice, New inspection
 - Records: Invoices, Inspection reports
 - Business: Analytics, Price list, Settings
@@ -29,6 +29,7 @@ The sidebar groups the complete app:
 
 - Read, search and update website inquiries.
 - Reply to an inquiry in its existing Gmail thread.
+- Read and answer customer email conversations on the Email tab without opening Gmail: the website enquiry, every reply and every answer in one thread, in order, with a manual Refresh.
 - Call or prepare an SMS for a customer.
 - Plan the day on a Google Calendar style timeline: drag bookings to new times, drag to resize, tap an empty slot to book, jump to any date. Bookings keep the customer's email.
 - Create editable invoice PDFs with one searchable "Add items" picker, printed service checklists, bank payment details, recorded payments, drafts and Gmail sending.

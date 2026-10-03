@@ -10,7 +10,7 @@ The PWA has five independent browser entry points:
 
 | Entry point | Purpose | Main scripts |
 | --- | --- | --- |
-| `/` | Main owner console | `app.js`, `customers.js`, Ashley scripts |
+| `/` | Main owner console | `app.js`, `email.js`, `customers.js`, Ashley scripts |
 | `/invoice/` | Invoice generator | `invoice/app.js`, `invoice/invoice-pdf.js`, `leave-guard.js` |
 | `/inspection/` | Inspection generator | `inspection/app.js`, `inspection/report-pdf.js`, `leave-guard.js` |
 | `/prices/` | Price catalogue editor | inline page script |
@@ -108,11 +108,21 @@ Autocomplete ranking is:
 
 Recency breaks ties.
 
+### `email.js`
+
+The Email tab. Loaded after `app.js` and uses its globals (`gFetch`, `getToken`, `cachedGToken`, `STATE`, `sb`, `esc`, `toast`, `setView`, `openDetail`, `encHeader`, `u8b64`, `b64url`). Exposes `renderEmail()` for `render()` and `MMQLD_MAIL` (`openFor(email)`, `openThread(id)`, `refresh()`, `isOpen()`, `close()`).
+
+- List: `threads.list` with the Customers or All inbox query, then `threads.get?format=metadata` only for threads whose `historyId` changed (five at a time). Summaries and the customer list are cached in `mmqld_mail_v1`.
+- Thread: `threads.get?format=full`, MIME walked for text/plain (HTML converted to text when there is no usable plain part; email HTML is never inserted into the page), quoted history split off, the website notification parsed into fields.
+- Send: plain-text MIME to `messages.send` with `threadId`, the thread's subject, `In-Reply-To` and `References`.
+- Repaint safety: `app.js` repaints the active view every minute. `renderEmail()` only builds what is missing, and the reply text is kept in memory and in `mmqld_mail_v1`, so a background repaint never loses a half-written reply.
+- `body.mail-thread` gives an open conversation the whole area above the nav, like `ash-mode` for Ashley; `setView()` clears it on other tabs.
+
 ### `gmail-send.js`
 
 Provides generator-page Gmail access. It waits for and can re-inject Google Identity Services, caches a short-lived token, searches for an existing conversation, and sends a multipart PDF attachment.
 
-The main shell has equivalent Gmail helpers in `app.js` because it predates this shared generator module.
+The main shell has equivalent Gmail helpers in `app.js` because it predates this shared generator module. Both copies of `findThread()` finish with `latestInThread()`, so an invoice, report or Reply-sheet email answers the newest message in the conversation (bounces skipped) with the full `References` chain, not the first notification.
 
 ### `storage.js`
 

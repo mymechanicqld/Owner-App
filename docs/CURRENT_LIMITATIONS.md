@@ -64,6 +64,13 @@ When editing an existing record, a failed new upload leaves the older `pdf_path`
 
 The main Records delete path removes the database row first, then makes best-effort Storage deletes for the PDF and, for reports, every photo, thumbnail and the cover photo. A failed object deletion is swallowed, so an orphaned public file can remain.
 
+### Email tab
+
+- No live updates. New mail appears on Refresh, or when the tab is opened after a minute away. Push would need a Google Cloud Pub/Sub topic and a server endpoint.
+- Replies are plain text with the standard signature. There is no rich formatting, no attachments from the reply bar, and no CC.
+- The Customers list finds conversations by subject and by recent enquirers' addresses. A customer who emails directly from an address that never enquired shows under All inbox, not Customers.
+- Gmail sign-in lasts about an hour. After that the first Refresh may briefly open Google's window to issue a new token.
+
 ### Calendar
 
 ### Drag works within one day

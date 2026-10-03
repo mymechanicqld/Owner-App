@@ -2,6 +2,22 @@
 
 This file records completed owner-app changes, production updates and important verification details. Add new entries at the top.
 
+## 3 October 2026: Email tab
+
+Status: Built and tested locally against recorded real Gmail data; live end-to-end test pending.
+
+- **Email** replaces Search in the bottom navigation. Search moved to the sidebar as "Search customers"; it works as before.
+- The Email tab lists the business Gmail's customer conversations (Customers / All inbox, Gmail search, unread count on the tab), opens a conversation as one thread in order (website enquiry card, owner replies, customer answers) and replies into the same thread. See FEATURES.md > Email.
+- The inquiry sheet gained an **Emails** button that opens the customer's conversation.
+- The Reply sheet, invoice sending and report sending now answer the newest message in the thread with the full References chain, instead of the first notification.
+- Bounced emails are shown as "Email not delivered" and never become the reply address. Found on a real thread where an invoice went to a mistyped address.
+
+### How it was checked
+
+- The real inbox was read (metadata and bodies of recent enquiry threads) to confirm how threads form. Gmail already keeps notification, reply and customer answers together: a real 4-message enquiry thread was used as the reference.
+- The page was run locally against recorded real Gmail responses with sending captured instead of sent: list of 25 threads, the 4-message thread, a 5-message invoice thread with two bounces and a PDF, the Connect Gmail state, back gesture, repaint while typing, and the inquiry sheet's Emails button.
+- The outgoing MIME was inspected: `threadId`, `Re:` + the thread subject, `In-Reply-To` = newest message, `References` = full chain, UTF-8 body with signature.
+
 ## 20 September 2026: Owner feedback after first use
 
 Status: Deployed.

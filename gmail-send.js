@@ -119,7 +119,28 @@
       if (/new booking|quote request|booking request/i.test(rec.subject)) { best = rec; break; }
       if (!best) best = rec;
     }
-    return best;
+    return latestInThread(best);
+  }
+
+  /* Reply to the newest message in the conversation, not the first: the
+     customer's mail app threads on In-Reply-To/References, so this keeps every
+     email the app sends in one conversation on their side too. The subject
+     stays the enquiry's own, because Gmail needs it to match the thread. */
+  async function latestInThread(found) {
+    if (!found || !found.threadId) return found;
+    try {
+      const th = await gFetch('/users/me/threads/' + found.threadId + '?format=metadata&metadataHeaders=Message-ID&metadataHeaders=References&metadataHeaders=From');
+      const msgs = (th.messages || []).filter((m) => {
+        const from = ((m.payload.headers || []).find((x) => x.name.toLowerCase() === 'from') || {}).value || '';
+        return !/mailer-daemon|postmaster/i.test(from);
+      });
+      const last = msgs[msgs.length - 1];
+      if (!last) return found;
+      const h = {}; (last.payload.headers || []).forEach((x) => (h[x.name.toLowerCase()] = x.value));
+      if (!h['message-id']) return found;
+      const refs = (h.references ? h.references.split(/\s+/) : []).concat(h['message-id']).filter(Boolean).slice(-20);
+      return { ...found, messageId: h['message-id'], references: refs.join(' ') };
+    } catch (_) { return found; }
   }
 
   const u8b64 = (str) => btoa(unescape(encodeURIComponent(str)));
@@ -134,7 +155,7 @@
       ? (/^re:/i.test(opts.thread.subject) ? opts.thread.subject : 'Re: ' + opts.thread.subject)
       : opts.subject;
     const head = ['To: ' + opts.to, 'Subject: ' + encHeader(subj), 'MIME-Version: 1.0', 'Content-Type: multipart/mixed; boundary="' + boundary + '"'];
-    if (opts.thread && opts.thread.messageId) { head.push('In-Reply-To: ' + opts.thread.messageId); head.push('References: ' + opts.thread.messageId); }
+    if (opts.thread && opts.thread.messageId) { head.push('In-Reply-To: ' + opts.thread.messageId); head.push('References: ' + (opts.thread.references || opts.thread.messageId)); }
     const body = [
       '--' + boundary,
       'Content-Type: text/plain; charset="UTF-8"', 'Content-Transfer-Encoding: base64', '',

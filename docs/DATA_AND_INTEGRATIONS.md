@@ -154,7 +154,27 @@ It reads up to ten matching messages and prefers a subject that looks like a boo
 - `In-Reply-To`
 - `References`
 
+The `In-Reply-To` is the newest message in that thread (bounces skipped) and `References` is its full chain, so the customer's mail app keeps every email in one conversation too. The subject stays the thread's own subject with `Re:`, because Gmail only files a sent message into a thread when the subject matches.
+
 This keeps the communication in the existing Gmail conversation when possible.
+
+### How an enquiry thread forms
+
+Checked against the real inbox on 3 October 2026:
+
+1. The website's Resend notification arrives from `"<Customer> via My Mechanic QLD" <onboarding@resend.dev>` (or the configured sender) to `mymechanicqld@gmail.com`, subject `New booking — <Name> (<REGO>) · <Service> · <Suburb>`, with `Reply-To: <customer>`. Gmail's own filter labels it "Form Inquiries".
+2. The owner's reply (from the app or from Gmail's Reply) goes to the customer as `Re: New booking — ...` in the same thread.
+3. The customer's answer carries `In-Reply-To`/`References`, so Gmail files it in the same thread (and its filter labels it "Customer Replies").
+
+The Email tab relies on this: one thread per enquiry, and the notification's Reply-To identifies the customer.
+
+### Email tab queries
+
+- Customers: `{subject:"New booking" subject:"Invoice from" subject:"inspection report" subject:"Your enquiry with" from:<recent enquirer> ...}`, with up to 40 distinct inquiry emails from the last 45 days.
+- All inbox: `in:inbox category:primary`.
+- A search adds the typed words as a quoted phrase.
+
+Opening a conversation removes Gmail's `UNREAD` label from it (`threads.modify`, allowed by `gmail.modify`).
 
 ### Message formats
 
@@ -188,6 +208,7 @@ The system instructions deliberately omit the business name, app name, URL and d
 | --- | --- | --- |
 | `mmqld_settings` | local settings copy | until reset or site data is cleared |
 | `mmqld_gtok` | Gmail access token and expiry | about one hour |
+| `mmqld_mail_v1` | Email tab: last customer list (60 summaries, no message bodies), the business address, last refresh time and unsent replies | until replaced or site data is cleared |
 | `mmqld_ashley_log` | visible Ashley chat and compact history | until cleared |
 | `mmqld_ashley_endpoint` | optional endpoint override | until removed |
 | `mmqld_products_cache` | invoice picker product cache | until replaced or site data is cleared |
@@ -206,7 +227,8 @@ Because counters are local, two devices can generate the same sequence number on
 ### To Google
 
 - Gmail queries
-- message metadata and full message reads requested by Ashley
+- message metadata and full message reads requested by Ashley or opened on the Email tab
+- marking an opened conversation as read
 - outgoing email recipients, bodies and PDF attachments
 
 ### To Cloudflare Workers AI

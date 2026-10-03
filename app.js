@@ -161,6 +161,7 @@ function setView(v) {
   closeSidebar();
   // Ashley manages her own scrolling, so the outer scroller stands down.
   document.body.classList.toggle('ash-mode', v === 'ashley');
+  document.body.classList.toggle('mail-thread', v === 'email' && !!(window.MMQLD_MAIL && MMQLD_MAIL.isOpen()));
   if (v === 'calendar') STATE._calScrolledFor = null; // land on the right hour again
   $('.main').scrollTop = 0;
   render();
@@ -171,6 +172,7 @@ function render() {
   else if (STATE.view === 'inquiries') renderInquiries();
   else if (STATE.view === 'calendar') renderCalendar();
   else if (STATE.view === 'search') renderSearch();
+  else if (STATE.view === 'email') { if (typeof renderEmail === 'function') renderEmail(); }
   else if (STATE.view === 'analytics') renderAnalytics();
   else if (STATE.view === 'ashley') { if (typeof renderAshley === 'function') renderAshley(); }
   else if (STATE.view === 'invoices') renderInvoices();
@@ -368,7 +370,8 @@ function openDetail(id) {
         ${STATUSES.map((st) => `<option value="${st}" ${st === s.status ? 'selected' : ''}>${STATUS_LABEL[st]}</option>`).join('')}
       </select></div></div>
     <div class="actions">
-      <button class="btn primary full" id="act-reply"><i data-lucide="send"></i>Reply by email</button>
+      <button class="btn primary ${s.email ? '' : 'full'}" id="act-reply"><i data-lucide="send"></i>Reply by email</button>
+      ${s.email ? `<button class="btn ghost" id="act-emails"><i data-lucide="mails"></i>Emails</button>` : ''}
       ${s.phone ? `<a class="btn ghost" href="tel:${esc(tel)}"><i data-lucide="phone"></i>Call</a>` : ''}
       ${s.phone ? `<button class="btn ghost" id="act-message"><i data-lucide="message-circle"></i>Message</button>` : '<a class="btn ghost" href="mailto:'+esc(s.email)+'"><i data-lucide="mail"></i>Mail</a>'}
       <button class="btn ghost" id="act-invoice"><i data-lucide="file-text"></i>Invoice</button>
@@ -384,6 +387,8 @@ function openDetail(id) {
     s.status = ns; toast('Marked ' + STATUS_LABEL[ns], 'ok'); render();
   });
   $('#act-reply').addEventListener('click', () => openReply(id));
+  // The whole email conversation with this customer, on the Email tab.
+  const eBtn = $('#act-emails'); if (eBtn) eBtn.addEventListener('click', () => { closeSheet(); MMQLD_MAIL.openFor(s.email); });
   const genParams = () => new URLSearchParams({
     id: s.id || '',
     name: s.full_name || '',
@@ -1242,14 +1247,35 @@ async function findThread(email, rego) {
     if (/new booking|quote request|booking request/i.test(rec.subject)) { best = rec; break; }
     if (!best) best = rec;
   }
-  return best;
+  return latestInThread(best);
 }
+/* Reply to the newest message in the conversation, not the first: the
+   customer's mail app threads on In-Reply-To/References, so this keeps every
+   email the app sends in one conversation on their side too. The subject
+   stays the enquiry's own, because Gmail needs it to match the thread. */
+async function latestInThread(found) {
+  if (!found || !found.threadId) return found;
+  try {
+    const th = await gFetch('/users/me/threads/' + found.threadId + '?format=metadata&metadataHeaders=Message-ID&metadataHeaders=References&metadataHeaders=From');
+    const msgs = (th.messages || []).filter((m) => {
+      const from = ((m.payload.headers || []).find((x) => x.name.toLowerCase() === 'from') || {}).value || '';
+      return !/mailer-daemon|postmaster/i.test(from);
+    });
+    const last = msgs[msgs.length - 1];
+    if (!last) return found;
+    const h = {}; (last.payload.headers || []).forEach((x) => (h[x.name.toLowerCase()] = x.value));
+    if (!h['message-id']) return found;
+    const refs = (h.references ? h.references.split(/\s+/) : []).concat(h['message-id']).filter(Boolean).slice(-20);
+    return { ...found, messageId: h['message-id'], references: refs.join(' ') };
+  } catch (_) { return found; }
+}
+
 async function sendThreaded(to, body, found) {
   let subject = found && found.subject ? found.subject : 'Your enquiry with ' + CONFIG.BUSINESS_NAME;
   if (!/^re:/i.test(subject)) subject = 'Re: ' + subject;
   const lines = ['To: ' + to, 'Subject: ' + encHeader(subject), 'MIME-Version: 1.0',
     'Content-Type: text/plain; charset="UTF-8"', 'Content-Transfer-Encoding: base64'];
-  if (found && found.messageId) { lines.push('In-Reply-To: ' + found.messageId); lines.push('References: ' + found.messageId); }
+  if (found && found.messageId) { lines.push('In-Reply-To: ' + found.messageId); lines.push('References: ' + (found.references || found.messageId)); }
   const raw = b64url(lines.join('\r\n') + '\r\n\r\n' + u8b64(body));
   const payload = { raw };
   if (found && found.threadId) payload.threadId = found.threadId;
@@ -1271,7 +1297,7 @@ async function sendAttachment(to, subject, bodyText, filename, pdfBase64, found)
   const boundary = 'mmqld_' + Math.random().toString(36).slice(2);
   let subj = found && found.subject ? (/^re:/i.test(found.subject) ? found.subject : 'Re: ' + found.subject) : subject;
   const head = ['To: ' + to, 'Subject: ' + encHeader(subj), 'MIME-Version: 1.0', 'Content-Type: multipart/mixed; boundary="' + boundary + '"'];
-  if (found && found.messageId) { head.push('In-Reply-To: ' + found.messageId); head.push('References: ' + found.messageId); }
+  if (found && found.messageId) { head.push('In-Reply-To: ' + found.messageId); head.push('References: ' + (found.references || found.messageId)); }
   const body = [
     '--' + boundary, 'Content-Type: text/plain; charset="UTF-8"', 'Content-Transfer-Encoding: base64', '', u8b64(bodyText), '',
     '--' + boundary, 'Content-Type: application/pdf; name="' + filename + '"', 'Content-Transfer-Encoding: base64',
@@ -1376,7 +1402,12 @@ $('#scrim').addEventListener('click', closeSheet);
 $('#sheet-close').addEventListener('click', closeSheet);
 $('#side-scrim').addEventListener('click', closeSidebar);
 $('#btn-menu').addEventListener('click', openSidebar);
-$('#btn-refresh').addEventListener('click', () => { loadData(false); toast('Refreshed'); });
+$('#btn-refresh').addEventListener('click', () => {
+  loadData(false);
+  // On the Email tab the header button checks Gmail too.
+  if (STATE.view === 'email' && window.MMQLD_MAIL) MMQLD_MAIL.refresh();
+  toast('Refreshed');
+});
 
 /* gate (optional) + boot */
 /* Settings can switch Ashley off entirely. Hide her tab and sidebar entry, and

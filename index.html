@@ -45,7 +45,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="My Mechanic QLD" />
   <title>My Mechanic QLD</title>
-  <link rel="stylesheet" href="styles.css?v=39" />
+  <link rel="stylesheet" href="styles.css?v=40" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
@@ -67,6 +67,7 @@
     <section class="view" id="view-inquiries"></section>
     <section class="view" id="view-calendar"></section>
     <section class="view" id="view-search"></section>
+    <section class="view" id="view-email"></section>
     <section class="view" id="view-analytics"></section>
     <section class="view" id="view-ashley"></section>
     <section class="view" id="view-invoices"></section>
@@ -77,7 +78,7 @@
     <button data-view="dashboard" class="active"><i data-lucide="layout-dashboard"></i>Dashboard</button>
     <button data-view="inquiries"><i data-lucide="inbox"></i>Inquiries</button>
     <button data-view="calendar"><i data-lucide="calendar"></i>Calendar</button>
-    <button data-view="search"><i data-lucide="search"></i>Search</button>
+    <button data-view="email"><i data-lucide="mail"></i>Email<span class="nav-badge" data-mail-badge hidden></span></button>
     <button data-view="ashley"><i data-lucide="sparkles"></i>Ashley</button>
   </nav>
 </div>
@@ -95,7 +96,8 @@
     <button data-view="ashley"><i data-lucide="sparkles"></i>Ashley</button>
     <button data-view="inquiries"><i data-lucide="inbox"></i>Inquiries</button>
     <button data-view="calendar"><i data-lucide="calendar"></i>Calendar</button>
-    <button data-view="search"><i data-lucide="search"></i>Search</button>
+    <button data-view="email"><i data-lucide="mail"></i>Email<span class="side-badge" data-mail-badge hidden></span></button>
+    <button data-view="search"><i data-lucide="search"></i>Search customers</button>
 
     <div class="sidebar__group">Create</div>
     <a href="invoice/index.html"><i data-lucide="file-plus"></i>New invoice</a>
@@ -132,7 +134,8 @@
 <script src="config.js?v=47"></script>
 <script src="settings.js?v=47"></script>
 <script src="customers.js?v=39"></script>
-<script src="app.js?v=47"></script>
+<script src="app.js?v=48"></script>
+<script src="email.js?v=48"></script>
 <script src="ashley-tools.js?v=46"></script>
 <script src="ashley-agent.js?v=45"></script>
 <script src="ashley-ui.js?v=39"></script>
