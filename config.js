@@ -136,6 +136,11 @@ const TEMPLATES = {
     price: '',
     build: (g) => g + '\n\n' + _tpl('tpl_reply_diy', {}) + _sig(),
   },
+  started: {
+    label: 'Started job',
+    price: '',
+    build: (g) => g + '\n\n' + _tpl('tpl_reply_started', {}) + _sig(),
+  },
   custom: {
     label: 'Custom',
     price: '',

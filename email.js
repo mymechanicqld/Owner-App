@@ -661,7 +661,7 @@
       const sub = t.enq ? [t.enq.service, t.enq.rego].filter(Boolean).join(' \u00b7 ') || 'Website enquiry' : t.subject;
       const tag = t.kind === 'enquiry' ? '<span class="mtag mtag--enq">Enquiry</span>' : t.kind === 'invoice' ? '<span class="mtag">Invoice</span>' : t.kind === 'report' ? '<span class="mtag">Report</span>' : '';
       const lr = t.kind === 'enquiry' ? linkedEnquiry(t.email, t.enq && t.enq.rego) : null;
-      const diy = lr && typeof lr.ai_diy_score === 'number' && lr.ai_diy_score >= 0.6 ? '<span class="mtag mtag--diy">Likely DIY</span>' : '';
+      const diy = lr && typeof isLikelyDiy === 'function' && isLikelyDiy(lr) ? '<span class="mtag mtag--diy">Likely DIY</span>' : '';
       const status = t.bounced ? '<span class="mtag mtag--bad">Not delivered</span>' : t.waiting && t.count > 0 ? '<span class="mtag mtag--wait">Needs reply</span>' : '';
       return `
       <button class="mrow ${t.unread ? 'unread' : ''}" data-thread="${esc(t.id)}">

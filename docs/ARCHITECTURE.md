@@ -128,7 +128,7 @@ Builds every outgoing email body: `MMQLD_MIME.alternative(text)` returns the Con
 
 ### `cloudflare/triage`
 
-Worker `mmqld-triage` on the business Cloudflare account. A cron trigger runs every minute: it reads up to 25 inquiries from the last `WINDOW_HOURS` (48) with `ai_checked_at` null, runs `@cf/cloudflare/clef-flash` through the AI binding with one `noul` question ("Does the customer say they already have, or will supply, their own parts and only want us to fit or install them?") over "Service requested / Customer notes", and PATCHes `ai_diy_score`, `ai_checked_at` and `ai_model`. A failed row stays unchecked and is retried next minute. `POST /run` with `X-Run-Key` triggers a pass on demand and returns the scores. Secrets: `SUPABASE_URL`, `SUPABASE_KEY` (the publishable key), `RUN_KEY`.
+Worker `mmqld-triage` on the business Cloudflare account. A cron trigger runs every minute: it reads up to 25 inquiries from the last `WINDOW_HOURS` (48) with `ai_checked_at` null, runs `@cf/cloudflare/clef-flash` through the AI binding with two `noul` questions in one call (own parts; started it themselves) over "Service requested / Customer notes", and PATCHes `ai_diy_score`, `ai_started_score`, `ai_checked_at` and `ai_model`. Rows checked before the second question existed (`ai_started_score` null) are re-checked. If migration 011 has not run, it falls back to the own-parts question alone. A failed row stays unchecked and is retried next minute. `POST /run` with `X-Run-Key` triggers a pass on demand and returns the scores. Secrets: `SUPABASE_URL`, `SUPABASE_KEY` (the publishable key), `RUN_KEY`.
 
 ### `gmail-send.js`
 

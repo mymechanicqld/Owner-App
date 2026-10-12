@@ -189,8 +189,8 @@
 <main id="stack"></main>
 <div class="toast" id="toast"></div>
 
-<script src="../config.js?v=50"></script>
-<script src="../settings.js?v=49"></script>
+<script src="../config.js?v=51"></script>
+<script src="../settings.js?v=50"></script>
 <script src="../invoice/assets.js?v=40"></script>
 <script>
 (function () {
@@ -263,6 +263,7 @@
     report_not_checked: { title: 'Not checked', parent: 'reports', kind: 'list', vars: [], note: 'One item per line, printed under "does not check the following".' },
     tpl_reply_service: { title: 'Service reply', parent: 'messages', kind: 'reply', vars: ['price', 'business'], price: 'price_service', note: 'Your reply to a website enquiry. "Hi Sam," goes above it and your signature below.' },
     tpl_reply_diy: { title: 'Own parts reply', parent: 'messages', kind: 'reply', vars: ['business'], note: 'For enquiries marked "Likely DIY", where the customer wants to supply their own parts. "Hi Sam," goes above it and your signature below.' },
+    tpl_reply_started: { title: 'Started job reply', parent: 'messages', kind: 'reply', vars: ['business'], note: 'For enquiries marked "Likely DIY" because the customer started the job themselves. "Hi Sam," goes above it and your signature below.' },
     tpl_reply_diagnostic: { title: 'Diagnostic reply', parent: 'messages', kind: 'reply', vars: ['price', 'business'], price: 'price_diagnostic', note: 'Your reply to a website enquiry. "Hi Sam," goes above it and your signature below.' },
     tpl_sms_website: { title: 'Website link text', parent: 'messages', kind: 'sms', vars: ['first_name', 'business', 'form_link', 'sender'] },
     tpl_sms_service: { title: 'Service text', parent: 'messages', kind: 'sms', vars: ['first_name', 'price', 'business', 'sender'], price: 'price_service' },
@@ -398,6 +399,7 @@
           tpl('tpl_reply_service', 'Service'),
           tpl('tpl_reply_diagnostic', 'Diagnostic'),
           tpl('tpl_reply_diy', 'Own parts (decline)'),
+          tpl('tpl_reply_started', 'Started job (decline)'),
         ] },
         { head: 'Text messages', rows: [
           tpl('tpl_sms_website', 'Website link'),

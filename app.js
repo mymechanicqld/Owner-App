@@ -202,11 +202,26 @@ function closeSidebar() { $('#sidebar').classList.remove('open'); $('#side-scrim
 function openSidebar() { $('#sidebar').classList.add('open'); $('#side-scrim').classList.add('open'); }
 
 /* "Likely DIY": the triage Worker (cloudflare/triage) scores each new inquiry
-   with Cloudflare's Clef-flash for "customer supplies their own parts and
-   only wants them fitted", which the business does not take on. */
-const DIY_MIN = 0.6;
-const isLikelyDiy = (r) => !!r && typeof r.ai_diy_score === 'number' && r.ai_diy_score >= DIY_MIN;
-const diyPct = (r) => Math.round((r.ai_diy_score || 0) * 100);
+   with Cloudflare's Clef-flash on two things the business does not take on:
+   the customer supplies their own parts (ai_diy_score), or they started the
+   repair themselves and want it finished (ai_started_score). The second is
+   fuzzier on real data, so it needs a higher score. */
+const DIY_MIN = 0.6, STARTED_MIN = 0.8;
+const ownParts = (r) => !!r && typeof r.ai_diy_score === 'number' && r.ai_diy_score >= DIY_MIN;
+const startedIt = (r) => !!r && typeof r.ai_started_score === 'number' && r.ai_started_score >= STARTED_MIN;
+const isLikelyDiy = (r) => ownParts(r) || startedIt(r);
+const pct = (v) => Math.round((v || 0) * 100);
+/* The decline that fits: whichever check is further past its line. */
+function diyKind(r) {
+  if (ownParts(r) && startedIt(r)) return (r.ai_started_score - STARTED_MIN) > (r.ai_diy_score - DIY_MIN) ? 'started' : 'diy';
+  return startedIt(r) ? 'started' : 'diy';
+}
+function diyWhy(r) {
+  const bits = [];
+  if (ownParts(r)) bits.push('have their own parts and want them fitted (' + pct(r.ai_diy_score) + '% sure)');
+  if (startedIt(r)) bits.push('have started the job themselves and want it finished (' + pct(r.ai_started_score) + '% sure)');
+  return bits.join(', and ');
+}
 
 /* ----------------------------------------------------------- row builder -- */
 function rowHtml(s) {
@@ -217,8 +232,8 @@ function rowHtml(s) {
   <div class="row" data-id="${s.id}">
     <div class="ic"><i data-lucide="${sv.icon}"></i></div>
     <div class="body">
-      <div class="name"><span class="dot" style="background:${STATUS_COLOR[s.status] || '#2563EB'}"></span>${esc(s.full_name || 'Unknown')}${isLikelyDiy(s) ? '<span class="diy-tag">Likely DIY</span>' : ''}</div>
-      <div class="line">${rego} ${bits}</div>
+      <div class="name"><span class="dot" style="background:${STATUS_COLOR[s.status] || '#2563EB'}"></span><span class="nm">${esc(s.full_name || 'Unknown')}</span></div>
+      <div class="line">${isLikelyDiy(s) ? '<span class="diy-tag">Likely DIY</span> ' : ''}${rego} ${bits}</div>
     </div>
     <div class="when">${relTime(s.created_at)}<br><span style="color:var(--accent)">${esc(sv.label)}</span></div>
   </div>`;
@@ -246,7 +261,7 @@ function renderDashboard() {
       <div class="stat"><div class="k"><i data-lucide="calendar-days"></i>This week</div><div class="v">${week}</div><div class="s">Enquiries in 7 days</div></div>
       <div class="stat"><div class="k"><i data-lucide="wrench"></i>Top job</div><div class="v" style="font-size:18px;line-height:1.2;margin-top:8px">${topJob ? esc(topJob[0]) : '-'}</div><div class="s">${topJob ? topJob[1] + ' this week' : 'No data'}</div></div>
     </div>
-    ${diyRecent.length ? `<button class="diy-banner" id="diy-banner"><i data-lucide="package-x"></i><span><b>${diyRecent.length} likely DIY ${diyRecent.length === 1 ? 'enquiry' : 'enquiries'}</b> in the last 48 hours. The customer seems to have their own parts.</span><i data-lucide="chevron-right"></i></button>` : ''}
+    ${diyRecent.length ? `<button class="diy-banner" id="diy-banner"><i data-lucide="package-x"></i><span><b>${diyRecent.length} likely DIY ${diyRecent.length === 1 ? 'enquiry' : 'enquiries'}</b> in the last 48 hours: own parts, or a job they started themselves.</span><i data-lucide="chevron-right"></i></button>` : ''}
     <div class="section-title">Recent inquiries</div>
     <div class="list" id="dash-recent">${recent.length ? recent.map(rowHtml).join('') : emptyHtml('inbox', 'No inquiries yet', 'New leads will show up here.')}</div>
     ${recent.length ? `<button class="btn ghost full" id="see-all" style="margin-top:14px"><i data-lucide="arrow-right"></i>See all inquiries</button>` : ''}
@@ -267,7 +282,7 @@ function renderInquiries(skeleton = false) {
   const filtered = STATE.inqDiy ? inRange.filter(isLikelyDiy) : inRange;
   el.innerHTML = `
     <div class="view-head"><h2>Inquiries</h2><div class="meta">${filtered.length} shown</div></div>
-    <div class="toolbar">${ranges.map(([k, l]) => `<button class="chip ${STATE.inqRange === k ? 'active' : ''}" data-range="${k}">${l}</button>`).join('')}${diyCount ? `<button class="chip chip--diy ${STATE.inqDiy ? 'active' : ''}" id="inq-diy">Likely DIY ${diyCount}</button>` : ''}</div>
+    <div class="toolbar">${diyCount ? `<button class="chip chip--diy ${STATE.inqDiy ? 'active' : ''}" id="inq-diy">Likely DIY ${diyCount}</button>` : ''}${ranges.map(([k, l]) => `<button class="chip ${STATE.inqRange === k ? 'active' : ''}" data-range="${k}">${l}</button>`).join('')}</div>
     <div class="list">${filtered.length ? filtered.map(rowHtml).join('') : emptyHtml('inbox', 'Nothing here', 'No inquiries in this window.')}</div>
   `;
 }
@@ -390,7 +405,7 @@ function openDetail(id) {
   const field = (icon, label, val) => val ? `<div class="field"><div class="fic"><i data-lucide="${icon}"></i></div><div><div class="fl">${label}</div><div class="fv">${val}</div></div></div>` : '';
   const tel = s.phone ? s.phone.replace(/\s/g, '') : '';
   $('#sheet-body').innerHTML = `
-    ${isLikelyDiy(s) ? `<div class="diy-note"><i data-lucide="package-x"></i><div><b>Likely DIY job</b><span>From what they wrote, the customer seems to have their own parts and wants them fitted (${diyPct(s)}% sure). Checked automatically when the enquiry came in. The Reply button starts on the "Own parts" decline.</span></div></div>` : ''}
+    ${isLikelyDiy(s) ? `<div class="diy-note"><i data-lucide="package-x"></i><div><b>Likely DIY job</b><span>From what they wrote, the customer seems to ${esc(diyWhy(s))}. Checked automatically when the enquiry came in. The Reply button starts on the "${diyKind(s) === 'started' ? 'Started job' : 'Own parts'}" decline.</span></div></div>` : ''}
     ${field('phone', 'Phone', s.phone ? `<a href="tel:${esc(tel)}">${esc(s.phone)}</a>` : '')}
     ${field('mail', 'Email', s.email ? `<a href="mailto:${esc(s.email)}">${esc(s.email)}</a>` : '')}
     ${field('map-pin', 'Suburb', esc(s.suburb))}
@@ -457,18 +472,19 @@ function openReply(id) {
   // Start on the template that fits the job: a service quote for servicing,
   // the diagnostic price for diagnosis, and a blank reply for everything else.
   const cat = svcCategory(s), key = svcKey(s.service_needed);
-  STATE.replyTmpl = isLikelyDiy(s) ? 'diy'
+  STATE.replyTmpl = isLikelyDiy(s) ? diyKind(s)
     : cat === 'standard-servicing' || key === 'logbook-servicing' ? 'service'
     : cat === 'diagnosis' || key === 'warning-light-diagnostics' ? 'diagnostic' : 'custom';
   const t0 = STATE.replyTmpl;
   $('#sheet-title').textContent = 'Reply to ' + firstName(s.full_name);
   $('#sheet-sub').innerHTML = `Sends a threaded reply via Gmail`;
-  const tmplKeys = isLikelyDiy(s) ? ['diy', 'service', 'diagnostic', 'custom'] : ['service', 'diagnostic', 'custom'];
+  // A flagged enquiry gets its decline first; the quotes stay one tap away in case the flag is wrong.
+  const tmplKeys = isLikelyDiy(s) ? [diyKind(s), 'service', 'diagnostic', 'custom'] : ['service', 'diagnostic', 'custom'];
   $('#sheet-body').innerHTML = `
     <button class="btn ghost" id="reply-back" style="margin-bottom:14px;width:auto;display:inline-flex"><i data-lucide="chevron-left"></i>Back</button>
     <div class="reply-to">To <b>${esc(s.email || 'no email on file')}</b></div>
     <div class="tmpl-seg" id="tmpl-seg">${tmplKeys.map((k) => `<button data-tmpl="${k}" class="${k === t0 ? 'active' : ''}">${TEMPLATES[k].label}</button>`).join('')}</div>
-    <div class="price-row" id="price-row" style="display:${t0 === 'custom' || t0 === 'diy' ? 'none' : 'flex'}"><label>Price</label><div class="pin"><span>$</span><input id="price-in" type="number" inputmode="numeric" value="${TEMPLATES[t0].price || ''}" /></div></div>
+    <div class="price-row" id="price-row" style="display:${['custom', 'diy', 'started'].includes(t0) ? 'none' : 'flex'}"><label>Price</label><div class="pin"><span>$</span><input id="price-in" type="number" inputmode="numeric" value="${TEMPLATES[t0].price || ''}" /></div></div>
     <textarea class="composer" id="composer">${esc(buildReplyText(t0, s, TEMPLATES[t0].price))}</textarea>
     <div class="actions"><button class="btn primary full" id="send-reply"><i data-lucide="send"></i>Send reply</button></div>
     <p style="font-size:12px;color:var(--subtle);margin-top:10px;text-align:center">Sent in the customer's existing email thread, so the whole conversation stays together in Gmail.</p>
@@ -483,7 +499,7 @@ function openReply(id) {
     const b = e.target.closest('[data-tmpl]'); if (!b) return;
     STATE.replyTmpl = b.dataset.tmpl;
     document.querySelectorAll('#tmpl-seg button').forEach((x) => x.classList.toggle('active', x === b));
-    $('#price-row').style.display = STATE.replyTmpl === 'custom' || STATE.replyTmpl === 'diy' ? 'none' : 'flex';
+    $('#price-row').style.display = ['custom', 'diy', 'started'].includes(STATE.replyTmpl) ? 'none' : 'flex';
     if ($('#price-in')) $('#price-in').value = TEMPLATES[STATE.replyTmpl].price || '';
     refresh();
   });
@@ -505,7 +521,7 @@ async function sendReplyNow(id) {
     const found = await findThread(s.email, s.vehicle_rego);
     await sendThreaded(s.email, body, found);
     // advance status: a priced quote -> quoted, custom -> contacted
-    const ns = STATE.replyTmpl === 'custom' || STATE.replyTmpl === 'diy' ? 'contacted' : 'quoted';
+    const ns = ['custom', 'diy', 'started'].includes(STATE.replyTmpl) ? 'contacted' : 'quoted';
     await sb.from('quote_submissions').update({ status: ns }).eq('id', id);
     s.status = ns;
     toast(found && found.threadId ? 'Reply sent in thread' : 'Reply sent', 'ok');

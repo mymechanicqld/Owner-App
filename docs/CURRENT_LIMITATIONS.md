@@ -66,7 +66,7 @@ The main Records delete path removes the database row first, then makes best-eff
 
 ### Likely DIY check
 
-- It asks one question: is the customer supplying their own parts. A job the customer started themselves without mentioning parts ("attempted to change the water pump, stripped the bolts") usually scores low. A second question can be added to the same call for almost no cost.
+- The started-it-themselves question is fuzzier than the parts one. At its 0.8 cut-off it still flags a customer who swapped a part themselves and now wants a diagnosis ("just replaced O2 sensors, now revs high", 0.86), which may be a job worth taking.
 - It only reads what the customer typed. A note like "using original parts" can be ambiguous (scored 0.76 in testing).
 - It looks back 48 hours, so older enquiries are never scored. Changing `WINDOW_HOURS` and redeploying would score older ones.
 - The label is a hint for the owner, nothing is declined or sent automatically.

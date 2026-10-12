@@ -101,16 +101,18 @@ Bookings hold title, job type, date, start time, duration, customer, **email**, 
 
 ## Likely DIY
 
-New website enquiries are checked automatically for "the customer is supplying their own parts and only wants them fitted", which the business does not take on. The check runs on Cloudflare (`cloudflare/triage`) within about a minute of the enquiry arriving.
+New website enquiries are checked automatically for two kinds of job the business does not take on: the customer is supplying their own parts and only wants them fitted, or the customer has started the repair themselves and wants it finished. The check runs on Cloudflare (`cloudflare/triage`) within about a minute of the enquiry arriving.
+
+Both get the same "Likely DIY" label; the detail sheet says which and how sure.
 
 - Dashboard: a violet "N likely DIY enquiries in the last 48 hours" bar. Tapping it opens Inquiries filtered to them.
-- Inquiries: a "Likely DIY" tag on the row and a "Likely DIY N" filter chip.
+- Inquiries: a "Likely DIY" tag on the row's second line (so long names stay readable) and a "Likely DIY N" filter chip, first in the row so it is seen.
 - Detail sheet: a note saying how sure the check is, for example "95% sure".
-- Reply: starts on the **Own parts** template, a warm decline that offers to do the whole job with our parts. The wording is in Settings > Messages > Own parts (decline). Sending it marks the enquiry Contacted.
+- Reply: starts on the matching decline, **Own parts** (we only fit parts we supply, offer the whole job with our parts) or **Started job** (the playbook wording: not something we can pick up and finish, offer the whole job ourselves). Service and Diagnostic quotes stay one tap away in case the flag is wrong. Wording in Settings > Messages. Sending a decline marks the enquiry Contacted.
 - Email tab: the enquiry's conversation carries the tag.
 - Ashley sees `likely_diy` on every enquiry and can list only those, so "reply to the likely DIY enquiries" works. Each email still needs the owner's Confirm.
 
-An enquiry is labelled when its score is 0.6 or more (`DIY_MIN` in `app.js`). Unchecked or older enquiries simply show no label.
+Labelled when the own-parts score is 0.6 or more (`DIY_MIN`) or the started-it score is 0.8 or more (`STARTED_MIN`, in `app.js`). Unchecked or older enquiries show no label.
 
 ## Email
 

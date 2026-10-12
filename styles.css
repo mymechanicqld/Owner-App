@@ -721,7 +721,10 @@ body.mail-thread #view-email.active { display: flex; flex-direction: column; hei
    (scored automatically by cloudflare/triage). Violet, so it never reads as a
    status colour.
    ========================================================================== */
-.diy-tag { margin-left: 2px; font-size: 10.5px; font-weight: 800; letter-spacing: 0.02em; padding: 2px 7px; border-radius: 999px; background: #EDE9FE; color: #5B21B6; border: 1px solid #DDD6FE; white-space: nowrap; }
+.row .name { min-width: 0; }
+.row .name .nm { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row .when { max-width: 42%; }
+.diy-tag { margin-right: 2px; font-size: 10.5px; font-weight: 800; letter-spacing: 0.02em; padding: 2px 7px; border-radius: 999px; background: #EDE9FE; color: #5B21B6; border: 1px solid #DDD6FE; white-space: nowrap; }
 .mtag--diy { background: #EDE9FE; color: #5B21B6; border-color: #DDD6FE; }
 .chip.chip--diy { border-color: #DDD6FE; color: #5B21B6; background: #F5F3FF; }
 .chip.chip--diy.active { background: #6D28D9; border-color: #6D28D9; color: #fff; }
