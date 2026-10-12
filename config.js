@@ -40,7 +40,7 @@ const CONFIG = {
   ASHLEY: {
     ENDPOINT: (function () {
       try { const o = localStorage.getItem('mmqld_ashley_endpoint'); if (o) return o; } catch (_) {}
-      return 'https://mmqld-ashley.todo-r2-d1.workers.dev';
+      return 'https://mmqld-ashley.mmqld.workers.dev';
     })(),
     APP_KEY: _unramble(_RAMBLED.ash),
   },

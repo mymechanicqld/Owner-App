@@ -164,7 +164,7 @@ The UI and send path also clean dash punctuation. The business signature is dete
 
 ## Privacy design
 
-The system instructions do not name the business, app, site or database. The model runs in Cloudflare Workers AI under the Cloudflare account signed in as gursahib99888@gmail.com, with no third-party model router in between.
+The system instructions do not name the business, app, site or database. The model runs in Cloudflare Workers AI under the business Cloudflare account (Mymechanicqld@gmail.com's Account), with no third-party model router in between.
 
 This reduces unnecessary project disclosure but does not make model calls data-free. Relevant customer details and tool results are sent to the model when the owner's request needs them.
 

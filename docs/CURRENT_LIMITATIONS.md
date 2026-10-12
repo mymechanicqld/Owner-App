@@ -99,9 +99,9 @@ It is fast and cheap, but in testing it described a declined action as done, and
 
 Workers AI gives 10,000 free neurons a day, about 150 to 250 Ashley questions. When that is used up, Ashley stops answering until 10am Brisbane time. The app does not count usage itself; the Cloudflare dashboard shows it.
 
-### The Worker lives on a personal Cloudflare account
+### The Worker's address is a workers.dev address
 
-`mmqld-ashley` is deployed on the Cloudflare account signed in as gursahib99888@gmail.com, on that account's `todo-r2-d1.workers.dev` subdomain. Deploying or changing it needs that login. Moving it to a business-owned account would change the endpoint URL in `config.js`.
+`mmqld-ashley` runs on the business Cloudflare account at `mmqld-ashley.mmqld.workers.dev`. Moving it to another account, or to a custom domain, changes the address in `config.js`. Phones load the new address with the next page load.
 
 ### Privacy minimisation is not anonymisation
 

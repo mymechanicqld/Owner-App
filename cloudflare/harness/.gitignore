@@ -1,0 +1,4 @@
+# Credentials for the Cloudflare account. The Owner-App repository is public.
+.env
+.env.*
+!.env.example

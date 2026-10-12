@@ -1,3 +1,9 @@
 .DS_Store
 # Local PDF exports can hold customer details; never commit them.
 output/
+
+# Local secrets and wrangler state (Cloudflare harness and Workers).
+.env
+.env.*
+!.env.example
+.wrangler/

@@ -8,7 +8,7 @@ Canonical owner app:
 
 Ashley's model endpoint, on Cloudflare:
 
-- <https://mmqld-ashley.todo-r2-d1.workers.dev>
+- <https://mmqld-ashley.mmqld.workers.dev>
 
 Legacy GitHub Pages copies may still exist on an installed phone. They use the same Cloudflare endpoint, which accepts the GitHub Pages origin.
 
@@ -22,13 +22,15 @@ The owner-app Vercel project needs no environment variables. It serves static fi
 
 Ashley's model runs on Cloudflare Workers AI through the Worker in `cloudflare/ashley`:
 
-- URL: <https://mmqld-ashley.todo-r2-d1.workers.dev>
+- URL: <https://mmqld-ashley.mmqld.workers.dev>
 - Model: `@cf/zai-org/glm-4.7-flash`, thinking off, one retry on transient errors
 - Model access: the Worker's AI binding. There is no model API key.
 - Secret: `ASHLEY_APP_KEY`, which must match the handshake in `config.js`
-- Account: the Cloudflare account signed in as gursahib99888@gmail.com (account ID `7b9aacaaa3e2edf9947a8da986f1ba38`). The `todo-r2-d1` part of the URL is that account's workers.dev subdomain, not this project.
-- Deploy: `npx wrangler deploy` from `cloudflare/ashley` while `npx wrangler whoami` shows that account. `wrangler` is installed in `~/Documents/MyProjects/CloudFare-Setup`.
-- Rotate the handshake: `npx wrangler secret put ASHLEY_APP_KEY`, then re-ramble the same value into `_RAMBLED.ash` in `config.js`.
+- Account: the business Cloudflare account, "Mymechanicqld@gmail.com's Account" (account ID `da076ea95e20322c72f5c47f698bdeb5`), workers.dev subdomain `mmqld`. Moved here on 11 October 2026.
+- Managed with the harness in `cloudflare/harness` (see its README). Its `.env` holds the account ID and an account API token and is git-ignored. No `wrangler login` or MCP is needed.
+- Deploy: from `cloudflare/harness`, `node cf.mjs deploy ../ashley`.
+- Rotate the handshake: `echo -n NEW_VALUE | node cf.mjs secret mmqld-ashley ASHLEY_APP_KEY`, then re-ramble the same value into `_RAMBLED.ash` in `config.js`.
+- The previous Worker, `mmqld-ashley.todo-r2-d1.workers.dev` on the personal account signed in as gursahib99888@gmail.com, served Ashley until this move. Delete it from that account once no installed app still calls it.
 - Quick health check without spending allowance: a POST with no `X-Ashley-Key` must return `401 Not authorised`.
 - Cost: about 17 to 22 neurons per model step, so a normal question costs 35 to 65 neurons. The free allowance is 10,000 neurons a day, resetting at 10am Brisbane time. When it runs out, Ashley says so until the reset.
 

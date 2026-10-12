@@ -59,7 +59,7 @@ Owner's phone
   |-- Google Identity Services and Gmail API
   |     `-- Inbox search, threaded replies and PDF attachments
   |
-  `-- Ashley Worker on Cloudflare (mmqld-ashley.todo-r2-d1.workers.dev)
+  `-- Ashley Worker on Cloudflare (mmqld-ashley.mmqld.workers.dev)
         `-- GLM 4.7 Flash through the Workers AI binding, no key
 ```
 

@@ -2,6 +2,17 @@
 
 This file records completed owner-app changes, production updates and important verification details. Add new entries at the top.
 
+## 11 October 2026: Ashley moved to the business Cloudflare account
+
+Status: Built and tested; live once pushed.
+
+- New `cloudflare/harness`: a dependency-free Node tool (`cf.mjs`) that drives a Cloudflare account through its API using an account token in a git-ignored `.env` (the repository is public). It verifies the token, registers the workers.dev subdomain, lists and deploys Workers (wrangler with the token, no login), sets secrets from stdin, makes a single Workers AI call, and passes any other API request through.
+- New account: "Mymechanicqld@gmail.com's Account" (`da076ea95e20322c72f5c47f698bdeb5`). The token reaches Workers, Workers AI, KV, D1 and R2.
+- Registered the subdomain `mmqld`, deployed `mmqld-ashley` (unchanged code), set `ASHLEY_APP_KEY` to the app's existing handshake.
+- `config.js` now points Ashley at `https://mmqld-ashley.mmqld.workers.dev`.
+- Checks: no key returns 401; one tool-calling request picked the right tool for about 2 neurons; a full question in the local app ("enquiries this week and most common job") ran two model steps through the new Worker and answered from real data.
+- The old Worker on the personal account is still deployed so nothing breaks mid-switch.
+
 ## 4 October 2026: Signature no longer folded by Gmail, signature switch
 
 Status: Deployed; the Gmail side needs one more real reply to confirm.
