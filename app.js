@@ -495,7 +495,7 @@ function openReply(id) {
     <div class="tmpl-seg" id="tmpl-seg">${tmplKeys.map((k) => `<button data-tmpl="${k}" class="${k === t0 ? 'active' : ''}">${TEMPLATES[k].label}</button>`).join('')}</div>
     <div class="price-row" id="price-row" style="display:${['custom', 'diy', 'started'].includes(t0) ? 'none' : 'flex'}"><label>Price</label><div class="pin"><span>$</span><input id="price-in" type="number" inputmode="numeric" value="${TEMPLATES[t0].price || ''}" /></div></div>
     <textarea class="composer" id="composer">${esc(buildReplyText(t0, s, TEMPLATES[t0].price))}</textarea>
-    <div class="actions"><button class="btn primary full" id="send-reply"><i data-lucide="send"></i>Send reply</button></div>
+    <div class="actions reply-acts">${ashleyOn() ? '<button class="btn ai-btn" id="ai-rewrite" title="Rewrite with Ashley"><i data-lucide="sparkles"></i><span>Rewrite</span></button>' : ''}<button class="btn primary ${ashleyOn() ? '' : 'full'}" id="send-reply"><i data-lucide="send"></i>Send reply</button></div>
     <p style="font-size:12px;color:var(--subtle);margin-top:10px;text-align:center">Sent in the customer's existing email thread, so the whole conversation stays together in Gmail.</p>
   `;
   icons();
@@ -515,6 +515,115 @@ function openReply(id) {
   if ($('#price-in')) $('#price-in').addEventListener('input', refresh);
   $('#reply-back').addEventListener('click', () => openDetail(id));
   $('#send-reply').addEventListener('click', () => sendReplyNow(id));
+  const aiBtn = $('#ai-rewrite'); if (aiBtn) aiBtn.addEventListener('click', () => rewriteWithAshley(s));
+}
+
+/* ------------------------------------------------- rewrite with Ashley -- */
+/* The owner jots the gist ("$168", "can do Thursday arvo, $220 all in") and
+   Ashley turns it into a proper reply that answers what the customer asked.
+   Runs on the same Cloudflare model as Ashley (cloudflare/ashley), with no
+   tools. The model only sees the job, the car, the suburb, what the customer
+   wrote and the owner's draft: no contact details, no business identity. The
+   greeting and the signature are added here, not by the model. */
+const ashleyOn = () => !window.MMQLD_SETTINGS || MMQLD_SETTINGS.bool('ashley_enabled');
+const REWRITE_RULES = `You rewrite a mobile mechanic's quick draft into the email reply he sends to a customer.
+
+His draft is the instruction. Use ONLY facts from his draft and the customer's enquiry.
+- A price in the draft is the price for the JOB REQUESTED, explained the way PRICE MEANS says.
+  It does not cover other repairs the customer mentions.
+- Never invent or promise a price, a day, a date, a time, a part, a brand or a warranty that is not
+  in his draft. The customer's preferred date is only what they asked for: do not confirm or offer it
+  unless his draft does. Without a day in the draft, ask when suits them.
+- Never offer or agree to any work his draft does not mention, even if the customer asked for it.
+  Say only what his draft says, in better words.
+- If the draft says no or we cannot help, decline warmly and offer what we can do if he said it.
+
+Write prices with a dollar sign and no cents, for example $650.
+
+Write as the business: "we" and "us", never "I". Warm, natural and short, like a real person, two
+to four sentences. Australian spelling.
+NEVER use a dash as punctuation (no em-dash, no en-dash); use a comma or a full stop. No emojis.
+End with a simple next step, such as asking them to reply to book in.
+
+Write only the body: no greeting line, no sign-off, no name, no business details. Those are added
+automatically. Do not put the message in quotes.`;
+
+function rewriteContext(s) {
+  const lines = [
+    'Job requested: ' + (svcLabel(s.service_needed) || 'not given'),
+    carDesc(s) ? 'Car: ' + carDesc(s) : '',
+    s.suburb ? 'Suburb: ' + s.suburb : '',
+    s.preferred_date ? "Customer's preferred date (their wish, not confirmed): " + fmtDate(s.preferred_date) : '',
+    'What the customer wrote: ' + (String(s.symptoms || '').trim() || '(nothing beyond the job type)'),
+    // Decided here, not left to the model: a diagnosis price and a job price mean different things.
+    'PRICE MEANS: ' + (svcCategory(s) === 'diagnosis' || ['warning-light-diagnostics', 'not-sure', 'general-enquiry'].includes(svcKey(s.service_needed))
+      ? 'a diagnosis fee. It covers finding the fault; any repair is quoted once we know what is needed.'
+      : 'the price for doing this job. Do not describe it as a diagnosis.'),
+  ];
+  return lines.filter(Boolean).join('\n');
+}
+
+/* Split the composer into greeting / what he wrote / signature, so only the
+   middle goes to the model and the rest is put back untouched. */
+function splitDraft(text) {
+  let t = String(text || '').replace(/\r\n/g, '\n');
+  let greet = '';
+  const m = t.match(/^\s*((?:good (?:morning|afternoon|evening)|hi|hello|hey|dear)\b[^\n]{0,40},?)\s*\n/i);
+  if (m) { greet = m[1].trim(); t = t.slice(m[0].length); }
+  const sig = window.MMQLD_SETTINGS ? MMQLD_SETTINGS.signature().trim() : '';
+  const at = sig ? t.indexOf(sig.split('\n')[0]) : -1;
+  if (at >= 0) t = t.slice(0, at);
+  return { greet, body: t.trim() };
+}
+
+function tidyRewrite(out) {
+  let t = String(out || '').trim().replace(/^["'\u201C]|["'\u201D]$/g, '').trim();
+  // Belt and braces: the rules forbid these, the model sometimes forgets.
+  t = t.replace(/^(good (morning|afternoon|evening)|hi|hello|hey|dear)\b[^\n]{0,40},?\s*\n+/i, '');
+  t = t.replace(/\n+\s*(thanks|thank you|cheers|kind regards|regards|best)[^\n]{0,30}\s*(\n[^\n]{0,40}){0,4}$/i, '');
+  t = t.replace(/\s*[\u2014\u2013]\s*/g, ', ').replace(/ - /g, ', ');
+  return t.trim();
+}
+
+async function rewriteWithAshley(s) {
+  const box = $('#composer'), btn = $('#ai-rewrite');
+  if (!box || !btn || btn.disabled) return;
+  const before = box.value;
+  const { greet, body } = splitDraft(before);
+  if (body.replace(/\s/g, '').length < 2) {
+    toast('Jot the gist first, for example "$168" or "can do Thursday"', 'err');
+    return box.focus();
+  }
+  const cfg = CONFIG.ASHLEY || {};
+  btn.disabled = true; box.disabled = true; box.classList.add('ai-busy');
+  btn.innerHTML = '<span class="spin dark"></span><span>Rewriting</span>';
+  try {
+    const res = await fetch(cfg.ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Ashley-Key': cfg.APP_KEY || '' },
+      body: JSON.stringify({
+        messages: [
+          { role: 'system', content: REWRITE_RULES },
+          { role: 'user', content: 'CUSTOMER ENQUIRY (context only)\n' + rewriteContext(s) + '\n\nHIS DRAFT\n' + body
+            + '\n\nReminder: say only what his draft says, in better words. Do not mention or offer any other job, part or request from the enquiry.' },
+        ],
+        temperature: 0.2,
+        max_tokens: 400,
+      }),
+    });
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(j.error || 'Ashley could not rewrite it (' + res.status + ')');
+    const text = tidyRewrite(j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content);
+    if (!text) throw new Error('Ashley came back empty, try again');
+    box.value = (greet || greeting()) + '\n\n' + text + (window.MMQLD_SETTINGS ? MMQLD_SETTINGS.signature() : '');
+    toastAction('Rewritten by Ashley. Check it, then send.', 'Undo', () => { const b = $('#composer'); if (b) b.value = before; });
+  } catch (e) {
+    toast(String((e && e.message) || e).slice(0, 120), 'err');
+  } finally {
+    const b = $('#ai-rewrite'), c = $('#composer');
+    if (c) { c.disabled = false; c.classList.remove('ai-busy'); }
+    if (b) { b.disabled = false; b.innerHTML = '<i data-lucide="sparkles"></i><span>Rewrite</span>'; icons(); }
+  }
 }
 
 async function sendReplyNow(id) {

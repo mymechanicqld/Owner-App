@@ -162,6 +162,19 @@ The model is instructed to:
 
 The UI and send path also clean dash punctuation. The business signature is deterministic browser code, not generated text.
 
+## Rewrite with Ashley (Reply sheet)
+
+`rewriteWithAshley()` in `app.js` calls the same Cloudflare endpoint with no tools: one system message of rules (`REWRITE_RULES`) and one user message holding the enquiry (job, car, suburb, the customer's preferred date marked as not confirmed, what they wrote, and a PRICE MEANS line decided in code from the job type) plus the owner's draft, ending with a reminder to say only what the draft says. Temperature 0.2, at most 400 tokens, about 5 neurons per rewrite.
+
+Rules that came out of testing on real enquiries (11 Oct 2026):
+
+- The customer's preferred date was read as a booking ("we can fit you in Tuesday"), so it is labelled as their wish and never confirmed unless the draft says so.
+- A $168 diagnosis was described as covering "the inspection and fix", and a brake pad price as "finding the fault". Whether a price is a diagnosis fee or a job price is now decided in code from the job type, not by the model.
+- Work the customer mentioned but the owner did not offer (a supercharger belt) crept in. The rule is repeated as the last line of the request, which stopped it.
+- "We", never "I"; prices with a dollar sign; no dashes as punctuation (also removed in code).
+
+The greeting line and the signature are taken off before the call and put back after, so the model never sees the business details. Only the job, car, suburb, preferred date and the customer's own words go to the model, never their name, email, phone or address.
+
 ## Privacy design
 
 The system instructions do not name the business, app, site or database. The model runs in Cloudflare Workers AI under the business Cloudflare account (Mymechanicqld@gmail.com's Account), with no third-party model router in between.

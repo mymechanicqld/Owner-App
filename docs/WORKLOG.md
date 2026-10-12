@@ -2,6 +2,14 @@
 
 This file records completed owner-app changes, production updates and important verification details. Add new entries at the top.
 
+## 11 October 2026: Rewrite with Ashley on the Reply sheet
+
+Status: Deployed.
+
+- Migration 011 applied by the owner. The once-a-minute triage run re-scored the last 48 hours by itself and scored two new enquiries with no manual trigger, confirming the scheduled path. Mitch Taylor (0.93) and Shantal (0.86) now carry the DIY tile.
+- New sparkle **Rewrite** button left of Send reply: the owner's quick draft plus the enquiry go to the Cloudflare model behind Ashley (no tools) and come back as a proper reply in "we", greeting kept, signature added, with Undo. See ASHLEY.md for the rules and what testing changed.
+- Tested on real enquiries: "$168" on a brake fault diagnosis, "220 all in, thursday arvo" on brake pads, and a decline with a $650 counter-offer on a started water pump job. The final rules gave accurate replies for all of them.
+
 ## 11 October 2026: Started-it-themselves check added to Likely DIY
 
 Status: Deployed; needs website migration 011 run once to take effect.

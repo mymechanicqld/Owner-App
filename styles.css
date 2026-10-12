@@ -751,3 +751,15 @@ body.mail-thread #view-email.active { display: flex; flex-direction: column; hei
 .diy-note { display: flex; gap: 11px; align-items: flex-start; padding: 12px 14px; margin-bottom: 12px; border-radius: 13px; background: #F5F3FF; border: 1px solid #DDD6FE; color: #4C1D95; font-size: 13.5px; line-height: 1.45; }
 .diy-note svg { width: 19px; height: 19px; flex: 0 0 auto; margin-top: 1px; color: #6D28D9; }
 .diy-note b { display: block; font-weight: 800; margin-bottom: 1px; }
+
+/* Rewrite with Ashley, beside Send reply */
+.reply-acts { grid-template-columns: auto 1fr; }
+.btn.ai-btn {
+  padding: 14px 16px; color: #fff; border: 0;
+  background: linear-gradient(135deg, #6D28D9 0%, #2563EB 100%);
+  box-shadow: 0 3px 10px rgba(91,33,182,0.28);
+}
+.btn.ai-btn:active { filter: brightness(0.92); }
+.btn.ai-btn:disabled { opacity: 0.85; }
+.btn.ai-btn .spin.dark { border-color: rgba(255,255,255,0.4); border-top-color: #fff; width: 16px; height: 16px; }
+.composer.ai-busy { background: linear-gradient(90deg, var(--soft) 25%, #EDE9FE 50%, var(--soft) 75%); background-size: 200% 100%; animation: sh 1.3s infinite; color: var(--subtle); }

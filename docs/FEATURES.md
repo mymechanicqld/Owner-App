@@ -37,6 +37,7 @@ The detail sheet can:
 
 - show phone, email, suburb, address, vehicle, service with its website category, requested date, notes and submission time
 - change status between New, Contacted, Quoted, Booked, Won, Lost and Archived
+- **Rewrite with Ashley** (sparkle button left of Send reply, on every template): the owner jots the gist ("$168", "220 all in, thursday arvo", "sorry we can't finish started jobs, happy to do the whole job for 650") and Ashley rewrites it into a proper reply to what the customer asked. It keeps the greeting and adds the standard signature. An Undo button on the toast brings the draft back. Hidden when Ashley is switched off in Settings
 - reply by email; the reply sheet starts on the template that fits the service (Logbook service quote for servicing, Diagnostic for diagnosis, a blank reply for everything else)
 - open the whole email conversation with the customer on the Email tab (Emails button, shown when there is an email address)
 - call the customer
