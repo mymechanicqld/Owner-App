@@ -175,6 +175,10 @@ Rules that came out of testing on real enquiries (11 Oct 2026):
 
 The greeting line and the signature are taken off before the call and put back after, so the model never sees the business details. Only the job, car, suburb, preferred date and the customer's own words go to the model, never their name, email, phone or address.
 
+## Draft a polite no (Likely DIY enquiries)
+
+`draftDecline()` in `app.js`, from the button in a Likely DIY enquiry's note. Same endpoint, no tools, `DECLINE_RULES`: one or two sentences, a gentle reason and the offer, never risk, liability, blame, prices or dates. The model gets the job, car, the customer's words, and the reason and offer spelt out in plain words (`declineBrief()`), never the "Likely DIY" label. If the reply contains "DIY" or "do it yourself" anyway, the app keeps the standard decline template. Tested 11 Oct 2026 on Mitch Taylor and Shantal (started) and an own-parts enquiry: all short, kind, correct reason, no label.
+
 ## Privacy design
 
 The system instructions do not name the business, app, site or database. The model runs in Cloudflare Workers AI under the business Cloudflare account (Mymechanicqld@gmail.com's Account), with no third-party model router in between.

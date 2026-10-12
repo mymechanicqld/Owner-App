@@ -2,6 +2,14 @@
 
 This file records completed owner-app changes, production updates and important verification details. Add new entries at the top.
 
+## 11 October 2026: Draft a polite no for Likely DIY enquiries
+
+Status: Deployed.
+
+- A **Draft a polite no** button in the Likely DIY note. One tap opens the reply on the matching decline and Ashley writes a one or two sentence, personal "sorry, we can't take this on" with the right reason and the offer to do the whole job ourselves. The owner reviews and taps Send reply.
+- The word "DIY" never reaches the customer: the model is told the reason in plain words, and any draft containing "DIY" or "do it yourself" falls back to the standard template.
+- Rewrite button restyled white with navy (owner's request), and the new button matches.
+
 ## 11 October 2026: Rewrite with Ashley on the Reply sheet
 
 Status: Deployed.

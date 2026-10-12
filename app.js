@@ -414,7 +414,7 @@ function openDetail(id) {
   const field = (icon, label, val) => val ? `<div class="field"><div class="fic"><i data-lucide="${icon}"></i></div><div><div class="fl">${label}</div><div class="fv">${val}</div></div></div>` : '';
   const tel = s.phone ? s.phone.replace(/\s/g, '') : '';
   $('#sheet-body').innerHTML = `
-    ${isLikelyDiy(s) ? `<div class="diy-note"><i data-lucide="package-x"></i><div><b>Likely DIY job</b><span>From what they wrote, the customer seems to ${esc(diyWhy(s))}. Checked automatically when the enquiry came in. The Reply button starts on the "${diyKind(s) === 'started' ? 'Started job' : 'Own parts'}" decline.</span></div></div>` : ''}
+    ${isLikelyDiy(s) ? `<div class="diy-note"><i data-lucide="package-x"></i><div><b>Likely DIY job</b><span>From what they wrote, the customer seems to ${esc(diyWhy(s))}. Checked automatically when the enquiry came in.</span>${ashleyOn() && s.email ? '<button class="diy-draft" id="act-diy-draft"><i data-lucide="sparkles"></i>Draft a polite no</button>' : ''}</div></div>` : ''}
     ${field('phone', 'Phone', s.phone ? `<a href="tel:${esc(tel)}">${esc(s.phone)}</a>` : '')}
     ${field('mail', 'Email', s.email ? `<a href="mailto:${esc(s.email)}">${esc(s.email)}</a>` : '')}
     ${field('map-pin', 'Suburb', esc(s.suburb))}
@@ -449,6 +449,7 @@ function openDetail(id) {
     s.status = ns; toast('Marked ' + STATUS_LABEL[ns], 'ok'); render();
   });
   $('#act-reply').addEventListener('click', () => openReply(id));
+  const dBtn = $('#act-diy-draft'); if (dBtn) dBtn.addEventListener('click', () => { openReply(id); draftDecline(s); });
   // The whole email conversation with this customer, on the Email tab.
   const eBtn = $('#act-emails'); if (eBtn) eBtn.addEventListener('click', () => { closeSheet(); MMQLD_MAIL.openFor(s.email); });
   const genParams = () => new URLSearchParams({
@@ -516,6 +517,77 @@ function openReply(id) {
   $('#reply-back').addEventListener('click', () => openDetail(id));
   $('#send-reply').addEventListener('click', () => sendReplyNow(id));
   const aiBtn = $('#ai-rewrite'); if (aiBtn) aiBtn.addEventListener('click', () => rewriteWithAshley(s));
+}
+
+/* ------------------------------------------- draft a polite no (DIY) -- */
+/* For an enquiry flagged Likely DIY: Ashley writes a short, kind decline
+   from what the customer wrote, the owner checks it and presses Send. The
+   reason is described to the model in plain words and the label itself is
+   never sent, because it is the business's own shorthand: the customer must
+   never read "DIY". A check below makes sure of it either way. */
+const DECLINE_RULES = `You write a short, kind email reply from a mobile mechanic business turning down a job.
+
+Write ONE or TWO sentences only:
+1. Thank them and say, gently, that this is not a job we are able to take on, giving the reason you
+   are told in WHY WE CANNOT, in plain friendly words. You may name their job or car.
+2. Offer the alternative you are told in WHAT WE CAN OFFER, and invite them to reply if that suits.
+
+Never mention risk, danger, liability, safety, insurance or that they did anything wrong. Never use
+the words "DIY" or "do it yourself". Never give a price, a date or a time.
+Write as the business: "we" and "us", never "I". Australian spelling. NEVER use a dash as punctuation
+(no em-dash, no en-dash). No emojis. Write only the sentences: no greeting, no sign-off, no name,
+no business details, no quotes.`;
+
+function declineBrief(s) {
+  const started = diyKind(s) === 'started';
+  return [
+    'Job requested: ' + (svcLabel(s.service_needed) || 'not given'),
+    carDesc(s) ? 'Car: ' + carDesc(s) : '',
+    'What the customer wrote: ' + (String(s.symptoms || '').trim() || '(nothing beyond the job type)'),
+    'WHY WE CANNOT: ' + (started
+      ? 'the work has already been started, and we are not able to pick up and finish a job someone else has begun.'
+      : 'we only fit parts that we supply ourselves, so we cannot fit parts the customer provides.'),
+    'WHAT WE CAN OFFER: ' + (started
+      ? 'to take care of the whole job ourselves from the start.'
+      : 'to do the whole job for them with our own parts, and send a price.'),
+  ].filter(Boolean).join('\n');
+}
+
+async function draftDecline(s) {
+  const box = $('#composer'), btn = $('#ai-rewrite');
+  if (!box) return;
+  const before = box.value;                     // the matching decline template, kept as the fallback
+  const { greet } = splitDraft(before);
+  const cfg = CONFIG.ASHLEY || {};
+  box.disabled = true; box.classList.add('ai-busy');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spin dark"></span><span>Writing</span>'; }
+  try {
+    const res = await fetch(cfg.ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Ashley-Key': cfg.APP_KEY || '' },
+      body: JSON.stringify({
+        messages: [
+          { role: 'system', content: DECLINE_RULES },
+          { role: 'user', content: declineBrief(s) + '\n\nReminder: one or two sentences, kind, and never the words DIY or do it yourself.' },
+        ],
+        temperature: 0.3,
+        max_tokens: 200,
+      }),
+    });
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(j.error || 'Ashley could not write it (' + res.status + ')');
+    const text = tidyRewrite(j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content);
+    // The customer must never read our label. If it slips in, keep the ready-made decline instead.
+    if (!text || /\bDIY\b|do[\s-]*it[\s-]*your\s*self/i.test(text)) throw new Error('Kept the standard wording, check it and send');
+    box.value = (greet || greeting()) + '\n\n' + text + (window.MMQLD_SETTINGS ? MMQLD_SETTINGS.signature() : '');
+    toastAction('Drafted by Ashley. Check it, then send.', 'Undo', () => { const b = $('#composer'); if (b) b.value = before; });
+  } catch (e) {
+    toast(String((e && e.message) || e).slice(0, 120), 'err');
+  } finally {
+    const b = $('#ai-rewrite'), c = $('#composer');
+    if (c) { c.disabled = false; c.classList.remove('ai-busy'); }
+    if (b) { b.disabled = false; b.innerHTML = '<i data-lucide="sparkles"></i><span>Rewrite</span>'; icons(); }
+  }
 }
 
 /* ------------------------------------------------- rewrite with Ashley -- */
