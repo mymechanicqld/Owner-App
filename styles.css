@@ -754,12 +754,8 @@ body.mail-thread #view-email.active { display: flex; flex-direction: column; hei
 
 /* Rewrite with Ashley, beside Send reply */
 .reply-acts { grid-template-columns: auto 1fr; }
-.btn.ai-btn {
-  padding: 14px 16px; color: #fff; border: 0;
-  background: linear-gradient(135deg, #6D28D9 0%, #2563EB 100%);
-  box-shadow: 0 3px 10px rgba(91,33,182,0.28);
-}
-.btn.ai-btn:active { filter: brightness(0.92); }
-.btn.ai-btn:disabled { opacity: 0.85; }
-.btn.ai-btn .spin.dark { border-color: rgba(255,255,255,0.4); border-top-color: #fff; width: 16px; height: 16px; }
-.composer.ai-busy { background: linear-gradient(90deg, var(--soft) 25%, #EDE9FE 50%, var(--soft) 75%); background-size: 200% 100%; animation: sh 1.3s infinite; color: var(--subtle); }
+.btn.ai-btn { padding: 14px 16px; background: var(--surface); color: var(--accent); border: 1px solid var(--hairline-dk); box-shadow: var(--shadow-sm); }
+.btn.ai-btn:active { background: var(--accent-soft); }
+.btn.ai-btn:disabled { opacity: 0.75; }
+.btn.ai-btn .spin.dark { width: 16px; height: 16px; }
+.composer.ai-busy { background: linear-gradient(90deg, var(--soft) 25%, var(--accent-soft) 50%, var(--soft) 75%); background-size: 200% 100%; animation: sh 1.3s infinite; color: var(--subtle); }
