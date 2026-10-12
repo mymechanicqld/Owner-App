@@ -106,7 +106,7 @@ New website enquiries are checked automatically for two kinds of job the busines
 Both get the same "Likely DIY" label; the detail sheet says which and how sure.
 
 - Dashboard: a violet "N likely DIY enquiries in the last 48 hours" bar. Tapping it opens Inquiries filtered to them.
-- Inquiries: a "Likely DIY" tag on the row's second line (so long names stay readable) and a "Likely DIY N" filter chip, first in the row so it is seen.
+- Inquiry rows (Inquiries, Dashboard, Search): the left tile is the enquiry's flag. Likely DIY is a solid violet tile with "DIY"; otherwise the tile shows the status (New, Contacted, Quoted, Booked, Won, Lost) in its colour. The job type stays written on the right, so the tile no longer repeats it, and the old status dot is gone. Inquiries also has a "Likely DIY N" filter chip, first in the row.
 - Detail sheet: a note saying how sure the check is, for example "95% sure".
 - Reply: starts on the matching decline, **Own parts** (we only fit parts we supply, offer the whole job with our parts) or **Started job** (the playbook wording: not something we can pick up and finish, offer the whole job ourselves). Service and Diagnostic quotes stay one tap away in case the flag is wrong. Wording in Settings > Messages. Sending a decline marks the enquiry Contacted.
 - Email tab: the enquiry's conversation carries the tag.

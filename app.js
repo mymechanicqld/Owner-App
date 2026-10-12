@@ -224,16 +224,25 @@ function diyWhy(r) {
 }
 
 /* ----------------------------------------------------------- row builder -- */
+/* The left tile is the enquiry's flag. Likely DIY wins (solid violet, so it
+   never reads as a status); otherwise it is the status, in the status colour.
+   The job type is written on the right, so it does not need the tile. */
+const STATUS_ICON = { new: 'inbox', contacted: 'message-circle', quoted: 'receipt', booked: 'calendar-check', won: 'badge-check', lost: 'circle-x', archived: 'archive' };
+function flagTile(s) {
+  if (isLikelyDiy(s)) return `<div class="ic flag flag--diy" title="Likely DIY"><i data-lucide="package-x"></i><span>DIY</span></div>`;
+  const st = STATUSES.includes(s.status) ? s.status : 'new';
+  return `<div class="ic flag flag--${st}" title="${STATUS_LABEL[st]}"><i data-lucide="${STATUS_ICON[st]}"></i><span>${STATUS_LABEL[st]}</span></div>`;
+}
 function rowHtml(s) {
   const sv = svc(s.service_needed);
   const rego = s.vehicle_rego ? `<span class="rego">${esc(s.vehicle_rego)}</span>` : '';
   const bits = [esc(s.suburb || ''), carDesc(s) ? esc(carDesc(s)) : ''].filter(Boolean).join(' · ');
   return `
   <div class="row" data-id="${s.id}">
-    <div class="ic"><i data-lucide="${sv.icon}"></i></div>
+    ${flagTile(s)}
     <div class="body">
-      <div class="name"><span class="dot" style="background:${STATUS_COLOR[s.status] || '#2563EB'}"></span><span class="nm">${esc(s.full_name || 'Unknown')}</span></div>
-      <div class="line">${isLikelyDiy(s) ? '<span class="diy-tag">Likely DIY</span> ' : ''}${rego} ${bits}</div>
+      <div class="name"><span class="nm">${esc(s.full_name || 'Unknown')}</span></div>
+      <div class="line">${rego} ${bits}</div>
     </div>
     <div class="when">${relTime(s.created_at)}<br><span style="color:var(--accent)">${esc(sv.label)}</span></div>
   </div>`;

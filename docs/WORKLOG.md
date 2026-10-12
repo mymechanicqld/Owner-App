@@ -9,7 +9,7 @@ Status: Deployed; needs website migration 011 run once to take effect.
 - The triage Worker now asks Clef-flash a second question in the same call: has the customer already started the repair themselves and wants it finished. Stored in `ai_started_score` (migration 011). About 1.1 neurons per enquiry for both.
 - Calibrated on the last 400 enquiries: 0.84 and above all genuine; cut-off 0.8.
 - App: the same "Likely DIY" label covers both, the detail note says which, and the Reply sheet starts on a new **Started job** decline (playbook wording, editable in Settings > Messages). Ashley gets `diy_reason` and the wording for both.
-- Row layout: the tag moved to the row's second line after it squeezed long names; the filter chip moved to the front of the chip row.
+- Row layout (owner's request): the left tile, which repeated the job type already written on the right, is now the flag tile: solid violet "DIY" for Likely DIY, otherwise the status in its colour. The status dot and the in-line tag are gone. The filter chip moved to the front of the chip row.
 - Scored with both questions, the last 48 hours give two flags: Mitch Taylor (started the water pump himself, 93%) and Shantal (replaced O2 sensors, now wants a diagnosis, 86%, borderline).
 
 ## 11 October 2026: Automatic "Likely DIY" check with Cloudflare Clef

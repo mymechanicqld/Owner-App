@@ -724,6 +724,17 @@ body.mail-thread #view-email.active { display: flex; flex-direction: column; hei
 .row .name { min-width: 0; }
 .row .name .nm { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .row .when { max-width: 42%; }
+.row .ic.flag { width: 58px; height: 48px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; }
+.row .ic.flag svg { width: 18px; height: 18px; }
+.row .ic.flag span { font-size: 9px; font-weight: 800; letter-spacing: 0.02em; line-height: 1; }
+.row .ic.flag--new { background: var(--st-new-bg); color: var(--st-new); }
+.row .ic.flag--contacted { background: #FEF3C7; color: var(--st-contacted); }
+.row .ic.flag--quoted { background: var(--st-quoted-bg); color: var(--st-quoted); }
+.row .ic.flag--booked { background: var(--st-booked-bg); color: var(--st-booked); }
+.row .ic.flag--won { background: var(--st-won-bg); color: var(--st-won); }
+.row .ic.flag--lost { background: var(--st-lost-bg); color: var(--st-lost); }
+.row .ic.flag--archived { background: var(--st-archived-bg); color: var(--st-archived); }
+.row .ic.flag--diy { background: #6D28D9; color: #fff; box-shadow: 0 2px 6px rgba(109,40,217,0.28); }
 .diy-tag { margin-right: 2px; font-size: 10.5px; font-weight: 800; letter-spacing: 0.02em; padding: 2px 7px; border-radius: 999px; background: #EDE9FE; color: #5B21B6; border: 1px solid #DDD6FE; white-space: nowrap; }
 .mtag--diy { background: #EDE9FE; color: #5B21B6; border-color: #DDD6FE; }
 .chip.chip--diy { border-color: #DDD6FE; color: #5B21B6; background: #F5F3FF; }
