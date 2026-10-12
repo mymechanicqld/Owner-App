@@ -131,6 +131,11 @@ const TEMPLATES = {
     get price() { return CONFIG.DEFAULT_DIAGNOSTIC_PRICE; },
     build: (g, price) => g + '\n\n' + _tpl('tpl_reply_diagnostic', { price }) + _sig(),
   },
+  diy: {
+    label: 'Own parts',
+    price: '',
+    build: (g) => g + '\n\n' + _tpl('tpl_reply_diy', {}) + _sig(),
+  },
   custom: {
     label: 'Custom',
     price: '',

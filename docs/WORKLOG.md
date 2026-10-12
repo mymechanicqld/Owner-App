@@ -2,6 +2,19 @@
 
 This file records completed owner-app changes, production updates and important verification details. Add new entries at the top.
 
+## 11 October 2026: Automatic "Likely DIY" check with Cloudflare Clef
+
+Status: Deployed.
+
+The owner wanted enquiries where the customer supplies their own parts flagged as soon as they arrive, so he does not spend time on them.
+
+- Research: the models are Cloudflare's **Clef** family (Clef, Clef-flash, Clef-omni), decision models released 1 Oct 2026 that return probabilities for typed questions. Clef-flash runs on the free plan at $0.038 per million input tokens, under one neuron per enquiry.
+- Calibrated on the last 400 real enquiries: every one at 0.76 or above said they had or would supply the part; the next was 0.33. Cut-off 0.6.
+- Website migration 010 (applied by the owner) added `ai_diy_score`, `ai_checked_at`, `ai_model`.
+- New Worker `cloudflare/triage` (`mmqld-triage`, business account): every minute it scores unchecked inquiries from the last 48 hours and writes the score back. `POST /run` triggers a pass on demand.
+- App: Likely DIY tag, dashboard bar, Inquiries filter, detail note, an "Own parts" decline template (Settings > Messages), the tag on the Email tab, and Ashley can see and filter them.
+- First pass: all 11 enquiries from the last 48 hours scored, none flagged (highest 0.33, a self-replaced O2 sensor wanting diagnosis). One was a started-it-themselves job without parts (0.07), which the parts question does not cover.
+
 ## 11 October 2026: Ashley moved to the business Cloudflare account
 
 Status: Built and tested; live once pushed.

@@ -78,6 +78,8 @@
     // Quick replies to website enquiries. The greeting ("Hi Sam,") goes above
     // and the signature below automatically.
     tpl_reply_service: "We can book you in for a standard (regular) service for ${price}, completed mobile at your location.\n\nThis service includes:\n• Oil and filter change\n• Fluids inspected and topped up as required\n• Brake and safety check\n• Cooling and charging system checks\n• Filter checks\n• Spark plug checks\n• Logbook stamped\n• Labour and mobile service\n\nIf you'd like to proceed, please reply with your preferred day and address, and we'll lock in a booking.",
+    // Declining a job where the customer supplies the parts (the business only fits parts it supplies).
+    tpl_reply_diy: "Thanks for thinking of us. We only fit parts that we supply ourselves, so a job using your own parts is not something we are able to take on, sorry about that.\n\nWhat we are very happy to do is take care of the whole job for you, parts included. If that suits, let me know and I will get you a price.",
     tpl_reply_diagnostic: "We can book it in for diagnosis which is ${price}, find out what needs to be done and go from there.\n\nPlease let us know if you'd like to proceed with the booking.",
     // Text message templates, complete messages
     tpl_sms_website: 'Hi {first_name}, thank you for getting in touch with {business}. So we can provide an accurate quote, please share your vehicle and job details through our online form here: {form_link} . We will get back to you shortly. Kind regards, {sender}',

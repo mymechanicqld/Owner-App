@@ -63,6 +63,7 @@
     id: r.id, received: niceWhen(r.created_at), name: r.full_name, email: r.email, phone: r.phone,
     suburb: r.suburb, address: r.address, vehicle: car(r), rego: r.vehicle_rego,
     job: svcLabel(r.service_needed) || r.service_needed, category: svcCategoryLabel(r) || null, status: r.status,
+    likely_diy: typeof r.ai_diy_score === 'number' ? r.ai_diy_score >= 0.6 : null,
     what_they_said: clip(r.symptoms, 400), preferred_date: r.preferred_date || null,
   });
   const slimBooking = (r) => ({
@@ -195,7 +196,8 @@
       return x.order('created_at', { ascending: false }).limit(Math.min(Number(a.limit) || 25, 60));
     });
     const wanted = a.job_type ? svcKey(a.job_type) || a.job_type : null;
-    const out = wanted ? rows.filter((r) => svcKey(r.service_needed) === wanted) : rows;
+    let out = wanted ? rows.filter((r) => svcKey(r.service_needed) === wanted) : rows;
+    if (a.likely_diy === true) out = out.filter((r) => typeof r.ai_diy_score === 'number' && r.ai_diy_score >= 0.6);
     return { count: out.length, enquiries: out.map(slimInquiry) };
   }
 
@@ -515,6 +517,7 @@
           since_hours: { type: 'number', description: 'How far back to look, in hours. Default 48.' },
           status: { type: 'string', enum: ['new', 'contacted', 'quoted', 'booked', 'won', 'lost', 'archived'] },
           job_type: { type: 'string', description: 'Filter to one job type slug, e.g. brake-pads, general-servicing, diagnosis (older inquiries also use brake-repair, not-sure)' },
+          likely_diy: { type: 'boolean', description: 'true = only enquiries flagged as likely DIY (customer supplying their own parts)' },
           limit: { type: 'number' },
         },
       },

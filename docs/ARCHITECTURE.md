@@ -126,6 +126,10 @@ The Email tab. Loaded after `app.js` and uses its globals (`gFetch`, `getToken`,
 
 Builds every outgoing email body: `MMQLD_MIME.alternative(text)` returns the Content-Type and encoded body of a `multipart/alternative` part (plain text + HTML with a unique invisible ending, so Gmail does not fold the repeated signature). Loaded before `app.js` on the main page and before `gmail-send.js` on the generator pages.
 
+### `cloudflare/triage`
+
+Worker `mmqld-triage` on the business Cloudflare account. A cron trigger runs every minute: it reads up to 25 inquiries from the last `WINDOW_HOURS` (48) with `ai_checked_at` null, runs `@cf/cloudflare/clef-flash` through the AI binding with one `noul` question ("Does the customer say they already have, or will supply, their own parts and only want us to fit or install them?") over "Service requested / Customer notes", and PATCHes `ai_diy_score`, `ai_checked_at` and `ai_model`. A failed row stays unchecked and is retried next minute. `POST /run` with `X-Run-Key` triggers a pass on demand and returns the scores. Secrets: `SUPABASE_URL`, `SUPABASE_KEY` (the publishable key), `RUN_KEY`.
+
 ### `gmail-send.js`
 
 Provides generator-page Gmail access. It waits for and can re-inject Google Identity Services, caches a short-lived token, searches for an existing conversation, and sends a multipart PDF attachment.

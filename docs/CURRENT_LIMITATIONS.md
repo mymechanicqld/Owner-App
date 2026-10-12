@@ -64,6 +64,13 @@ When editing an existing record, a failed new upload leaves the older `pdf_path`
 
 The main Records delete path removes the database row first, then makes best-effort Storage deletes for the PDF and, for reports, every photo, thumbnail and the cover photo. A failed object deletion is swallowed, so an orphaned public file can remain.
 
+### Likely DIY check
+
+- It asks one question: is the customer supplying their own parts. A job the customer started themselves without mentioning parts ("attempted to change the water pump, stripped the bolts") usually scores low. A second question can be added to the same call for almost no cost.
+- It only reads what the customer typed. A note like "using original parts" can be ambiguous (scored 0.76 in testing).
+- It looks back 48 hours, so older enquiries are never scored. Changing `WINDOW_HOURS` and redeploying would score older ones.
+- The label is a hint for the owner, nothing is declined or sent automatically.
+
 ### Email tab
 
 - No live updates. New mail appears on Refresh, or when the tab is opened after a minute away. Push would need a Google Cloud Pub/Sub topic and a server endpoint.

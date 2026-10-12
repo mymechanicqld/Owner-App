@@ -48,6 +48,7 @@ The app currently relies on:
 - `service_needed`
 - `service_category` (added by website migration 009 on 3 Oct 2026; null on older rows, so the app works it out from `service_needed` when it is empty)
 - `symptoms`
+- `ai_diy_score`, `ai_checked_at`, `ai_model` (website migration 010, 11 Oct 2026): the automatic "likely DIY" check, written by the triage Worker. Null until checked
 - `preferred_date`
 - `status`
 - `notes`, for Ashley updates
@@ -218,6 +219,15 @@ There is no model key: the Worker uses Cloudflare's AI binding.
 
 The system instructions deliberately omit the business name, app name, URL and database identity. Customer or business-operation data still reaches the model when it is needed to answer a request. The signature and business identity are attached in browser code after the model writes the message body.
 
+## Cloudflare Workers AI: Clef-flash (likely DIY check)
+
+Clef is Cloudflare's own family of decision models (released 1 Oct 2026): given a piece of text ("state") and typed questions, it returns a calibrated probability per answer rather than generated text. `@cf/cloudflare/clef-flash` is the small, fast one.
+
+- Request: `{ state, questions: { diy: { type: 'noul', instructions } } }`; response `answers.diy.noul` (0 to 1).
+- Price: $0.038 per million input tokens, nothing for output. An enquiry is about 200 tokens, under one neuron, so the 10,000-neuron free daily allowance (shared with Ashley) covers thousands of checks a day.
+- Calibration (11 Oct 2026, last 400 enquiries): 27 scored 0.76 or more and every one said the customer had or would supply the part; the next score down was 0.33. Hence the 0.6 cut-off.
+- Data sent: the service slug and the customer's notes only. No name, phone, email or address.
+
 ## Browser local storage
 
 | Key | Purpose | Typical lifetime |
@@ -246,6 +256,10 @@ Because counters are local, two devices can generate the same sequence number on
 - message metadata and full message reads requested by Ashley or opened on the Email tab
 - marking an opened conversation as read
 - outgoing email recipients, bodies and PDF attachments
+
+### To Cloudflare Workers AI (likely DIY check)
+
+- each new inquiry's service and notes, from the triage Worker
 
 ### To Cloudflare Workers AI
 

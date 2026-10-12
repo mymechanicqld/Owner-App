@@ -1,0 +1,19 @@
+{
+  // Checks each new inquiry for "likely DIY" with Clef-flash, every minute.
+  // Deploy from owner-app/cloudflare/harness: node cf.mjs deploy ../triage
+  // Secrets (set with the harness, value on stdin):
+  //   SUPABASE_URL   the project's address (same as config.js)
+  //   SUPABASE_KEY   the project's publishable key (same as config.js)
+  //   RUN_KEY        lets the harness trigger a run on demand (POST /run)
+  "$schema": "https://unpkg.com/wrangler/config-schema.json",
+  "name": "mmqld-triage",
+  "main": "src/index.js",
+  "compatibility_date": "2026-06-01",
+  "workers_dev": true,
+  "ai": { "binding": "AI" },
+  "triggers": { "crons": ["* * * * *"] },
+  "vars": {
+    "WINDOW_HOURS": "48"
+  },
+  "observability": { "enabled": false }
+}

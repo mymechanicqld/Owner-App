@@ -660,6 +660,8 @@
     return '<div class="mail-list">' + MAIL.ids.map((id) => MAIL.meta[id]).filter(Boolean).map((t) => {
       const sub = t.enq ? [t.enq.service, t.enq.rego].filter(Boolean).join(' \u00b7 ') || 'Website enquiry' : t.subject;
       const tag = t.kind === 'enquiry' ? '<span class="mtag mtag--enq">Enquiry</span>' : t.kind === 'invoice' ? '<span class="mtag">Invoice</span>' : t.kind === 'report' ? '<span class="mtag">Report</span>' : '';
+      const lr = t.kind === 'enquiry' ? linkedEnquiry(t.email, t.enq && t.enq.rego) : null;
+      const diy = lr && typeof lr.ai_diy_score === 'number' && lr.ai_diy_score >= 0.6 ? '<span class="mtag mtag--diy">Likely DIY</span>' : '';
       const status = t.bounced ? '<span class="mtag mtag--bad">Not delivered</span>' : t.waiting && t.count > 0 ? '<span class="mtag mtag--wait">Needs reply</span>' : '';
       return `
       <button class="mrow ${t.unread ? 'unread' : ''}" data-thread="${esc(t.id)}">
@@ -668,7 +670,7 @@
           <span class="mrow__top"><span class="mrow__name">${esc(t.name)}</span>${t.count > 1 ? `<span class="mrow__n">${t.count}</span>` : ''}<span class="mrow__when">${esc(shortWhen(t.lastAt))}</span></span>
           <span class="mrow__sub">${esc(sub)}</span>
           <span class="mrow__snip">${t.lastMine ? '<b>You:</b> ' : ''}${esc(snippetFor(t))}</span>
-          ${tag || status ? `<span class="mrow__tags">${tag}${status}</span>` : ''}
+          ${tag || status || diy ? `<span class="mrow__tags">${tag}${diy}${status}</span>` : ''}
         </span>
         ${t.unread ? '<span class="mrow__dot"></span>' : ''}
       </button>`;

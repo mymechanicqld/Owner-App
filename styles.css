@@ -715,3 +715,25 @@ body.mail-thread #view-email.active { display: flex; flex-direction: column; hei
 .mrobot b { display: block; font-weight: 800; color: inherit; }
 .mrobot span { display: block; }
 .mrobot em { display: block; font-style: normal; font-size: 11.5px; opacity: 0.75; margin-top: 2px; }
+
+/* ============================================================================
+   "Likely DIY": inquiries where the customer seems to supply their own parts
+   (scored automatically by cloudflare/triage). Violet, so it never reads as a
+   status colour.
+   ========================================================================== */
+.diy-tag { margin-left: 2px; font-size: 10.5px; font-weight: 800; letter-spacing: 0.02em; padding: 2px 7px; border-radius: 999px; background: #EDE9FE; color: #5B21B6; border: 1px solid #DDD6FE; white-space: nowrap; }
+.mtag--diy { background: #EDE9FE; color: #5B21B6; border-color: #DDD6FE; }
+.chip.chip--diy { border-color: #DDD6FE; color: #5B21B6; background: #F5F3FF; }
+.chip.chip--diy.active { background: #6D28D9; border-color: #6D28D9; color: #fff; }
+.diy-banner {
+  width: 100%; display: flex; align-items: center; gap: 11px; text-align: left; margin: -4px 0 18px;
+  padding: 13px 14px; border-radius: 14px; background: #F5F3FF; border: 1px solid #DDD6FE; color: #4C1D95; font-size: 13.5px; line-height: 1.4;
+}
+.diy-banner b { font-weight: 800; }
+.diy-banner svg { width: 20px; height: 20px; flex: 0 0 auto; color: #6D28D9; }
+.diy-banner svg:last-child { width: 18px; height: 18px; color: #A78BFA; }
+.diy-banner span { flex: 1; }
+.diy-banner:active { background: #EDE9FE; }
+.diy-note { display: flex; gap: 11px; align-items: flex-start; padding: 12px 14px; margin-bottom: 12px; border-radius: 13px; background: #F5F3FF; border: 1px solid #DDD6FE; color: #4C1D95; font-size: 13.5px; line-height: 1.45; }
+.diy-note svg { width: 19px; height: 19px; flex: 0 0 auto; margin-top: 1px; color: #6D28D9; }
+.diy-note b { display: block; font-weight: 800; margin-bottom: 1px; }

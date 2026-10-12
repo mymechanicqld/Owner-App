@@ -99,6 +99,19 @@ Bookings hold title, job type, date, start time, duration, customer, **email**, 
 - an existing booking offers Call, Message, Invoice and Inspection shortcuts; Invoice and Inspection carry the email and the linked inquiry across
 - new bookings default to the duration in Settings, otherwise 60 minutes
 
+## Likely DIY
+
+New website enquiries are checked automatically for "the customer is supplying their own parts and only wants them fitted", which the business does not take on. The check runs on Cloudflare (`cloudflare/triage`) within about a minute of the enquiry arriving.
+
+- Dashboard: a violet "N likely DIY enquiries in the last 48 hours" bar. Tapping it opens Inquiries filtered to them.
+- Inquiries: a "Likely DIY" tag on the row and a "Likely DIY N" filter chip.
+- Detail sheet: a note saying how sure the check is, for example "95% sure".
+- Reply: starts on the **Own parts** template, a warm decline that offers to do the whole job with our parts. The wording is in Settings > Messages > Own parts (decline). Sending it marks the enquiry Contacted.
+- Email tab: the enquiry's conversation carries the tag.
+- Ashley sees `likely_diy` on every enquiry and can list only those, so "reply to the likely DIY enquiries" works. Each email still needs the owner's Confirm.
+
+An enquiry is labelled when its score is 0.6 or more (`DIY_MIN` in `app.js`). Unchecked or older enquiries simply show no label.
+
 ## Email
 
 The Email tab (bottom navigation, and Day to day in the sidebar) shows the business Gmail's customer conversations, so the owner can read and answer them without opening Gmail. Code: `email.js`.

@@ -34,6 +34,15 @@ Ashley's model runs on Cloudflare Workers AI through the Worker in `cloudflare/a
 - Quick health check without spending allowance: a POST with no `X-Ashley-Key` must return `401 Not authorised`.
 - Cost: about 17 to 22 neurons per model step, so a normal question costs 35 to 65 neurons. The free allowance is 10,000 neurons a day, resetting at 10am Brisbane time. When it runs out, Ashley says so until the reset.
 
+## Likely DIY check on Cloudflare
+
+- Worker: `mmqld-triage` on the business account, <https://mmqld-triage.mmqld.workers.dev>, cron every minute.
+- Deploy: from `cloudflare/harness`, `node cf.mjs deploy ../triage`.
+- Run a pass now and see the scores: `curl -X POST https://mmqld-triage.mmqld.workers.dev/run -H "X-Run-Key: $TRIAGE_RUN_KEY"` (the key is in `cloudflare/harness/.env`).
+- Health: `GET /` returns `ok`; `POST /run` without the key returns 401.
+- Needs website migration 010 (applied 11 Oct 2026). Without the columns a pass fails harmlessly and retries.
+- Re-check an enquiry: set its `ai_checked_at` to null; it is scored again within a minute if it is under 48 hours old.
+
 ## Google OAuth setup
 
 The Google OAuth credential must be a Web application client.

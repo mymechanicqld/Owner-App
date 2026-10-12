@@ -43,6 +43,8 @@ node cf.mjs ai "Say hello in five words" # one small Workers AI call
 node cf.mjs api GET /accounts/:account/workers/scripts   # any API call
 ```
 
+`.env` also holds `TRIAGE_RUN_KEY`, which triggers a pass of the likely DIY check on demand (see `../triage` and docs/OPERATIONS.md).
+
 `deploy` runs `npx wrangler@4 deploy` with the token and account from `.env`, so it always lands in this account whatever wrangler login the Mac has. `secret` reads the value from stdin so it never appears in shell history. Output never prints the token.
 
 ## Notes
