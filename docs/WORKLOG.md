@@ -4,7 +4,7 @@ This file records completed owner-app changes, production updates and important 
 
 ## 13 October 2026: Phone notifications, and a listener Worker
 
-Status: Deployed; first real alert to be confirmed on the owner's phone.
+Status: Deployed. Confirmed on a real iPhone on 13 Oct 2026: turned on from Settings > Notifications and the test alert arrived.
 
 - New Worker `cloudflare/listener` (`mmqld-listener`): every minute it alerts connected phones about new enquiries (with Likely DIY, spam left out) and customer email replies. Encrypted Web Push written with Web Crypto only; matches the RFC 8291 test vector byte for byte.
 - `mmqld-gmail` gained `/internal/token` and `/internal/device` for the listener (service binding, shared `INTERNAL_KEY`).
