@@ -102,6 +102,17 @@ Bookings hold title, job type, date, start time, duration, customer, **email**, 
 - an existing booking offers Call, Message, Invoice and Inspection shortcuts; Invoice and Inspection carry the email and the linked inquiry across
 - new bookings default to the duration in Settings, otherwise 60 minutes
 
+## Phone notifications
+
+Settings > Notifications turns alerts on for this phone. Within about a minute, even with the app closed:
+
+- **New enquiry**: "New enquiry: Zilla Lingwoodock", then the job, suburb and "Likely DIY" when the check thinks so, and the start of what they wrote. Obvious spam (casino ads and the like) is left out by a Clef-flash question.
+- **Customer reply**: "Reply from …" and the start of the email, for a new inbox email in a conversation the business has already written in. Website notifications, newsletters and bounces are ignored.
+
+Tapping an alert opens that enquiry's details or that Email conversation. Each kind can be switched off. A test button sends one straight away.
+
+Needs Gmail connected on the phone (the alerts carry customer names, so only a connected phone can sign up). iPhone needs iOS 16.4 or later and the app opened from its Home Screen icon. The alerts come from the listener Worker (`cloudflare/listener`).
+
 ## Likely DIY
 
 New website enquiries are checked automatically for two kinds of job the business does not take on: the customer is supplying their own parts and only wants them fitted, or the customer has started the repair themselves and wants it finished. The check runs on Cloudflare (`cloudflare/triage`) within about a minute of the enquiry arriving.

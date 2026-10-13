@@ -44,6 +44,13 @@ const CONFIG = {
     ENDPOINT: 'https://mmqld-gmail.mmqld.workers.dev',
   },
 
+  // Phone notifications: the listener Worker (cloudflare/listener) and its
+  // public Web Push key. Neither is a secret.
+  LISTENER: {
+    ENDPOINT: 'https://mmqld-listener.mmqld.workers.dev',
+    VAPID_PUBLIC: 'BGb31Df8LR4NqgvWQKwi1D0XxrepxZvduf7Yw7hjEiiQDKQg0ADmtCDby4Grf_TZB5GDrES0NTxgi5i6RaWKez4',
+  },
+
   ASHLEY: {
     ENDPOINT: (function () {
       try { const o = localStorage.getItem('mmqld_ashley_endpoint'); if (o) return o; } catch (_) {}

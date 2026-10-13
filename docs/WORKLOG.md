@@ -2,6 +2,16 @@
 
 This file records completed owner-app changes, production updates and important verification details. Add new entries at the top.
 
+## 13 October 2026: Phone notifications, and a listener Worker
+
+Status: Deployed; first real alert to be confirmed on the owner's phone.
+
+- New Worker `cloudflare/listener` (`mmqld-listener`): every minute it alerts connected phones about new enquiries (with Likely DIY, spam left out) and customer email replies. Encrypted Web Push written with Web Crypto only; matches the RFC 8291 test vector byte for byte.
+- `mmqld-gmail` gained `/internal/token` and `/internal/device` for the listener (service binding, shared `INTERNAL_KEY`).
+- App: Settings > Notifications (on, test, per-kind switches, off), `push.js`, `push/sw.js`, and alerts open the enquiry or conversation.
+- The service worker problem: the app had removed its service worker because one that controls the page breaks iPhone PDF uploads, and every page removes any it finds. The notification worker is scoped to `/push/` so it never controls a page, and the kill switch now spares it. Checked: registered, active, no page controlled, no reload.
+- Free plan budget written up in OPERATIONS.md: everything fits, with KV writes (1,000 a day) the one to watch, so state is only written when something changes.
+
 ## 13 October 2026: Gmail stays signed in
 
 Status: Deployed.

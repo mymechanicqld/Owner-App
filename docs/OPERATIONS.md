@@ -53,6 +53,30 @@ Ashley's model runs on Cloudflare Workers AI through the Worker in `cloudflare/a
 - Health: `POST /token` with a made-up `X-Device-Key` must return 401 `unknown_device`.
 - The Google OAuth app must stay **In production**. In Testing, refresh tokens expire after 7 days.
 
+## Notifications listener on Cloudflare
+
+- Worker `mmqld-listener`, <https://mmqld-listener.mmqld.workers.dev>, cron every minute, KV `mmqld-listener` (`ae859ccda89b469e91c1d822edb19f14`): `subs` (all phones, one key), `state:enq` (last enquiry seen), `state:gmail` (Gmail history id).
+- Secrets: `SUPABASE_URL`, `SUPABASE_KEY`, `INTERNAL_KEY` (same value as on `mmqld-gmail`), `VAPID_PRIVATE_JWK`. Backups of the last two are in `cloudflare/harness/.env`. The VAPID public key is in `config.js` and the Worker's vars; if the key pair ever changes, every phone must turn notifications on again.
+- Deploy: from `cloudflare/harness`, `node cf.mjs deploy ../listener`. Test the push code: `node cloudflare/listener/test-webpush.mjs`.
+- Run the jobs now and see what they found: `curl -X POST https://mmqld-listener.mmqld.workers.dev/run -H "X-Internal-Key: $INTERNAL_KEY"`.
+- Start again from now (no replay): delete `state:enq` and `state:gmail`; the next run re-seeds them without sending anything.
+
+## Cloudflare free plan budget
+
+All four Workers (`mmqld-ashley`, `mmqld-triage`, `mmqld-gmail`, `mmqld-listener`) run on the free plan. Limits checked 13 Oct 2026 against Cloudflare's docs.
+
+| Limit (free) | Used, roughly | Notes |
+| --- | --- | --- |
+| Worker requests 100,000/day | about 3,500 | two crons x 1,440, plus app calls |
+| CPU 10 ms per run | well under | almost all time is network waiting, which does not count |
+| Cron triggers 5 per account | 2 | triage, listener |
+| Subrequests 50 per run | at most about 25 | the listener handles up to 10 new emails per run |
+| KV reads 100,000/day | about 6,000 | listener state each minute, Gmail token cache |
+| KV writes 1,000/day | about 50 to 200 | only when something changed: new enquiry, new inbox mail, a phone signing up, a token refresh. Never once a minute. |
+| Workers AI 10,000 neurons/day | a few hundred normally | Ashley about 40 per question, rewrite about 5, DIY check about 1 and spam check under 1 per enquiry |
+
+Bulk testing is what gets near the AI limit (8,400 neurons on 13 Oct during calibration); normal days are a few percent of it.
+
 ## Google OAuth setup
 
 The Google OAuth credential must be a Web application client.

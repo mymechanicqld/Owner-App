@@ -16,7 +16,8 @@
 (function () {
   if (!('serviceWorker' in navigator)) return;
   navigator.serviceWorker.getRegistrations().then(function (rs) {
-    rs.forEach(function (r) { r.unregister(); });
+    // Keep the notification worker (scope /push/): it never controls a page.
+    rs.forEach(function (r) { if (!/\/push\/$/.test(r.scope)) r.unregister(); });
   }).catch(function () {});
 })();
 </script>
@@ -212,8 +213,8 @@
 
 <div class="toast" id="toast"></div>
 
-<script src="../config.js?v=52"></script>
-<script src="../settings.js?v=50"></script>
+<script src="../config.js?v=53"></script>
+<script src="../settings.js?v=51"></script>
 <script>
 /* ============================================================================
    Price list editor

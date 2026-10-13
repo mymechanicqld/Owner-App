@@ -134,6 +134,14 @@ Worker `mmqld-triage` on the business Cloudflare account. A cron trigger runs ev
 
 Shared Gmail sign-in for the main app, the invoice and inspection pages and Settings (`MMQLD_GAUTH`: `getToken`, `quiet`, `connect`, `disconnect`, `expire`, `connected`, `lasting`). Keeps the phone signed in through the `mmqld-gmail` Worker; see DATA_AND_INTEGRATIONS.md > Gmail > Authentication. `app.js` keeps `getToken`, `cachedGToken` and `ensureGis` as thin wrappers so `email.js` and Ashley's tools did not change.
 
+### `cloudflare/listener` (`mmqld-listener`)
+
+Cron every minute. Jobs: `newEnquiries` (Supabase rows after the last one seen; waits up to 3 minutes for the DIY check; skips spam with one Clef-flash question) and `customerReplies` (Gmail `history.list` from the last history id, INBOX additions not sent by us or robots, in a thread that has a SENT message). Sends encrypted Web Push (RFC 8291 aes128gcm + RFC 8292 VAPID, `src/webpush.js`, checked against the RFC 8291 test vector by `test-webpush.mjs`). Gets its Gmail token and checks phone device keys through a service binding to `mmqld-gmail` (`/internal/*`, guarded by `INTERNAL_KEY`). Routes: `/subscribe`, `/unsubscribe`, `/test` (device key), `/run` (device key, or `X-Internal-Key` from the harness). New jobs go in `JOBS`.
+
+### `push.js` and `push/sw.js`
+
+`push.js` (Settings) asks permission, registers `push/sw.js` with scope `/push/`, subscribes with the VAPID public key and registers with the listener. `push/sw.js` shows alerts and opens `/?open=<id>` or `/?thread=<id>` (or messages an open window); `app.js` `openFromLink()` handles both. The worker's scope keeps it from controlling any page, which matters: a page-controlling service worker breaks PDF uploads on iPhone. The kill switch in each page head now removes every service worker except `/push/`.
+
 ### `gmail-send.js`
 
 Provides generator-page Gmail access. It waits for and can re-inject Google Identity Services, caches a short-lived token, searches for an existing conversation, and sends a multipart PDF attachment.

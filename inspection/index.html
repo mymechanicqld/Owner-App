@@ -21,6 +21,7 @@
 (function(){
   if(!('serviceWorker' in navigator))return;
   navigator.serviceWorker.getRegistrations().then(function(rs){
+    rs=rs.filter(function(r){return !/\/push\/$/.test(r.scope);}); // keep the notification worker: it never controls a page
     var had=rs.length>0;
     Promise.all(rs.map(function(r){return r.unregister();})).then(function(){
       if(window.caches&&caches.keys){caches.keys().then(function(ks){ks.forEach(function(k){caches.delete(k);});});}
@@ -314,8 +315,8 @@
 <div class="toasts" id="toastWrap"></div>
 
 <script src="https://accounts.google.com/gsi/client" async defer></script>
-<script src="../config.js?v=52"></script>
-<script src="../settings.js?v=50"></script>
+<script src="../config.js?v=53"></script>
+<script src="../settings.js?v=51"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="../storage.js?v=38" defer></script>
 <script src="../customers.js?v=40" defer></script>

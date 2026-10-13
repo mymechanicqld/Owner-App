@@ -1665,13 +1665,33 @@ function boot() {
      check. */
   const foot = $('#side-foot');
   if (foot) foot.textContent = location.host;
-  loadData();
+  loadData().then(() => openFromLink(location.href));
   setInterval(() => loadData(false), 60000);
   // Warm Google's sign-in script so the first Send does not wait on it.
   ensureGis(20000).catch(() => {});
-  // NOTE: we deliberately do NOT register a service worker. A controlling SW
-  // triggers an iOS WebKit bug where cross-origin POSTs (PDF uploads) fail with
-  // "Load failed". The kill-switch in each page's <head> removes any old one.
+  // A tapped notification while the app is already open (push/sw.js).
+  if ('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('message', (e) => { if (e.data && e.data.mmqldOpen) openFromLink(e.data.mmqldOpen); });
+  // NOTE: no service worker controls this page. A controlling SW triggers an
+  // iOS WebKit bug where cross-origin POSTs (PDF uploads) fail with "Load
+  // failed". The only one allowed is the notification worker, scoped to
+  // /push/ so it never controls a page; the kill-switch in each page's <head>
+  // removes any other.
+}
+
+/* Notifications open the app at /?open=<enquiry id> or /?thread=<Gmail
+   thread id>. Show that, then tidy the address so a reload does not repeat it. */
+function openFromLink(href) {
+  let u; try { u = new URL(href, location.origin); } catch (_) { return; }
+  const enq = u.searchParams.get('open'), thread = u.searchParams.get('thread');
+  if (!enq && !thread) return;
+  if (u.search && location.search) history.replaceState(null, '', location.pathname);
+  if (enq) {
+    const row = STATE.rows.find((r) => r.id === enq);
+    setView('inquiries');
+    if (row) openDetail(row.id); else toast('That enquiry is not in the list yet, pull to refresh');
+  } else if (thread && window.MMQLD_MAIL) {
+    MMQLD_MAIL.openThread(thread);
+  }
 }
 if (CONFIG.GATE_PIN) {
   const pin = prompt('Enter passcode');

@@ -17,13 +17,15 @@
      POST /disconnect  header X-Device-Key. Forgets this phone.
      POST /forget-all  header X-Device-Key. Forgets every phone and the
                        refresh token (sign in again from scratch).
+     POST /internal/*  for the listener Worker only (X-Internal-Key): a
+                       Gmail access token, and a device-key check.
 
    The refresh token never leaves Cloudflare. A phone only holds its device
    key, a random secret this Worker made at connect time; only a phone that
    signed in to the business Google account gets one. Device keys are stored
    as SHA-256 hashes.
 
-   Secrets: GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, TOKEN_KEY. Var:
+   Secrets: GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, TOKEN_KEY, INTERNAL_KEY. Var:
    ALLOWED_EMAIL. KV: refresh token (AES-GCM encrypted), cached access
    token, device hashes.
    ========================================================================== */
@@ -130,6 +132,23 @@ export default {
         await env.KV.put('dev:' + (await sha256(key)), JSON.stringify({ at: new Date().toISOString(), ua: String(request.headers.get('User-Agent') || '').slice(0, 160) }));
         const acc = await cacheAccess(env, g.j.access_token, g.j.expires_in);
         return reply(200, { device_key: key, account: who, ...acc }, origin);
+      }
+
+      // Internal routes for the listener Worker (service binding), guarded by a
+      // shared secret: a Gmail access token for polling, and a device-key check
+      // so only connected phones can sign up for notifications.
+      if (path.startsWith('/internal/')) {
+        if (!env.INTERNAL_KEY || request.headers.get('X-Internal-Key') !== env.INTERNAL_KEY) return reply(401, { error: 'not_authorised' }, origin);
+        if (path === '/internal/token') {
+          const r = await freshAccess(env);
+          return reply(r.error ? 409 : 200, r, origin);
+        }
+        if (path === '/internal/device') {
+          const body = await request.json().catch(() => ({}));
+          const ok = await deviceOk(env, String(body.device_key || ''));
+          return reply(200, { ok, hash: ok ? await sha256(String(body.device_key)) : null }, origin);
+        }
+        return reply(404, { error: 'not_found' }, origin);
       }
 
       const key = request.headers.get('X-Device-Key') || '';

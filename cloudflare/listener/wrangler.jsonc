@@ -1,0 +1,21 @@
+{
+  // The listener: every minute, alerts connected phones about new enquiries
+  // and customer email replies (Web Push). See src/index.js.
+  // Deploy from owner-app/cloudflare/harness: node cf.mjs deploy ../listener
+  // Secrets: SUPABASE_URL, SUPABASE_KEY, INTERNAL_KEY (same as mmqld-gmail),
+  //          VAPID_PRIVATE_JWK. Backups of the last two are in harness/.env.
+  "$schema": "https://unpkg.com/wrangler/config-schema.json",
+  "name": "mmqld-listener",
+  "main": "src/index.js",
+  "compatibility_date": "2026-06-01",
+  "workers_dev": true,
+  "ai": { "binding": "AI" },
+  "kv_namespaces": [{ "binding": "KV", "id": "ae859ccda89b469e91c1d822edb19f14" }],
+  "services": [{ "binding": "GMAIL", "service": "mmqld-gmail" }],
+  "triggers": { "crons": ["* * * * *"] },
+  "vars": {
+    "VAPID_PUBLIC": "BGb31Df8LR4NqgvWQKwi1D0XxrepxZvduf7Yw7hjEiiQDKQg0ADmtCDby4Grf_TZB5GDrES0NTxgi5i6RaWKez4",
+    "VAPID_SUBJECT": "mailto:mymechanicqld@gmail.com"
+  },
+  "observability": { "enabled": false }
+}

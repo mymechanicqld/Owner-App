@@ -6,6 +6,7 @@
   //   GOOGLE_CLIENT_ID      the web OAuth client id (same as config.js)
   //   GOOGLE_CLIENT_SECRET  that client's secret (never in the app or repo)
   //   TOKEN_KEY             32 random bytes, base64url: encrypts the refresh token at rest
+  //   INTERNAL_KEY          shared with mmqld-listener for its /internal/* calls
   "$schema": "https://unpkg.com/wrangler/config-schema.json",
   "name": "mmqld-gmail",
   "main": "src/index.js",

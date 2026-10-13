@@ -13,7 +13,8 @@
 (function () {
   if (!('serviceWorker' in navigator)) return;
   navigator.serviceWorker.getRegistrations().then(function (rs) {
-    rs.forEach(function (r) { r.unregister(); });
+    // Keep the notification worker (scope /push/): it never controls a page.
+    rs.forEach(function (r) { if (!/\/push\/$/.test(r.scope)) r.unregister(); });
   }).catch(function () {});
 })();
 </script>
@@ -189,9 +190,10 @@
 <main id="stack"></main>
 <div class="toast" id="toast"></div>
 
-<script src="../config.js?v=52"></script>
-<script src="../settings.js?v=50"></script>
+<script src="../config.js?v=53"></script>
+<script src="../settings.js?v=51"></script>
 <script src="../gmail-auth.js?v=1"></script>
+<script src="../push.js?v=1"></script>
 <script src="../invoice/assets.js?v=40"></script>
 <script>
 (function () {
@@ -204,7 +206,7 @@
   const H = { apikey: CONFIG.SUPABASE_KEY };
 
   /* ------------------------------------------------------ live status -- */
-  const status = { synced: null, products: null, unpriced: 0, invDrafts: 0, repDrafts: null };
+  const status = { synced: null, products: null, unpriced: 0, invDrafts: 0, repDrafts: null, push: '' };
   const INV_DRAFTS = 'mmqld_invoice_drafts_v2';
   const INV_COUNTER = 'mmqld_invoice_counter', REP_COUNTER = 'mmqld_report_counter';
   const lsGet = (k) => { try { return localStorage.getItem(k); } catch (_) { return null; } };
@@ -288,7 +290,7 @@
   const ICON = {
     business: ['building-2', '#1E3A8A'], payments: ['landmark', '#34C759'], invoices: ['receipt', '#007AFF'], reports: ['clipboard-check', '#FF9500'],
     messages: ['message-circle', '#32ADE6'], prices: ['tag', '#5856D6'], calendar: ['calendar-days', '#FF3B30'], ashley: ['sparkles', '#AF52DE'],
-    gmail: ['mail', '#EA4335'], passcode: ['lock', '#8E8E93'], storage: ['hard-drive', '#8E8E93'], about: ['info', '#8E8E93'],
+    gmail: ['mail', '#EA4335'], notifications: ['bell', '#FF3B30'], passcode: ['lock', '#8E8E93'], storage: ['hard-drive', '#8E8E93'], about: ['info', '#8E8E93'],
   };
 
   const PAGES = {
@@ -312,6 +314,7 @@
         ] },
         { rows: [
           nav('gmail', 'Gmail', { icon: 'gmail', value: () => (gmailOn() ? 'Connected' : 'Not connected') }),
+          nav('notifications', 'Notifications', { icon: 'notifications', value: () => pushLabel() }),
           nav('passcode', 'Passcode', { icon: 'passcode', value: () => (S.get('passcode') ? 'On' : 'Off') }),
           nav('storage', 'Storage on this phone', { icon: 'storage' }),
           nav('about', 'About', { icon: 'about' }),
@@ -456,6 +459,29 @@
           foot: 'Use this if the phone is lost or replaced. Other phones stay connected.' }] : []),
       ],
     }),
+
+    notifications: () => {
+      const why = window.MMQLD_PUSH ? MMQLD_PUSH.support() : 'Notifications are not set up yet.';
+      const on = status.push === 'on';
+      return {
+        title: 'Notifications',
+        groups: [
+          { rows: [{ t: 'info', label: 'This phone', value: pushLabel() }],
+            foot: why || (status.push === 'blocked'
+              ? 'Notifications are blocked for this app. Allow them in the phone\'s Settings, then come back here.'
+              : 'Alerts arrive within about a minute, even when the app is closed. Tapping one opens that enquiry or conversation.') },
+          ...(why ? [] : [{ rows: [on
+            ? { t: 'action', label: 'Send a test notification', run: testPush }
+            : { t: 'action', label: 'Turn on notifications on this phone', run: enablePush }],
+            foot: on ? '' : 'Needs Gmail connected on this phone (Settings > Gmail), because alerts include customer names.' }]),
+          { head: 'Tell me about', rows: [
+            toggle('push_enquiries', 'New enquiries'),
+            toggle('push_replies', 'Customer email replies'),
+          ], foot: 'Enquiry alerts say "Likely DIY" when the automatic check thinks so. Obvious spam is left out. A reply counts when a customer answers a conversation you have written in.' },
+          ...(on ? [{ rows: [{ t: 'action', label: 'Turn off on this phone', danger: true, run: disablePush }] }] : []),
+        ],
+      };
+    },
 
     passcode: () => ({
       title: 'Passcode',
@@ -727,6 +753,7 @@
       tg.querySelector('.switch').setAttribute('aria-checked', String(on));
       await saveKey(k, on);
       if (k === 'invoice_show_bank') repaintPart();
+      if (k.startsWith('push_') && window.MMQLD_PUSH) MMQLD_PUSH.setPrefs(pushPrefs()).catch(() => {});
       return;
     }
     const pk = e.target.closest('[data-pick]');
@@ -794,7 +821,7 @@
   };
   function searchIndex() {
     const out = [];
-    ['business', 'payments', 'invoices', 'reports', 'messages', 'calendar', 'ashley', 'gmail', 'passcode', 'storage', 'about'].forEach((pid) => {
+    ['business', 'payments', 'invoices', 'reports', 'messages', 'calendar', 'ashley', 'gmail', 'notifications', 'passcode', 'storage', 'about'].forEach((pid) => {
       const m = PAGES[pid]();
       out.push({ label: m.title, page: pid, flash: '', where: 'Settings', words: m.title });
       m.groups.forEach((g) => g.rows.forEach((r) => {
@@ -857,6 +884,25 @@
     try { await MMQLD_GAUTH.connect(); repaint(); toast('Gmail connected'); }
     catch (e) { toast(String((e && e.message) || e).slice(0, 120)); }
   }
+  function pushLabel() {
+    if (!window.MMQLD_PUSH) return 'Off';
+    if (MMQLD_PUSH.support()) return 'Not available';
+    return status.push === 'on' ? 'On' : status.push === 'blocked' ? 'Blocked' : 'Off';
+  }
+  const pushPrefs = () => ({ enquiries: S.bool('push_enquiries'), replies: S.bool('push_replies') });
+  async function refreshPush() { try { status.push = await MMQLD_PUSH.status(); } catch (_) { status.push = 'off'; } }
+  async function enablePush() {
+    try { await MMQLD_PUSH.enable(pushPrefs()); await refreshPush(); repaint(); toast('Notifications on'); await MMQLD_PUSH.test().catch(() => {}); }
+    catch (e) { await refreshPush(); repaint(); toast(String((e && e.message) || e).slice(0, 140)); }
+  }
+  async function testPush() {
+    try { await MMQLD_PUSH.test(); toast('Test sent, it should arrive in a few seconds'); }
+    catch (e) { toast(String((e && e.message) || e).slice(0, 140)); }
+  }
+  async function disablePush() {
+    await MMQLD_PUSH.disable(); await refreshPush(); repaint(); toast('Notifications off on this phone');
+  }
+
   async function disconnectGmail() {
     if (!confirm('Disconnect Gmail on this phone? You can connect again any time.')) return;
     await MMQLD_GAUTH.disconnect(); repaint(); toast('Gmail disconnected on this phone');
@@ -865,6 +911,7 @@
   /* ----------------------------------------------------------- startup -- */
   async function loadStatus() {
     status.invDrafts = invDraftCount();
+    if (window.MMQLD_PUSH) await refreshPush();
     const [sync, prods, reps] = await Promise.all([
       fetch(REST + 'app_settings?id=eq.1&select=id', { headers: H }).then((r) => r.ok).catch(() => false),
       fetch(REST + 'products?select=price&active=eq.true', { headers: H }).then((r) => (r.ok ? r.json() : null)).catch(() => null),
@@ -875,7 +922,7 @@
     status.repDrafts = typeof reps === 'number' ? reps : 0;
     const a = document.activeElement;
     const typing = a && (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA');
-    if (current && ['root', 'about', 'storage'].includes(current.dataset.id) && !typing) repaint();
+    if (current && ['root', 'about', 'storage', 'notifications'].includes(current.dataset.id) && !typing) repaint();
   }
 
   document.addEventListener('mmqld:settings', () => {
