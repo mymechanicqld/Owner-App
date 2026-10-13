@@ -2,6 +2,13 @@
 
 This file records completed owner-app changes, production updates and important verification details. Add new entries at the top.
 
+## 13 October 2026: Draft with Ashley on the Email tab
+
+Status: Deployed.
+
+- A small sparkle button beside Send in an open conversation drafts the reply with Ashley's Cloudflare model from the enquiry and the last ten messages, following whatever the owner typed. Missing figures become [gaps], and Send asks before a reply with a gap goes out. Undo restores the typed text.
+- Tested on the real Vishal Verma test thread; see ASHLEY.md for the rule changes that stopped it mixing in earlier prices.
+
 ## 13 October 2026: Email tab keeps itself current
 
 Status: Deployed.

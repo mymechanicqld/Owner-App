@@ -162,6 +162,12 @@ The model is instructed to:
 
 The UI and send path also clean dash punctuation. The business signature is deterministic browser code, not generated text.
 
+## Draft with Ashley (Email tab)
+
+`draftMail()` in `email.js`, from the sparkle button beside Send in an open conversation. Same endpoint, no tools, `DRAFT_RULES`. The request holds the customer's first name, job, car and suburb from the linked enquiry, the earlier messages as background, and the customer's latest message set apart as THE MESSAGE TO ANSWER, plus the owner's typed notes. Email addresses and phone numbers in the messages are replaced with [email] and [phone] before sending; our signature is cut from our own messages. Temperature 0.3, at most 450 tokens.
+
+What testing on the Vishal Verma thread changed (13 Oct 2026): with the whole conversation as one block, the model mixed earlier prices ($189 diagnosis, $379 pads) into new replies and applied the owner's $180 to the wrong job. Setting the message to answer apart, telling it earlier messages are background only, and that a price in the notes belongs to what that message asks, fixed it. With no notes it must commit to nothing and leave [gaps].
+
 ## Likely DIY enquiries
 
 `list_inquiries` returns `likely_diy` and `diy_reason` ("supplying their own parts" or "started the job themselves") for each enquiry, and accepts `likely_diy: true` to list only those. Her instructions tell her to decline them warmly with the matching reason, offer the whole job, never mention risk or blame, and never use the word DIY to a customer. Every email still needs the owner's Confirm.

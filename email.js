@@ -537,6 +537,9 @@
     const ta = document.getElementById('mail-compose');
     const body = (ta ? ta.value : '').trim();
     if (!body) return toast('Write a reply first', 'err');
+    // A gap Ashley left for something only the owner knows, e.g. [price].
+    const gap = body.match(/\[[A-Za-z][A-Za-z ]{1,30}\]/);
+    if (gap && !confirm('The reply still has ' + gap[0] + ' in it. Send anyway?')) return;
     const to = replyTarget();
     if (!to) return toast('Could not work out who to reply to', 'err');
     MAIL.sending = true; paintComposer();
@@ -850,6 +853,7 @@
       </div>
       <div class="mc-row">
         <textarea id="mail-compose" rows="1" placeholder="Write a reply..." ${MAIL.sending || !MAIL.thread ? 'disabled' : ''}></textarea>
+        ${typeof ashleyOn === 'function' && ashleyOn() ? `<button class="mc-ai" id="mail-ai" aria-label="Draft with Ashley" title="Draft with Ashley" ${MAIL.sending || !MAIL.thread || drafting ? 'disabled' : ''}>${drafting ? '<span class="spin dark"></span>' : '<i data-lucide="sparkles"></i>'}</button>` : ''}
         <button class="mc-send" id="mail-send" aria-label="Send reply" ${MAIL.sending || !MAIL.thread ? 'disabled' : ''}>${MAIL.sending ? '<span class="spin"></span>' : '<i data-lucide="send"></i>'}</button>
       </div>`;
     const ta = document.getElementById('mail-compose');
@@ -880,6 +884,129 @@
     toast(next ? 'Signature on' : 'Signature off for replies');
   }
 
+  /* ------------------------------------------------ draft with Ashley -- */
+  /* Ashley drafts a reply from the customer's enquiry and the last ten
+     messages, on the same Cloudflare model as the rest of Ashley (no tools).
+     Whatever the owner has typed is the gist she must follow. She never
+     invents a price, a day or a promise: she leaves [price]-style gaps, and
+     Send asks before a reply goes out with one still in it. The model gets
+     no phone numbers, email addresses or street addresses. */
+  let drafting = false;
+  const DRAFT_RULES = `You draft an email reply for a mobile mechanic business to a customer, continuing their conversation.
+
+You are answering THE MESSAGE TO ANSWER. Earlier messages are background only: do not repeat their
+prices, offers or topics unless his notes or that message are about them.
+If he wrote notes, they are his answer to that message: put them into proper words and add nothing else.
+A price in his notes is for what that message asks about.
+Without notes, reply to that message in a sensible, helpful way, but commit to nothing: never state
+a price, day, time or decision, even one mentioned earlier. Put [price], [day and time] or [details]
+where he must decide.
+
+Use ONLY facts from the conversation and his notes. Never invent or promise a price, a day, a date, a
+time, a part, a brand or a warranty. If the reply needs one of those and it is not given, leave a gap
+in square brackets for him to fill in, for example [price] or [day and time]. Never offer extra work.
+
+The job is what the latest messages are about, which may differ from the job on the original enquiry.
+Name it rather than saying "it". End with a short next step, such as asking them to reply to confirm.
+
+Write as the business: "we" and "us", never "I". Warm, natural, professional and short: two to five
+sentences. Australian spelling. Write prices like $650. NEVER use a dash as punctuation (no em-dash, no
+en-dash); use a comma or a full stop. No emojis. Never use the word DIY.
+Write only the body: no greeting line, no sign-off, no name, no business details, no quotes.`;
+
+  const scrub = (t) => String(t || '')
+    .replace(/[\w.+-]+@[\w-]+\.[\w.]+/g, '[email]')
+    .replace(/(\+?61|0)[\d\s-]{8,12}\d/g, '[phone]');
+
+  function conversationBrief() {
+    const t = MAIL.meta[MAIL.open] || {};
+    const target = replyTarget();
+    const enq = target ? linkedEnquiry(target.email, t.enq && t.enq.rego) : null;
+    const MS = window.MMQLD_SETTINGS;
+    const sig = MS ? MS.signature().trim().split('\n')[0] : '';
+    const lines = ['CUSTOMER'];
+    lines.push('First name: ' + (typeof firstName === 'function' ? firstName((enq && enq.full_name) || (target && target.name) || '') : ''));
+    if (enq) {
+      lines.push('Job they asked about: ' + (typeof svcLabel === 'function' ? svcLabel(enq.service_needed) : enq.service_needed || ''));
+      const car = typeof carDesc === 'function' ? carDesc(enq) : '';
+      if (car) lines.push('Car: ' + car);
+      if (enq.suburb) lines.push('Suburb: ' + enq.suburb);
+    } else if (t.enq) {
+      lines.push('Job they asked about: ' + (t.enq.service || 'not given'));
+    }
+    const msgs = (MAIL.thread || []).filter((m) => !m.robot).slice(-10);
+    const lastCustomer = [...msgs].reverse().find((m) => !m.mine);
+    const out = [];
+    for (const m of msgs) {
+      const when = new Date(m.at).toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' });
+      let text;
+      if (m.notice) {
+        const d = m.noticeData || { fields: [], notes: '' };
+        const keep = d.fields.filter(([k]) => /^(service|car|rego|suburb|date|category)$/i.test(k)).map(([k, v]) => k + ': ' + v).join(', ');
+        text = 'Website enquiry. ' + keep + (d.notes ? '. They wrote: ' + d.notes : '');
+      } else {
+        text = m.split.body;
+        if (m.mine && sig) { const at = text.indexOf(sig); if (at > 0) text = text.slice(0, at); }
+        text = text.replace(/\n{2,}/g, '\n').trim().slice(0, 700);
+      }
+      out.push({ m, line: '[' + (m.mine ? 'Us' : 'Customer') + ', ' + when + '] ' + scrub(text) });
+    }
+    lines.push('', 'EARLIER MESSAGES, oldest first (background only)');
+    out.filter((o) => o.m !== lastCustomer).forEach((o) => lines.push(o.line));
+    const answer = out.find((o) => o.m === lastCustomer);
+    lines.push('', 'THE MESSAGE TO ANSWER (the customer\'s latest)', answer ? answer.line : '(the customer has not written yet: write a helpful first reply about their enquiry)');
+    return lines.join('\n');
+  }
+
+  async function draftMail() {
+    if (drafting || !MAIL.thread || MAIL.sending) return;
+    const id = MAIL.open;
+    const ta = document.getElementById('mail-compose');
+    const before = ta ? ta.value : '';
+    const notes = before.trim();
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.ASHLEY) || {};
+    drafting = true; paintComposer();
+    const box = document.getElementById('mail-compose');
+    if (box) { box.disabled = true; box.classList.add('ai-busy'); }
+    try {
+      const res = await fetch(cfg.ENDPOINT, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Ashley-Key': cfg.APP_KEY || '' },
+        body: JSON.stringify({
+          messages: [
+            { role: 'system', content: DRAFT_RULES },
+            { role: 'user', content: conversationBrief() + '\n\nHIS NOTES\n' + (notes ? scrub(notes) : '(none: reply to the latest customer message)')
+              + '\n\nReminder: answer THE MESSAGE TO ANSWER only, using his notes; add nothing else; use [gaps] for anything missing.' },
+          ],
+          temperature: 0.3,
+          max_tokens: 450,
+        }),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(j.error || 'Ashley could not draft it (' + res.status + ')');
+      let text = (typeof tidyRewrite === 'function' ? tidyRewrite : (x) => String(x || '').trim())(j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content);
+      if (!text) throw new Error('Ashley came back empty, try again');
+      if (/\bDIY\b/i.test(text)) text = text.replace(/\bDIY\b/gi, 'this');
+      const t = MAIL.meta[id] || {};
+      const target = replyTarget();
+      const enq = target ? linkedEnquiry(target.email, t.enq && t.enq.rego) : null;
+      const first = typeof firstName === 'function' ? firstName((enq && enq.full_name) || (target && target.name) || '') : '';
+      const out = (first && first !== 'there' ? 'Hi ' + first + ',' : 'Hi there,') + '\n\n' + text;
+      if (MAIL.open !== id) return;
+      MAIL.drafts[id] = out; persistDrafts();
+      drafting = false; paintComposer();
+      const b = document.getElementById('mail-compose');
+      if (b) { b.value = out; grow(b); b.focus(); b.setSelectionRange(0, 0); }
+      const restore = () => { const c = document.getElementById('mail-compose'); if (c) { c.value = before; MAIL.drafts[id] = before; persistDrafts(); grow(c); } };
+      const msg = /\[[A-Za-z][A-Za-z ]{1,30}\]/.test(out) ? 'Drafted. Fill in the [gaps], then send.' : 'Drafted by Ashley. Check it, then send.';
+      if (typeof toastAction === 'function') toastAction(msg, 'Undo', restore); else toast(msg);
+    } catch (e) {
+      toast(String((e && e.message) || e).slice(0, 120), 'err');
+    } finally {
+      if (drafting) { drafting = false; paintComposer(); }
+    }
+  }
+
   function grow(ta) { ta.style.height = 'auto'; ta.style.height = Math.min(ta.scrollHeight, 180) + 'px'; }
 
   /* --------------------------------------------------------------- wire -- */
@@ -907,6 +1034,7 @@
     if (e.target.closest('#mt-retry')) { MAIL.threadErr = ''; paintThread(true); return loadThread(MAIL.open, true); }
     if (e.target.closest('#mail-send')) return sendReply();
     if (e.target.closest('#mail-sig')) return toggleSig();
+    if (e.target.closest('#mail-ai')) return draftMail();
     const q = e.target.closest('[data-quoted]');
     if (q) { MAIL.showQuoted[q.dataset.quoted] = !MAIL.showQuoted[q.dataset.quoted]; const log = document.getElementById('mt-log'); const y = log.scrollTop; log.innerHTML = threadHtml(replyTarget()); log.scrollTop = y; icons(); return; }
     const att = e.target.closest('[data-att]');

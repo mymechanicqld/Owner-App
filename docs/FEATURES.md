@@ -169,6 +169,7 @@ Each conversation is one Gmail thread. Nothing is copied into Supabase; Gmail st
 - The reply is sent into the same Gmail thread (`threadId`), with the conversation's own subject, `In-Reply-To` the newest message and the full `References` chain. The owner sees it in the same thread in Gmail; the customer's mail app shows it in the same conversation.
 - It goes to the customer: the newest message not written by the business (the Reply-To on the website notification), skipping bounces.
 - A half-written reply survives the app's one-minute refresh, switching tabs and closing the app.
+- **Draft with Ashley** (small sparkle button beside Send): Ashley drafts the reply from the customer's enquiry (name, job, car, suburb) and the last ten messages. Whatever is typed in the box is the gist she follows ("we can do it for 180 this friday morning" became "We can do the front brake pads for $180 this Friday morning. Please let us know if that works for you."). With an empty box she writes a holding reply that commits to no price, day or decision. She never invents figures: anything only the owner can decide becomes a gap like [price], and Send asks before a reply with a gap goes out. Undo on the toast restores what was typed. The signature is added at send as usual.
 - A first reply moves a New inquiry to Contacted.
 
 ### Connecting Gmail

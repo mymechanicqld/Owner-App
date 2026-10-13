@@ -764,3 +764,10 @@ body.mail-thread #view-email.active { display: flex; flex-direction: column; hei
 .btn.ai-btn:disabled { opacity: 0.75; }
 .btn.ai-btn .spin.dark { width: 16px; height: 16px; }
 .composer.ai-busy { background: linear-gradient(90deg, var(--soft) 25%, var(--accent-soft) 50%, var(--soft) 75%); background-size: 200% 100%; animation: sh 1.3s infinite; color: var(--subtle); }
+/* Draft with Ashley, beside Send on the Email tab: small, white, app navy */
+.mc-ai { flex: 0 0 auto; width: 43px; height: 43px; border-radius: 50%; background: var(--surface); border: 1px solid var(--hairline-dk); color: var(--accent); display: grid; place-items: center; box-shadow: var(--shadow-sm); }
+.mc-ai svg { width: 19px; height: 19px; }
+.mc-ai:active { background: var(--accent-soft); }
+.mc-ai:disabled { opacity: 0.6; }
+.mc-ai .spin.dark { width: 17px; height: 17px; }
+.mc-row textarea.ai-busy { background: linear-gradient(90deg, var(--soft) 25%, var(--accent-soft) 50%, var(--soft) 75%); background-size: 200% 100%; animation: sh 1.3s infinite; color: var(--subtle); }
