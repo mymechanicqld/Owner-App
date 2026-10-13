@@ -119,6 +119,7 @@ The Email tab. Loaded after `app.js` and uses its globals (`gFetch`, `getToken`,
 - List: `threads.list` with the Customers or All inbox query, then `threads.get?format=metadata` only for threads whose `historyId` changed (five at a time). Summaries and the customer list are cached in `mmqld_mail_v1`.
 - Thread: `threads.get?format=full`, MIME walked for text/plain (HTML converted to text when there is no usable plain part; email HTML is never inserted into the page), quoted history split off, the website notification parsed into fields.
 - Send: plain-text MIME to `messages.send` with `threadId`, the thread's subject, `In-Reply-To` and `References`.
+- Staying current: `renderEmail()` (called by the one-minute repaint) re-checks the list when it is over a minute old, and `checkThread()` checks an open conversation with a `format=minimal` call, fetching the full thread only when a new message id appears and redrawing only the message log. `visibilitychange` runs the same checks when the app returns to the screen.
 - Repaint safety: `app.js` repaints the active view every minute. `renderEmail()` only builds what is missing, and the reply text is kept in memory and in `mmqld_mail_v1`, so a background repaint never loses a half-written reply.
 - `body.mail-thread` gives an open conversation the whole area above the nav, like `ash-mode` for Ashley; `setView()` clears it on other tabs.
 

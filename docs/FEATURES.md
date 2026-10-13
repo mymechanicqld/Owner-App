@@ -148,7 +148,9 @@ Each conversation is one Gmail thread. Nothing is copied into Supabase; Gmail st
 
 - **Refresh** on the page (and the header refresh button while on Email) asks Gmail what changed. Only threads Gmail reports as changed are re-read, so a refresh with nothing new is one request.
 - Opening the tab also catches up quietly when the last check is over a minute old.
-- The list refreshes on demand, not live. A phone with notifications on is told about customer replies within about a minute (see Phone notifications).
+- While the Email tab is on screen it keeps itself current with no taps: the list is re-checked every minute, and an open conversation checks for new messages every minute and adds them in place (a "New message from …" toast for customer messages). The reply box and anything typed in it are never disturbed.
+- Coming back to the app (unlocking the phone, switching apps) re-checks straight away instead of waiting for the next minute.
+- A phone with notifications on is told about customer replies within about a minute even with the app closed (see Phone notifications).
 
 ### A conversation
 

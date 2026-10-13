@@ -83,7 +83,7 @@ The main Records delete path removes the database row first, then makes best-eff
 
 ### Email tab
 
-- The list itself does not update live: new mail appears on Refresh, or when the tab is opened after a minute away. A phone with notifications on is told about customer replies within about a minute.
+- Updates arrive by checking once a minute (and on returning to the app), so new mail can take up to a minute to appear on screen. It is not pushed into the page.
 - Replies are plain text with the standard signature. There is no rich formatting, no attachments from the reply bar, and no CC.
 - The Customers list finds conversations by subject and by recent enquirers' addresses. A customer who emails directly from an address that never enquired shows under All inbox, not Customers.
 

@@ -2,6 +2,15 @@
 
 This file records completed owner-app changes, production updates and important verification details. Add new entries at the top.
 
+## 13 October 2026: Email tab keeps itself current
+
+Status: Deployed.
+
+- An open conversation checks for new messages every minute (message ids only, so it is cheap) and adds them in place, with a toast for customer messages. Only the message log is redrawn; the reply box keeps its text and the keyboard.
+- Returning to the app re-checks the list or the open conversation straight away.
+- The list's own one-minute re-check already existed; since Gmail now stays signed in it keeps working without taps.
+- Tested on the real Vishal Verma test thread with the newest message held back on first load: it appeared on return to the app, the half-typed reply and cursor were untouched.
+
 ## 13 October 2026: Phone notifications, and a listener Worker
 
 Status: Deployed. Confirmed on a real iPhone on 13 Oct 2026: turned on from Settings > Notifications and the test alert arrived.

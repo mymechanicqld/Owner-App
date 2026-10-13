@@ -425,6 +425,7 @@
       if (MAIL.open !== id) return;
       MAIL.thread = (th.messages || []).map(parseMessage).sort((a, b) => a.at - b.at);
       MAIL.meta[id] = summarise(th);
+      lastThreadCheck = Date.now();
       if (markRead && MAIL.thread.some((x) => x.unread)) {
         // Opening it here counts as reading it, same as in Gmail.
         gm('/users/me/threads/' + id + '/modify', { method: 'POST', body: JSON.stringify({ removeLabelIds: ['UNREAD'] }) })
@@ -436,6 +437,55 @@
     }
     if (MAIL.open === id) paintThread(true);
   }
+  /* An open conversation keeps itself current: a cheap check (message ids
+     only) once a minute and whenever the app comes back to the screen. Only
+     when something new has arrived is the full thread fetched, and then only
+     the messages are redrawn: the reply box, and anything typed in it, is
+     never touched. */
+  let lastThreadCheck = 0, checking = false;
+  async function checkThread() {
+    const id = MAIL.open;
+    if (!id || !MAIL.thread || checking || MAIL.sending) return;
+    checking = true; lastThreadCheck = Date.now();
+    try {
+      const th = await gm('/users/me/threads/' + id + '?format=minimal');
+      if (MAIL.open !== id) return;
+      const known = new Set(MAIL.thread.map((m) => m.id));
+      const fresh = (th.messages || []).filter((m) => !known.has(m.id));
+      if (!fresh.length) return;
+      const full = await gm('/users/me/threads/' + id + '?format=full');
+      if (MAIL.open !== id) return;
+      MAIL.thread = (full.messages || []).map(parseMessage).sort((a, b) => a.at - b.at);
+      MAIL.meta[id] = summarise(full);
+      const log = document.getElementById('mt-log');
+      if (log) {
+        const nearBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 120;
+        log.innerHTML = threadHtml(replyTarget());
+        icons();
+        if (nearBottom) requestAnimationFrame(() => { log.scrollTop = log.scrollHeight; });
+      }
+      const newest = MAIL.thread.filter((m) => fresh.some((f) => f.id === m.id) && !m.mine).pop();
+      if (newest) {
+        toast('New message from ' + (newest.name || 'the customer'), 'ok');
+        // Reading it here counts as reading it, same as opening it.
+        gm('/users/me/threads/' + id + '/modify', { method: 'POST', body: JSON.stringify({ removeLabelIds: ['UNREAD'] }) }).catch(() => {});
+      }
+      saveCache();
+    } catch (_) {
+      // Quiet: the next minute tries again.
+    } finally {
+      checking = false;
+    }
+  }
+
+  /* Coming back to the app (unlock, switching apps): catch up straight away
+     instead of waiting for the next one-minute tick. */
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState !== 'visible' || STATE.view !== 'email' || !connected()) return;
+    if (MAIL.open) checkThread();
+    else if (!MAIL.loading) refreshList(false);
+  });
+
   function closeThread(fromPop) {
     if (!MAIL.open) return;
     if (!fromPop && history.state && history.state.mmqldMail) { history.back(); return; }
@@ -872,6 +922,8 @@
     if (!MAIL.open && connected() && !MAIL.loading && Date.now() - MAIL.lastSync > STALE_MS && !MAIL.q && MAIL.tab === 'customers') {
       refreshList(false);
     }
+    // The app repaints every minute; an open conversation checks for new mail then.
+    if (MAIL.open && connected() && Date.now() - lastThreadCheck > STALE_MS) checkThread();
   }
 
   loadCache();
