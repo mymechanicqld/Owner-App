@@ -260,7 +260,6 @@ function renderDashboard() {
   wk.forEach((r) => { const l = svc(r.service_needed).label; counts[l] = (counts[l] || 0) + 1; });
   const topJob = Object.entries(counts).sort((a, b) => b[1] - a[1])[0];
   const recent = rows.slice(0, 5);
-  const diyRecent = rows.filter((r) => isLikelyDiy(r) && r.status !== 'archived' && withinRange(r.created_at, '48h'));
 
   $('#view-dashboard').innerHTML = `
     <div class="view-head"><div><h2>${greeting().replace(',', '')}</h2><div class="meta">${new Date().toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long' })}</div></div></div>
@@ -270,7 +269,6 @@ function renderDashboard() {
       <div class="stat"><div class="k"><i data-lucide="calendar-days"></i>This week</div><div class="v">${week}</div><div class="s">Enquiries in 7 days</div></div>
       <div class="stat"><div class="k"><i data-lucide="wrench"></i>Top job</div><div class="v" style="font-size:18px;line-height:1.2;margin-top:8px">${topJob ? esc(topJob[0]) : '-'}</div><div class="s">${topJob ? topJob[1] + ' this week' : 'No data'}</div></div>
     </div>
-    ${diyRecent.length ? `<button class="diy-banner" id="diy-banner"><i data-lucide="package-x"></i><span><b>${diyRecent.length} likely DIY ${diyRecent.length === 1 ? 'enquiry' : 'enquiries'}</b> in the last 48 hours: own parts, or a job they started themselves.</span><i data-lucide="chevron-right"></i></button>` : ''}
     <div class="section-title">Recent inquiries</div>
     <div class="list" id="dash-recent">${recent.length ? recent.map(rowHtml).join('') : emptyHtml('inbox', 'No inquiries yet', 'New leads will show up here.')}</div>
     ${recent.length ? `<button class="btn ghost full" id="see-all" style="margin-top:14px"><i data-lucide="arrow-right"></i>See all inquiries</button>` : ''}
@@ -285,15 +283,46 @@ function renderInquiries(skeleton = false) {
     return;
   }
   const ranges = [['48h', 'Last 48h'], ['week', 'This week'], ['month', 'This month'], ['year', 'This year']];
-  const inRange = STATE.rows.filter((r) => r.status !== 'archived' && withinRange(r.created_at, STATE.inqRange));
-  const diyCount = inRange.filter(isLikelyDiy).length;
-  if (!diyCount) STATE.inqDiy = false;
-  const filtered = STATE.inqDiy ? inRange.filter(isLikelyDiy) : inRange;
+  const q = (STATE.inqQ || '').trim();
+  // Keep typing smooth: the view is rebuilt on every keystroke and on the
+  // one-minute refresh, so put the cursor back where it was.
+  const had = document.activeElement && document.activeElement.id === 'inq-search';
+  const caret = had ? document.activeElement.selectionStart : null;
+  let body, meta, toolbar = '';
+  if (q) {
+    // A search looks through every enquiry, whatever the time filter.
+    const hits = STATE.rows.filter((r) => inquiryMatches(r, q));
+    meta = hits.length + ' match' + (hits.length === 1 ? '' : 'es');
+    body = hits.length ? hits.map(rowHtml).join('') : emptyHtml('search-x', 'No matches', 'Try a name, rego, phone, email or suburb.');
+  } else {
+    const inRange = STATE.rows.filter((r) => r.status !== 'archived' && withinRange(r.created_at, STATE.inqRange));
+    const diyCount = inRange.filter(isLikelyDiy).length;
+    if (!diyCount) STATE.inqDiy = false;
+    const filtered = STATE.inqDiy ? inRange.filter(isLikelyDiy) : inRange;
+    meta = filtered.length + ' shown';
+    toolbar = `<div class="toolbar">${diyCount ? `<button class="chip chip--diy ${STATE.inqDiy ? 'active' : ''}" id="inq-diy">Likely DIY ${diyCount}</button>` : ''}${ranges.map(([k, l]) => `<button class="chip ${STATE.inqRange === k ? 'active' : ''}" data-range="${k}">${l}</button>`).join('')}</div>`;
+    body = filtered.length ? filtered.map(rowHtml).join('') : emptyHtml('inbox', 'Nothing here', 'No inquiries in this window.');
+  }
   el.innerHTML = `
-    <div class="view-head"><h2>Inquiries</h2><div class="meta">${filtered.length} shown</div></div>
-    <div class="toolbar">${diyCount ? `<button class="chip chip--diy ${STATE.inqDiy ? 'active' : ''}" id="inq-diy">Likely DIY ${diyCount}</button>` : ''}${ranges.map(([k, l]) => `<button class="chip ${STATE.inqRange === k ? 'active' : ''}" data-range="${k}">${l}</button>`).join('')}</div>
-    <div class="list">${filtered.length ? filtered.map(rowHtml).join('') : emptyHtml('inbox', 'Nothing here', 'No inquiries in this window.')}</div>
+    <div class="view-head"><h2>Inquiries</h2><div class="meta">${meta}</div></div>
+    <div class="search-bar"><i data-lucide="search"></i><input id="inq-search" type="search" placeholder="Name, rego, phone, email or suburb" value="${esc(STATE.inqQ || '')}" autocomplete="off" /></div>
+    ${toolbar}
+    <div class="list">${body}</div>
   `;
+  if (had) { const i = $('#inq-search'); i.focus(); const c = caret == null ? i.value.length : caret; i.setSelectionRange(c, c); }
+}
+
+/* Search across everything the owner might remember about a customer.
+   Phone numbers and regos match without spaces ("0451 159" finds 0451159954). */
+function inquiryMatches(r, q) {
+  const low = q.toLowerCase();
+  const squash = (v) => String(v || '').toLowerCase().replace(/[^a-z0-9@.]/g, '');
+  const sq = squash(q);
+  const text = [r.full_name, r.email, r.suburb, r.address, r.vehicle_make, r.vehicle_model, svc(r.service_needed).label, svcCategoryLabel(r)]
+    .some((v) => String(v || '').toLowerCase().includes(low));
+  if (text) return true;
+  if (sq.length < 2) return false;
+  return [r.phone, r.vehicle_rego, r.email].some((v) => squash(v).includes(sq));
 }
 
 /* ---------------------------------------------------------------- search -- */
@@ -402,7 +431,7 @@ function emptyHtml(icon, h, p) {
 
 /* ----------------------------------------------------------- detail sheet -- */
 function openSheet() { $('#scrim').classList.add('open'); $('#sheet').classList.add('open'); }
-function closeSheet() { $('#scrim').classList.remove('open'); $('#sheet').classList.remove('open'); STATE.activeId = null; }
+function closeSheet() { $('#scrim').classList.remove('open'); $('#sheet').classList.remove('open'); STATE.activeId = null; $('#sheet-diy').hidden = true; }
 
 function openDetail(id) {
   const s = STATE.rows.find((r) => r.id === id);
@@ -449,7 +478,11 @@ function openDetail(id) {
     s.status = ns; toast('Marked ' + STATUS_LABEL[ns], 'ok'); render();
   });
   $('#act-reply').addEventListener('click', () => openReply(id));
-  const dBtn = $('#act-diy-draft'); if (dBtn) dBtn.addEventListener('click', () => { openReply(id); draftDecline(s); });
+  const dBtn = $('#act-diy-draft'); if (dBtn) dBtn.addEventListener('click', () => { const k = declineKind(s); openReply(id, k); draftDecline(s, k); });
+  // Header shortcut: treat any enquiry as a job we do not take on, and draft the polite no.
+  const hDiy = $('#sheet-diy');
+  hDiy.hidden = !(ashleyOn() && s.email);
+  hDiy.onclick = () => { const k = declineKind(s); openReply(id, k); draftDecline(s, k); };
   // The whole email conversation with this customer, on the Email tab.
   const eBtn = $('#act-emails'); if (eBtn) eBtn.addEventListener('click', () => { closeSheet(); MMQLD_MAIL.openFor(s.email); });
   const genParams = () => new URLSearchParams({
@@ -475,21 +508,22 @@ function buildReplyText(tmpl, s, price) {
   if (tmpl === 'custom') return TEMPLATES.custom.build(g);
   return TEMPLATES[tmpl].build(g, price || TEMPLATES[tmpl].price);
 }
-function openReply(id) {
+function openReply(id, force) {
   const s = STATE.rows.find((r) => r.id === id);
   if (!s) return;
   STATE.activeId = id;
   // Start on the template that fits the job: a service quote for servicing,
   // the diagnostic price for diagnosis, and a blank reply for everything else.
   const cat = svcCategory(s), key = svcKey(s.service_needed);
-  STATE.replyTmpl = isLikelyDiy(s) ? diyKind(s)
-    : cat === 'standard-servicing' || key === 'logbook-servicing' ? 'service'
-    : cat === 'diagnosis' || key === 'warning-light-diagnostics' ? 'diagnostic' : 'custom';
+  STATE.replyTmpl = force || (isLikelyDiy(s) ? diyKind(s) : '') || (cat === 'standard-servicing' || key === 'logbook-servicing' ? 'service'
+    : cat === 'diagnosis' || key === 'warning-light-diagnostics' ? 'diagnostic' : 'custom');
   const t0 = STATE.replyTmpl;
+  $('#sheet-diy').hidden = true;
   $('#sheet-title').textContent = 'Reply to ' + firstName(s.full_name);
   $('#sheet-sub').innerHTML = `Sends a threaded reply via Gmail`;
   // A flagged enquiry gets its decline first; the quotes stay one tap away in case the flag is wrong.
-  const tmplKeys = isLikelyDiy(s) ? [diyKind(s), 'service', 'diagnostic', 'custom'] : ['service', 'diagnostic', 'custom'];
+  const decline = force || (isLikelyDiy(s) ? diyKind(s) : '');
+  const tmplKeys = decline ? [decline, decline === 'diy' ? 'started' : 'diy', 'custom'] : ['service', 'diagnostic', 'custom'];
   $('#sheet-body').innerHTML = `
     <button class="btn ghost" id="reply-back" style="margin-bottom:14px;width:auto;display:inline-flex"><i data-lucide="chevron-left"></i>Back</button>
     <div class="reply-to">To <b>${esc(s.email || 'no email on file')}</b></div>
@@ -538,8 +572,14 @@ Write as the business: "we" and "us", never "I". Australian spelling. NEVER use 
 (no em-dash, no en-dash). No emojis. Write only the sentences: no greeting, no sign-off, no name,
 no business details, no quotes.`;
 
-function declineBrief(s) {
-  const started = diyKind(s) === 'started';
+/* Which decline fits: the flag when there is one; otherwise, for a job the
+   owner marks by hand, whichever check leaned that way, else own parts. */
+function declineKind(s) {
+  if (isLikelyDiy(s)) return diyKind(s);
+  return (s.ai_started_score || 0) > (s.ai_diy_score || 0) ? 'started' : 'diy';
+}
+function declineBrief(s, kind) {
+  const started = (kind || declineKind(s)) === 'started';
   return [
     'Job requested: ' + (svcLabel(s.service_needed) || 'not given'),
     carDesc(s) ? 'Car: ' + carDesc(s) : '',
@@ -553,7 +593,7 @@ function declineBrief(s) {
   ].filter(Boolean).join('\n');
 }
 
-async function draftDecline(s) {
+async function draftDecline(s, kind) {
   const box = $('#composer'), btn = $('#ai-rewrite');
   if (!box) return;
   const before = box.value;                     // the matching decline template, kept as the fallback
@@ -568,7 +608,7 @@ async function draftDecline(s) {
       body: JSON.stringify({
         messages: [
           { role: 'system', content: DECLINE_RULES },
-          { role: 'user', content: declineBrief(s) + '\n\nReminder: one or two sentences, kind, and never the words DIY or do it yourself.' },
+          { role: 'user', content: declineBrief(s, kind) + '\n\nReminder: one or two sentences, kind, and never the words DIY or do it yourself.' },
         ],
         temperature: 0.3,
         max_tokens: 200,
@@ -1059,6 +1099,7 @@ function openEvent(ev) {
   const isEdit = ev && ev.id;
   STATE.editEventId = isEdit ? ev.id : null;
   const start = ev && ev.starts_at ? new Date(ev.starts_at) : (() => { const d = new Date(); d.setHours(9, 0, 0, 0); return d; })();
+  $('#sheet-diy').hidden = true;
   $('#sheet-title').textContent = isEdit ? 'Edit booking' : 'New booking';
   $('#sheet-sub').textContent = isEdit ? 'Update or delete this booking' : 'Check the details, then add it';
   const fld = (label, id, type, val, ph) => `<label class="form-field"><span>${label}</span><input id="${id}" type="${type}" value="${esc(val || '')}" placeholder="${ph || ''}" /></label>`;
@@ -1230,6 +1271,7 @@ function openMessageFor(fullName, phone, back) {
   STATE.msgTmpl = 'website';
   const first = firstName(fullName);
   const tel = phone.replace(/\s/g, '');
+  $('#sheet-diy').hidden = true;
   $('#sheet-title').textContent = 'Message ' + first;
   $('#sheet-sub').textContent = 'Opens your messaging app, pre-filled';
   const keys = Object.keys(MSG_TEMPLATES);
@@ -1643,10 +1685,14 @@ document.addEventListener('click', (e) => {
     return openEvent({ starts_at: d.toISOString() });
   }
   if (e.target.closest('#see-all')) return setView('inquiries');
-  if (e.target.closest('#diy-banner')) { STATE.inqRange = '48h'; STATE.inqDiy = true; return setView('inquiries'); }
   if (e.target.closest('#inq-diy')) { STATE.inqDiy = !STATE.inqDiy; renderInquiries(); icons(); return; }
 });
 // Jump to any date from the picker under the day title.
+document.addEventListener('input', (e) => {
+  if (e.target.id !== 'inq-search') return;
+  STATE.inqQ = e.target.value;
+  renderInquiries(); icons();
+});
 document.addEventListener('change', (e) => {
   if (e.target.id !== 'cal-date-input' || !e.target.value) return;
   STATE.calRef = new Date(e.target.value + 'T00:00:00'); STATE.calView = 'day';

@@ -22,6 +22,8 @@ Tapping a recent inquiry opens the same detail sheet used by Inquiries and Searc
 
 ## Inquiries
 
+A search bar sits at the top: it looks through every enquiry, whatever the time filter, by name, rego, phone, email, suburb, address, car or job. Phone numbers and regos match without spaces or capitals ("0401 835", "605rm3"). While searching, the time and DIY filters are hidden and the count shows matches.
+
 The Inquiries screen reads up to 3,000 rows from `quote_submissions`, newest first.
 
 Available time filters:
@@ -106,8 +108,8 @@ New website enquiries are checked automatically for two kinds of job the busines
 
 Both get the same "Likely DIY" label; the detail sheet says which and how sure.
 
-- Dashboard: a violet "N likely DIY enquiries in the last 48 hours" bar. Tapping it opens Inquiries filtered to them.
 - Inquiry rows (Inquiries, Dashboard, Search): the left tile is the enquiry's flag. Likely DIY is a solid violet tile with "DIY"; otherwise the tile shows the status (New, Contacted, Quoted, Booked, Won, Lost) in its colour. The job type stays written on the right, so the tile no longer repeats it, and the old status dot is gone. Inquiries also has a "Likely DIY N" filter chip, first in the row.
+- Any enquiry: a small **DIY** button beside the close button in the details header treats it as a job we do not take on and drafts the polite no straight away, the same as the button in the note. For an unflagged enquiry it picks whichever reason the check leaned towards (own parts if neither); the Reply sheet offers both declines.
 - Detail sheet: a note saying which kind and how sure the check is, for example "93% sure", with a **Draft a polite no** button. It opens the reply on the matching decline and has Ashley write one or two kind sentences from the customer's notes and job: sorry, the reason (we only fit parts we supply / we cannot pick up a job that has been started), and the offer to do the whole job ourselves. The owner checks it and taps Send reply; Undo brings back the standard wording. The customer never sees the word "DIY": it is never sent to the model, and a draft containing it is replaced by the standard decline.
 - Reply: starts on the matching decline, **Own parts** (we only fit parts we supply, offer the whole job with our parts) or **Started job** (the playbook wording: not something we can pick up and finish, offer the whole job ourselves). Service and Diagnostic quotes stay one tap away in case the flag is wrong. Wording in Settings > Messages. Sending a decline marks the enquiry Contacted.
 - Email tab: the enquiry's conversation carries the tag.

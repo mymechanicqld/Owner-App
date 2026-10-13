@@ -2,6 +2,15 @@
 
 This file records completed owner-app changes, production updates and important verification details. Add new entries at the top.
 
+## 13 October 2026: Zilla's enquiry, search on Inquiries, DIY button in the header
+
+Status: Deployed.
+
+- Zilla Lingwoodock (own shock absorbers and ball joints to fit, brake pads not bought yet) was missed at 0.13. The checker now asks a third own-parts question and takes the higher score; the last 48 hours were re-scored and she is flagged (0.77). One expected extra flag: Gaylene Smith (changed her own fuel and spark plugs, 0.72). See DATA_AND_INTEGRATIONS.md for what was tried.
+- The dashboard's likely DIY banner is removed (the DIY tile on each row is enough).
+- Search is back at the top of Inquiries (name, rego, phone, email, suburb, car, job), across all enquiries.
+- A small DIY button beside the close button in any enquiry's details drafts the polite no, for jobs the check missed.
+
 ## 11 October 2026: Draft a polite no for Likely DIY enquiries
 
 Status: Deployed.

@@ -5,8 +5,9 @@
    have not been checked yet, asks Cloudflare's Clef-flash decision model two
    questions and writes both probabilities back to the inquiry:
 
-     ai_diy_score      own parts: they supply the parts and only want them
-                       fitted (the app labels 0.6 and above "Likely DIY")
+     ai_diy_score      own parts: they supply some or all of the parts for us
+                       to fit; the higher of two questions (the app labels
+                       0.6 and above "Likely DIY")
      ai_started_score  started it themselves: they began the repair and want
                        it finished (the app labels 0.8 and above)
      ai_checked_at     when it was checked
@@ -40,6 +41,13 @@ const QUESTIONS = {
     type: 'noul',
     instructions: 'Has the customer (or a friend) already started this repair themselves, taken parts off or tried to do the job, and now wants a mechanic to finish it or fix what they began?',
   },
+  // Added 13 Oct 2026: "diy" misses customers who have some parts but also want
+  // other work ("two boxes of shock absorbers to put on, but no brake pads yet").
+  // It flags a few extra jobs ("has new tyres"), which the owner accepted.
+  owned: {
+    type: 'noul',
+    instructions: 'Does the customer mention parts they already own or have bought, which they want a mechanic to put on or install?',
+  },
 };
 
 const rest = (env, path) => env.SUPABASE_URL.replace(/\/+$/, '') + '/rest/v1/' + path;
@@ -63,15 +71,16 @@ async function pass(env) {
   }
   if (!r.ok) throw new Error('read inquiries ' + r.status + ' ' + (await r.text()).slice(0, 200));
   const rows = await r.json();
-  const questions = started ? QUESTIONS : { diy: QUESTIONS.diy };
+  const questions = started ? QUESTIONS : { diy: QUESTIONS.diy, owned: QUESTIONS.owned };
   const done = [];
   for (const row of rows) {
     try {
       const res = await env.AI.run(MODEL, { state: stateFor(row), questions });
       const a = (res && res.answers) || {};
-      const p = a.diy && a.diy.noul;
+      // Own parts is the stronger of the two own-parts questions.
+      const p = Math.max(a.diy ? a.diy.noul : 0, a.owned ? a.owned.noul : 0);
       const st = a.started && a.started.noul;
-      if (typeof p !== 'number' || (started && typeof st !== 'number')) throw new Error('no answer');
+      if (!a.diy || (started && typeof st !== 'number')) throw new Error('no answer');
       const r3 = (x) => Math.round(x * 1000) / 1000;
       const patch = { ai_diy_score: r3(p), ai_checked_at: new Date().toISOString(), ai_model: MODEL };
       if (started) patch.ai_started_score = r3(st);

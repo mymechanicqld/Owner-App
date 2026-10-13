@@ -227,6 +227,7 @@ Clef is Cloudflare's own family of decision models (released 1 Oct 2026): given 
 - Price: $0.038 per million input tokens, nothing for output. An enquiry is about 200 tokens, under one neuron, so the 10,000-neuron free daily allowance (shared with Ashley) covers thousands of checks a day.
 - Calibration (11 Oct 2026, last 400 enquiries). Own parts: 27 scored 0.76 or more and every one said the customer had or would supply the part; the next was 0.33, hence 0.6. Started it themselves: 0.84 and above were all genuine (stuck mid-job, parts already off); 0.5 to 0.8 were mostly normal diagnoses after a simple swap ("replaced battery, now no start" 0.78), hence the stricter 0.8.
 - Both questions in one call: about 310 input tokens, about 1.1 neurons per enquiry.
+- 13 Oct 2026: Zilla Lingwoodock ("two boxes of shock absorbers in the car that need to put on", plus brake pads she had not bought yet) scored 0.13, because the question said "only want us to fit". A third question, "Does the customer mention parts they already own or have bought, which they want a mechanic to put on or install?", now runs in the same call and `ai_diy_score` takes the higher of the two. Zilla 0.77. The owner accepted the trade-off: it also flags a few jobs like "Has new tyres. Lights need to be checked." and "have changed the fuel & spark plugs". Several rewordings and the larger Clef model were tried first; none separated these cases cleanly.
 - Data sent: the service slug and the customer's notes only. No name, phone, email or address.
 
 ## Browser local storage
