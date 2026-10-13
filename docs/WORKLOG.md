@@ -2,6 +2,12 @@
 
 This file records completed owner-app changes, production updates and important verification details. Add new entries at the top.
 
+## 13 October 2026: No pop-up after an AI draft
+
+Status: Deployed.
+
+- The "Drafted by Ashley / Rewritten by Ashley" toast (with Undo) is gone from all three AI drafts: Email tab sparkle, Rewrite, and Draft a polite no. It sat over the draft while the owner read it. Error messages still show. Send still asks before a reply with a [gap] goes out.
+
 ## 13 October 2026: Draft with Ashley on the Email tab
 
 Status: Deployed.

@@ -620,7 +620,7 @@ async function draftDecline(s, kind) {
     // The customer must never read our label. If it slips in, keep the ready-made decline instead.
     if (!text || /\bDIY\b|do[\s-]*it[\s-]*your\s*self/i.test(text)) throw new Error('Kept the standard wording, check it and send');
     box.value = (greet || greeting()) + '\n\n' + text + (window.MMQLD_SETTINGS ? MMQLD_SETTINGS.signature() : '');
-    toastAction('Drafted by Ashley. Check it, then send.', 'Undo', () => { const b = $('#composer'); if (b) b.value = before; });
+    // No toast: it covered the draft while the owner read it.
   } catch (e) {
     toast(String((e && e.message) || e).slice(0, 120), 'err');
   } finally {
@@ -728,7 +728,7 @@ async function rewriteWithAshley(s) {
     const text = tidyRewrite(j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content);
     if (!text) throw new Error('Ashley came back empty, try again');
     box.value = (greet || greeting()) + '\n\n' + text + (window.MMQLD_SETTINGS ? MMQLD_SETTINGS.signature() : '');
-    toastAction('Rewritten by Ashley. Check it, then send.', 'Undo', () => { const b = $('#composer'); if (b) b.value = before; });
+    // No toast: it covered the draft while the owner read it.
   } catch (e) {
     toast(String((e && e.message) || e).slice(0, 120), 'err');
   } finally {

@@ -997,9 +997,8 @@ Write only the body: no greeting line, no sign-off, no name, no business details
       drafting = false; paintComposer();
       const b = document.getElementById('mail-compose');
       if (b) { b.value = out; grow(b); b.focus(); b.setSelectionRange(0, 0); }
-      const restore = () => { const c = document.getElementById('mail-compose'); if (c) { c.value = before; MAIL.drafts[id] = before; persistDrafts(); grow(c); } };
-      const msg = /\[[A-Za-z][A-Za-z ]{1,30}\]/.test(out) ? 'Drafted. Fill in the [gaps], then send.' : 'Drafted by Ashley. Check it, then send.';
-      if (typeof toastAction === 'function') toastAction(msg, 'Undo', restore); else toast(msg);
+      // No toast: it covered the draft while the owner read it. Any [gap] is
+      // caught by Send, which asks before it goes out.
     } catch (e) {
       toast(String((e && e.message) || e).slice(0, 120), 'err');
     } finally {
