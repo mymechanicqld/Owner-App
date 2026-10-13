@@ -4,6 +4,10 @@
    no fetch handler and caches nothing. It shows the alerts the listener
    Worker sends (cloudflare/listener) and opens the right screen on a tap. */
 
+/* The app's folder: the one above this worker's /push/ scope. "/" on Vercel,
+   "/Owner-App/" on the old GitHub Pages copy. */
+const ROOT = new URL('../', self.registration.scope).href;
+
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', (e) => e.waitUntil(self.clients.claim()));
 
@@ -14,20 +18,21 @@ self.addEventListener('push', (event) => {
   event.waitUntil(self.registration.showNotification(d.title || 'My Mechanic QLD', {
     body: d.body || '',
     tag: d.tag || undefined,
-    icon: '/icon-192.png',
-    badge: '/icon-192.png',
+    icon: ROOT + 'icon-192.png',
+    badge: ROOT + 'icon-192.png',
     data: { url: d.url || '/' },
   }));
 });
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  const url = new URL((event.notification.data && event.notification.data.url) || '/', self.location.origin).href;
+  // Alerts carry app links like "/?open=<id>"; resolve them inside the app's folder.
+  const url = new URL(String((event.notification.data && event.notification.data.url) || '').replace(/^\//, ''), ROOT).href;
   event.waitUntil((async () => {
     const wins = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
     for (const w of wins) {
       // The app is open: bring it forward and tell it what to show.
-      if (new URL(w.url).origin === self.location.origin && 'focus' in w) {
+      if (w.url.startsWith(ROOT) && 'focus' in w) {
         await w.focus();
         w.postMessage({ mmqldOpen: url });
         return;

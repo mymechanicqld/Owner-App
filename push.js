@@ -20,6 +20,13 @@
   'use strict';
 
   const PREFS_KEY = 'mmqld_push_prefs';
+  /* The app's own folder, from where this file was loaded. On Vercel that is
+     the site root; on the old GitHub Pages copy it is /Owner-App/, so a fixed
+     "/push/" pointed at a file that does not exist there. */
+  const ROOT = (function () {
+    try { if (document.currentScript && document.currentScript.src) return new URL('./', document.currentScript.src).href; } catch (_) {}
+    return location.origin + '/';
+  })();
   const cfg = () => (typeof CONFIG === 'undefined' ? {} : (CONFIG.LISTENER || {}));
   const endpoint = () => String(cfg().ENDPOINT || '').replace(/\/+$/, '');
 
@@ -36,7 +43,7 @@
     return '';
   }
 
-  const reg = () => navigator.serviceWorker.getRegistration('/push/');
+  const reg = () => navigator.serviceWorker.getRegistration(ROOT + 'push/');
   async function subscription() {
     if (support()) return null;
     const r = await reg();
@@ -81,7 +88,7 @@
     if (!(window.MMQLD_GAUTH && MMQLD_GAUTH.lasting())) throw new Error('Connect Gmail on this phone first (Settings > Gmail). Notifications need it.');
     const perm = await Notification.requestPermission();
     if (perm !== 'granted') throw new Error(perm === 'denied' ? 'Notifications are blocked. Allow them for this app in the phone\'s Settings, then try again.' : 'Notifications were not allowed.');
-    const r = await navigator.serviceWorker.register('/push/sw.js', { scope: '/push/' });
+    const r = await navigator.serviceWorker.register(ROOT + 'push/sw.js', { scope: ROOT + 'push/' });
     await activated(r);
     let sub = await r.pushManager.getSubscription();
     if (!sub) sub = await r.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes(cfg().VAPID_PUBLIC) });

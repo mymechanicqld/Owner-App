@@ -2,6 +2,14 @@
 
 This file records completed owner-app changes, production updates and important verification details. Add new entries at the top.
 
+## 14 October 2026: Notifications on the old GitHub Pages copy
+
+Status: Deployed.
+
+- Turning on notifications failed on the owner's Android phone with "Failed to register a ServiceWorker for scope https://mymechanicqld.github.io/push/". That phone runs the old GitHub Pages copy, where the app lives under /Owner-App/, and the code used a fixed /push/ path (404 there).
+- `push.js` now works out the app's folder from where it was loaded, and `push/sw.js` resolves its icon and the tapped-alert link from its own scope, so both Vercel and GitHub Pages work.
+- The canonical address is still https://mmqld-app.vercel.app; the phone should be moved there (see OPERATIONS.md, deployment).
+
 ## 13 October 2026: Summary of the day
 
 Everything shipped today, newest first (details in the entries below):
