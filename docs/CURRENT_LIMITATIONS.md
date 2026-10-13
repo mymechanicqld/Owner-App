@@ -34,6 +34,12 @@ It covers calendar events (including the `customer_email` column), invoice recor
 
 Fresh environment setup needs the later migrations in addition to this file.
 
+### AI drafts (Rewrite, Draft a polite no, Draft with Ashley)
+
+- They come from GLM 4.7 Flash, a small model. The rules stop it inventing prices, days and promises, and Send asks before a reply with a [gap] goes out, but every draft still needs reading before it is sent.
+- In long conversations with several prices it can still mix topics; the latest customer message is set apart to prevent that, which fixed it in testing but is not a guarantee.
+- There is no Undo after a draft (the toast that carried it was removed because it covered the text). Editing or clearing the box is the way back.
+
 ### Notifications
 
 - They need Gmail connected on the phone, and on iPhone iOS 16.4+ with the app opened from the Home Screen icon.

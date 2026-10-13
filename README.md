@@ -31,7 +31,7 @@ The sidebar groups the complete app:
 - Reply to an inquiry in its existing Gmail thread. Ashley can rewrite a quick draft ("$168") into a proper reply, or draft a polite decline for a DIY job in one tap.
 - Phone notifications for new enquiries and customer email replies, opening the right screen when tapped.
 - Gmail stays signed in on each phone after one sign-in.
-- Read and answer customer email conversations on the Email tab without opening Gmail: the website enquiry, every reply and every answer in one thread, in order, with a manual Refresh.
+- Read and answer customer email conversations on the Email tab without opening Gmail: the website enquiry, every reply and every answer in one thread, in order. The list and an open conversation keep themselves current (every minute, and straight away when the app comes back on screen), and a sparkle button beside Send has Ashley draft the reply from the enquiry and the last ten messages.
 - Call or prepare an SMS for a customer.
 - Plan the day on a Google Calendar style timeline: drag bookings to new times, drag to resize, tap an empty slot to book, jump to any date. Bookings keep the customer's email.
 - Create editable invoice PDFs with one searchable "Add items" picker, printed service checklists, bank payment details, recorded payments, drafts and Gmail sending. Saving fills any gaps (email, address, rego, car) in the customer's enquiry and bookings.

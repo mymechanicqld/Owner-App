@@ -2,6 +2,18 @@
 
 This file records completed owner-app changes, production updates and important verification details. Add new entries at the top.
 
+## 13 October 2026: Summary of the day
+
+Everything shipped today, newest first (details in the entries below):
+
+- No pop-up after an AI draft; the text is no longer covered.
+- Draft with Ashley beside Send on the Email tab (enquiry plus last ten messages, [gaps] for anything only the owner can decide).
+- The Email tab keeps itself current: open conversations check every minute and everything re-checks on return to the app.
+- Phone notifications for new enquiries and customer replies, from a new listener Worker; confirmed on a real iPhone.
+- Gmail stays signed in: one sign-in per phone, refresh token kept encrypted on Cloudflare.
+- Likely DIY catches customers with some of their own parts (Zilla), the dashboard DIY banner is gone, a DIY button sits in every enquiry's header, and search is back on Inquiries.
+- Free plan budget checked and written up (OPERATIONS.md); all four Workers fit comfortably.
+
 ## 13 October 2026: No pop-up after an AI draft
 
 Status: Deployed.

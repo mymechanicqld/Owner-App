@@ -73,7 +73,7 @@ All four Workers (`mmqld-ashley`, `mmqld-triage`, `mmqld-gmail`, `mmqld-listener
 | Subrequests 50 per run | at most about 25 | the listener handles up to 10 new emails per run |
 | KV reads 100,000/day | about 6,000 | listener state each minute, Gmail token cache |
 | KV writes 1,000/day | about 50 to 200 | only when something changed: new enquiry, new inbox mail, a phone signing up, a token refresh. Never once a minute. |
-| Workers AI 10,000 neurons/day | a few hundred normally | Ashley about 40 per question, rewrite about 5, DIY check about 1 and spam check under 1 per enquiry |
+| Workers AI 10,000 neurons/day | a few hundred normally | Ashley about 40 per question; Rewrite, Draft a polite no and Draft with Ashley about 5 each; DIY check about 1 and spam check under 1 per enquiry |
 
 Bulk testing is what gets near the AI limit (8,400 neurons on 13 Oct during calibration); normal days are a few percent of it.
 
