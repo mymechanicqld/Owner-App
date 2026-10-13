@@ -130,6 +130,10 @@ Builds every outgoing email body: `MMQLD_MIME.alternative(text)` returns the Con
 
 Worker `mmqld-triage` on the business Cloudflare account. A cron trigger runs every minute: it reads up to 25 inquiries from the last `WINDOW_HOURS` (48) with `ai_checked_at` null, runs `@cf/cloudflare/clef-flash` through the AI binding with three `noul` questions in one call (own parts, parts they already own or bought to be fitted, started it themselves; `ai_diy_score` is the higher of the first two) over "Service requested / Customer notes", and PATCHes `ai_diy_score`, `ai_started_score`, `ai_checked_at` and `ai_model`. Rows checked before the second question existed (`ai_started_score` null) are re-checked. If migration 011 has not run, it falls back to the own-parts question alone. A failed row stays unchecked and is retried next minute. `POST /run` with `X-Run-Key` triggers a pass on demand and returns the scores. Secrets: `SUPABASE_URL`, `SUPABASE_KEY` (the publishable key), `RUN_KEY`.
 
+### `gmail-auth.js`
+
+Shared Gmail sign-in for the main app, the invoice and inspection pages and Settings (`MMQLD_GAUTH`: `getToken`, `quiet`, `connect`, `disconnect`, `expire`, `connected`, `lasting`). Keeps the phone signed in through the `mmqld-gmail` Worker; see DATA_AND_INTEGRATIONS.md > Gmail > Authentication. `app.js` keeps `getToken`, `cachedGToken` and `ensureGis` as thin wrappers so `email.js` and Ashley's tools did not change.
+
 ### `gmail-send.js`
 
 Provides generator-page Gmail access. It waits for and can re-inject Google Identity Services, caches a short-lived token, searches for an existing conversation, and sends a multipart PDF attachment.

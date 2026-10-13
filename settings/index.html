@@ -189,8 +189,9 @@
 <main id="stack"></main>
 <div class="toast" id="toast"></div>
 
-<script src="../config.js?v=51"></script>
+<script src="../config.js?v=52"></script>
 <script src="../settings.js?v=50"></script>
+<script src="../gmail-auth.js?v=1"></script>
 <script src="../invoice/assets.js?v=40"></script>
 <script>
 (function () {
@@ -210,8 +211,11 @@
   const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch (_) {} };
   const lsDel = (k) => { try { localStorage.removeItem(k); } catch (_) {} };
   const nextNumber = (k, base) => (parseInt(lsGet(k) || base, 10) || 0) + 1;
-  function gmailOn() {
-    try { const o = JSON.parse(lsGet('mmqld_gtok') || 'null'); return !!(o && o.t && Date.now() < o.e); } catch (_) { return false; }
+  function gmailOn() { return !!(window.MMQLD_GAUTH && MMQLD_GAUTH.connected()); }
+  function gmailStatus() {
+    if (!window.MMQLD_GAUTH) return 'Not connected';
+    if (MMQLD_GAUTH.lasting()) return 'Connected';
+    return MMQLD_GAUTH.cached() ? 'Connected for now' : 'Not connected';
   }
   function invDraftCount() {
     try { const d = JSON.parse(lsGet(INV_DRAFTS) || '[]'); return Array.isArray(d) ? d.length : 0; } catch (_) { return 0; }
@@ -444,10 +448,12 @@
     gmail: () => ({
       title: 'Gmail',
       groups: [
-        { rows: [{ t: 'info', label: 'Status', value: gmailOn() ? 'Connected' : 'Not connected' }],
+        { rows: [{ t: 'info', label: 'Status', value: gmailStatus() }],
           foot: 'Invoices, reports and replies are sent from your own Gmail, inside the customer’s existing conversation when there is one.' },
-        { rows: [{ t: 'action', label: gmailOn() ? 'Reconnect Gmail' : 'Connect Gmail', run: connectGmail }],
-          foot: 'Google asks you to confirm in a pop-up. Access lasts about an hour and renews by itself when the app sends something.' },
+        { rows: [{ t: 'action', label: (window.MMQLD_GAUTH && MMQLD_GAUTH.lasting()) ? 'Reconnect Gmail' : 'Connect Gmail', run: connectGmail }],
+          foot: 'Sign in once with the business Gmail on this phone and it stays connected. No more signing in again before sending.' },
+        ...((window.MMQLD_GAUTH && MMQLD_GAUTH.lasting()) ? [{ rows: [{ t: 'action', label: 'Disconnect this phone', danger: true, run: disconnectGmail }],
+          foot: 'Use this if the phone is lost or replaced. Other phones stay connected.' }] : []),
       ],
     }),
 
@@ -848,22 +854,12 @@
     await S.reset(); repaint(); toast('Settings reset');
   }
   async function connectGmail() {
-    try {
-      if (typeof google === 'undefined' || !google.accounts) {
-        await new Promise((res, rej) => { const s = document.createElement('script'); s.src = 'https://accounts.google.com/gsi/client'; s.onload = res; s.onerror = () => rej(new Error('Could not load Google sign-in')); document.head.appendChild(s); });
-      }
-      const client = google.accounts.oauth2.initTokenClient({
-        client_id: CONFIG.GOOGLE_CLIENT_ID,
-        scope: 'https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/gmail.send',
-        callback: (r) => {
-          if (r.error) return toast('Google sign-in did not finish');
-          lsSet('mmqld_gtok', JSON.stringify({ t: r.access_token, e: Date.now() + ((r.expires_in || 3600) - 60) * 1000 }));
-          repaint(); toast('Gmail connected');
-        },
-        error_callback: () => toast('Google sign-in was closed or blocked'),
-      });
-      client.requestAccessToken({ prompt: '' });
-    } catch (e) { toast(String((e && e.message) || e).slice(0, 80)); }
+    try { await MMQLD_GAUTH.connect(); repaint(); toast('Gmail connected'); }
+    catch (e) { toast(String((e && e.message) || e).slice(0, 120)); }
+  }
+  async function disconnectGmail() {
+    if (!confirm('Disconnect Gmail on this phone? You can connect again any time.')) return;
+    await MMQLD_GAUTH.disconnect(); repaint(); toast('Gmail disconnected on this phone');
   }
 
   /* ----------------------------------------------------------- startup -- */

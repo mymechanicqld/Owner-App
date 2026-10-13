@@ -281,7 +281,7 @@
      button instead of silently failing. Sending is different: it already runs
      off the Confirm tap, so it can ask for the token itself. */
   function gmailConnected() {
-    try { const o = JSON.parse(localStorage.getItem('mmqld_gtok') || 'null'); return !!(o && o.t && Date.now() < o.e); }
+    try { return !!(window.MMQLD_GAUTH && MMQLD_GAUTH.connected()); }
     catch (_) { return false; }
   }
   const NEEDS_GMAIL = {

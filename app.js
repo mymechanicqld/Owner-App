@@ -1440,84 +1440,21 @@ async function deleteLog(kind, table, bucket, id) {
 }
 
 /* ------------------------------------------------------------ gmail (GIS) -- */
-let tokenClient = null, tokenResolver = null;
-/* Shared token cache (same key as gmail-send.js) so a consent granted on a
-   generator page is reused here and vice-versa. localStorage, not
-   sessionStorage, so closing the app does not force re-authorising. */
+/* Sign-in lives in gmail-auth.js (shared with the invoice, report and
+   Settings pages): one tap connects a phone for good, and the one-hour
+   access token is then renewed quietly through the Gmail Worker. These names
+   stay because email.js and Ashley's tools call them. */
 const TOK_KEY = 'mmqld_gtok';
-function cachedGToken() { try { const o = JSON.parse(localStorage.getItem(TOK_KEY) || 'null'); if (o && o.t && Date.now() < o.e) return o; } catch (_) {} return null; }
-/* Google Identity Services loads async from Google's CDN and is often not ready
-   when the owner first taps Send. Wait for it (re-injecting the script if the
-   tag never loaded) rather than failing immediately. */
-const GIS_SRC = 'https://accounts.google.com/gsi/client';
-const gisReady = () => !!(window.google && google.accounts && google.accounts.oauth2);
-let gisWait = null;
-function ensureGis(timeoutMs) {
-  if (gisReady()) return Promise.resolve();
-  if (gisWait) return gisWait;
-  gisWait = new Promise((resolve, reject) => {
-    if (!document.querySelector('script[src^="' + GIS_SRC + '"]')) {
-      const s = document.createElement('script');
-      s.src = GIS_SRC; s.async = true; s.defer = true;
-      document.head.appendChild(s);
-    }
-    const deadline = Date.now() + (timeoutMs || 15000);
-    (function poll() {
-      if (gisReady()) return resolve();
-      if (Date.now() > deadline) {
-        gisWait = null;
-        return reject(new Error('Google sign-in could not load. Check your connection and try again.'));
-      }
-      setTimeout(poll, 150);
-    })();
-  });
-  return gisWait;
-}
-/* Google rejects a sign-in outright when the address the app is served from is
-   not on the OAuth client's "Authorized JavaScript origins" list. From the
-   browser that looks identical to the owner closing the pop-up, which sent us
-   chasing pop-up blockers when the app moved to a new URL. Name the real cause
-   and print the address that has to be registered. */
-function gErr(type) {
-  if (type === 'popup_failed_to_open') return 'Google sign-in was blocked. Allow pop-ups for this site, then try again.';
-  if (type === 'popup_closed_by_user') {
-    return 'Google sign-in did not finish. If a Google error page appeared, this app\'s address (' +
-      location.origin + ') still has to be added to the Google sign-in settings.';
-  }
-  return 'Google sign-in did not complete (' + (type || 'unknown') + '). If this keeps happening, check that ' +
-    location.origin + ' is listed in the Google sign-in settings.';
-}
-async function getToken() {
-  if (STATE.gtoken && Date.now() < STATE.gexp) return STATE.gtoken;
-  const c = cachedGToken();
-  if (c) { STATE.gtoken = c.t; STATE.gexp = c.e; return STATE.gtoken; }
-  await ensureGis();
-  if (CONFIG.GOOGLE_CLIENT_ID.startsWith('PASTE_')) throw new Error('Set GOOGLE_CLIENT_ID in config.js');
-  if (!tokenClient) {
-    tokenClient = google.accounts.oauth2.initTokenClient({
-      client_id: CONFIG.GOOGLE_CLIENT_ID,
-      scope: 'https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/gmail.send',
-      callback: (resp) => {
-        if (resp.error) return tokenResolver && tokenResolver.reject(new Error(gErr(resp.error)));
-        STATE.gtoken = resp.access_token;
-        STATE.gexp = Date.now() + ((resp.expires_in || 3600) - 60) * 1000;
-        try { localStorage.setItem(TOK_KEY, JSON.stringify({ t: STATE.gtoken, e: STATE.gexp })); } catch (_) {}
-        tokenResolver && tokenResolver.resolve(STATE.gtoken);
-      },
-      error_callback: (e) => { tokenResolver && tokenResolver.reject(new Error(gErr((e && e.type) || ''))); },
-    });
-  }
-  return new Promise((resolve, reject) => {
-    tokenResolver = { resolve, reject };
-    // Empty prompt: consent screen only if not already granted, then silent.
-    tokenClient.requestAccessToken({ prompt: '' });
-  });
-}
+function cachedGToken() { const t = MMQLD_GAUTH.cached(); return t ? { t } : null; }
+function ensureGis(timeoutMs) { return MMQLD_GAUTH.ensureGis(timeoutMs); }
+async function getToken() { return MMQLD_GAUTH.getToken(); }
 async function gFetch(path, opts = {}) {
-  const t = await getToken();
-  const r = await fetch('https://gmail.googleapis.com/gmail/v1' + path, {
-    ...opts, headers: { Authorization: 'Bearer ' + t, 'Content-Type': 'application/json', ...(opts.headers || {}) },
+  const call = async () => fetch('https://gmail.googleapis.com/gmail/v1' + path, {
+    ...opts, headers: { Authorization: 'Bearer ' + (await getToken()), 'Content-Type': 'application/json', ...(opts.headers || {}) },
   });
+  let r = await call();
+  // Google ended the token early: drop it and, on a connected phone, get a new one quietly.
+  if (r.status === 401) { MMQLD_GAUTH.expire(); if (MMQLD_GAUTH.lasting()) r = await call(); }
   if (!r.ok) throw new Error('Gmail ' + r.status);
   return r.json();
 }

@@ -43,6 +43,16 @@ Ashley's model runs on Cloudflare Workers AI through the Worker in `cloudflare/a
 - Needs website migration 010 (applied 11 Oct 2026). Without the columns a pass fails harmlessly and retries.
 - Re-check an enquiry: set its `ai_checked_at` to null; it is scored again within a minute if it is under 48 hours old.
 
+## Gmail connection keeper on Cloudflare
+
+- Worker `mmqld-gmail`, <https://mmqld-gmail.mmqld.workers.dev>, KV namespace `mmqld-gmail` (`840215926052407993d41ac75a45e825`).
+- Secrets: `GOOGLE_CLIENT_ID` (the web client, as in config.js), `GOOGLE_CLIENT_SECRET` (that client's secret, kept in `cloudflare/harness/.env`), `TOKEN_KEY` (random, encrypts the refresh token). Var `ALLOWED_EMAIL`.
+- Deploy: from `cloudflare/harness`, `node cf.mjs deploy ../gmail`.
+- KV holds `gmail:refresh` (encrypted), `gmail:access` (cached access token) and one `dev:<hash>` per connected phone.
+- Reset everything (every phone signs in again): delete those keys, or call `POST /forget-all` with a device key.
+- Health: `POST /token` with a made-up `X-Device-Key` must return 401 `unknown_device`.
+- The Google OAuth app must stay **In production**. In Testing, refresh tokens expire after 7 days.
+
 ## Google OAuth setup
 
 The Google OAuth credential must be a Web application client.

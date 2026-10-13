@@ -1,107 +1,21 @@
 /* ============================================================================
    Shared Gmail sender for the generator pages (invoice + inspection).
-   Sends a PDF as an attachment via the owner's Google sign-in (GIS token flow),
-   threaded into the customer's existing Gmail conversation when one is found.
-   Relies on CONFIG.GOOGLE_CLIENT_ID from config.js (loaded first).
+   Sends a PDF as an attachment via the owner's Gmail, threaded into the
+   customer's existing conversation when one is found. Sign-in comes from
+   gmail-auth.js, loaded before this file.
    ========================================================================== */
 (function () {
-  let tokenClient = null, pending = null, token = null, exp = 0;
-
-  /* Shared across the app + generator pages so a consent granted anywhere is
-     reused everywhere. localStorage (not sessionStorage) so closing the app
-     does not force the owner to authorise again — Google access tokens last
-     about an hour, and once the grant exists Google reissues them without
-     showing the consent screen again. */
-  const TOK_KEY = 'mmqld_gtok';
-  function cachedToken() { try { const o = JSON.parse(localStorage.getItem(TOK_KEY) || 'null'); if (o && o.t && Date.now() < o.e) return o; } catch (_) {} return null; }
-  function storeToken(t, e) { try { localStorage.setItem(TOK_KEY, JSON.stringify({ t: t, e: e })); } catch (_) {} }
-
-  /* Google Identity Services is loaded async from Google's CDN. On a phone it
-     is often not ready by the time the owner taps Send, and the tag can fail
-     outright on a flaky connection. Wait for it (re-injecting the script if it
-     never arrived) instead of giving up on the first try. */
-  const GIS_SRC = 'https://accounts.google.com/gsi/client';
-  const gisReady = () => !!(window.google && google.accounts && google.accounts.oauth2);
-  let gisWait = null;
-  function ensureGis(timeoutMs) {
-    if (gisReady()) return Promise.resolve();
-    if (gisWait) return gisWait;
-    gisWait = new Promise((resolve, reject) => {
-      if (!document.querySelector('script[src^="' + GIS_SRC + '"]')) {
-        const s = document.createElement('script');
-        s.src = GIS_SRC; s.async = true; s.defer = true;
-        document.head.appendChild(s);
-      }
-      const deadline = Date.now() + (timeoutMs || 15000);
-      (function poll() {
-        if (gisReady()) return resolve();
-        if (Date.now() > deadline) {
-          gisWait = null;
-          return reject(new Error('Google sign-in could not load. Check your connection and try again.'));
-        }
-        setTimeout(poll, 150);
-      })();
-    });
-    return gisWait;
-  }
-
-  /* Google rejects a sign-in outright when the address the app is served from is
-     not on the OAuth client's "Authorized JavaScript origins" list. From the
-     browser that looks identical to the owner closing the pop-up, which sent us
-     chasing pop-up blockers when the app moved to a new URL. Name the real cause
-     and print the address that has to be registered. */
-  function gErr(type) {
-    if (type === 'popup_failed_to_open') return 'Google sign-in was blocked. Allow pop-ups for this site, then try again.';
-    if (type === 'popup_closed_by_user') {
-      return 'Google sign-in did not finish. If a Google error page appeared, this app\'s address (' +
-        location.origin + ') still has to be added to the Google sign-in settings.';
-    }
-    return 'Google sign-in did not complete (' + (type || 'unknown') + '). If this keeps happening, check that ' +
-      location.origin + ' is listed in the Google sign-in settings.';
-  }
-
-  async function getToken() {
-    if (token && Date.now() < exp) return token;
-    const c = cachedToken();
-    if (c) { token = c.t; exp = c.e; return token; }
-    await ensureGis();
-    /* NOTE: config.js declares `const CONFIG`, and a top-level const lives in
-       the global lexical scope, NOT on window. This guard used to read
-       `!window.CONFIG`, which is always true, so it threw "Google client id not
-       set in config.js" on every send where a cached token did not already
-       short-circuit above. The id was always present and correct. Reference
-       CONFIG directly. */
-    if (typeof CONFIG === 'undefined' || !CONFIG.GOOGLE_CLIENT_ID ||
-        String(CONFIG.GOOGLE_CLIENT_ID).indexOf('PASTE_') === 0) {
-      throw new Error('Google sign-in is not set up yet: GOOGLE_CLIENT_ID is missing from config.js');
-    }
-    if (!tokenClient) {
-      tokenClient = google.accounts.oauth2.initTokenClient({
-        client_id: CONFIG.GOOGLE_CLIENT_ID,
-        scope: 'https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/gmail.send',
-        callback: (r) => {
-          if (r.error) return pending && pending.reject(new Error(gErr(r.error)));
-          token = r.access_token; exp = Date.now() + ((r.expires_in || 3600) - 60) * 1000;
-          storeToken(token, exp);
-          pending && pending.resolve(token);
-        },
-        error_callback: (e) => { pending && pending.reject(new Error(gErr((e && e.type) || ''))); },
-      });
-    }
-    return new Promise((resolve, reject) => {
-      pending = { resolve, reject };
-      // Empty prompt: Google shows the consent screen only if not already
-      // granted, then issues tokens silently. (Was 'consent', which forced the
-      // unverified-app warning on every send.)
-      tokenClient.requestAccessToken({ prompt: '' });
-    });
-  }
+  /* Sign-in is gmail-auth.js (loaded first), shared with the main app: one
+     tap connects a phone for good and the access token renews quietly. */
+  const getToken = () => MMQLD_GAUTH.getToken();
+  const ensureGis = (ms) => MMQLD_GAUTH.ensureGis(ms);
 
   async function gFetch(path, opts = {}) {
-    const t = await getToken();
-    const r = await fetch('https://gmail.googleapis.com/gmail/v1' + path, {
-      ...opts, headers: { Authorization: 'Bearer ' + t, 'Content-Type': 'application/json', ...(opts.headers || {}) },
+    const call = async () => fetch('https://gmail.googleapis.com/gmail/v1' + path, {
+      ...opts, headers: { Authorization: 'Bearer ' + (await getToken()), 'Content-Type': 'application/json', ...(opts.headers || {}) },
     });
+    let r = await call();
+    if (r.status === 401) { MMQLD_GAUTH.expire(); if (MMQLD_GAUTH.lasting()) r = await call(); }
     if (!r.ok) throw new Error('Gmail ' + r.status);
     return r.json();
   }
@@ -175,9 +89,6 @@
     return gFetch('/users/me/messages/send', { method: 'POST', body: JSON.stringify(payload) });
   }
 
-  // Warm the Google script as soon as the page is up, so the first Send does
-  // not have to wait for it.
-  if (!gisReady()) ensureGis(20000).catch(() => {});
 
   window.MMQLD_GMAIL = { findThread, sendWithAttachment, getToken, ensureGis };
 })();

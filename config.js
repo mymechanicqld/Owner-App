@@ -37,6 +37,13 @@ const CONFIG = {
   // APP_KEY is only a shared handshake so the Worker ignores random traffic.
   // It is obscurity, not a secret. If the endpoint is ever abused, change
   // the Worker's ASHLEY_APP_KEY secret and re-ramble the new value here.
+  // Keeps Gmail signed in: holds the Google refresh token and renews each
+  // connected phone's one-hour access token (cloudflare/gmail, see
+  // gmail-auth.js). Not a secret; a phone needs its own device key to use it.
+  GMAIL_AUTH: {
+    ENDPOINT: 'https://mmqld-gmail.mmqld.workers.dev',
+  },
+
   ASHLEY: {
     ENDPOINT: (function () {
       try { const o = localStorage.getItem('mmqld_ashley_endpoint'); if (o) return o; } catch (_) {}

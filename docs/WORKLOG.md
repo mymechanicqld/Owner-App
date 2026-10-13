@@ -2,6 +2,17 @@
 
 This file records completed owner-app changes, production updates and important verification details. Add new entries at the top.
 
+## 13 October 2026: Gmail stays signed in
+
+Status: Deployed.
+
+The owner had to sign in to Google again before sending whenever more than an hour had passed, because browser-only Google sign-in gives one-hour tokens that cannot be renewed quietly (and the iPhone home-screen app often forgot the Google login, so it was a full sign-in).
+
+- New Worker `cloudflare/gmail` (`mmqld-gmail`, business Cloudflare account, KV `mmqld-gmail`) keeps an encrypted Google refresh token for the business mailbox only, and gives each connected phone a fresh access token on request.
+- New `gmail-auth.js`, used by every page: one-time connect per phone, quiet renewal after that, Disconnect this phone in Settings.
+- The OAuth app was published by the owner (refresh tokens would expire weekly in Testing). The web client's secret is a Worker secret only.
+- Tested end to end on the local copy after the owner connected: with the access token removed, a new one came back with no popup in 0.1 s (Worker copy) and, with the Worker's copy cleared too, 0.4 s via Google's refresh. The main app, Email tab and invoice page all sent Gmail requests through it.
+
 ## 13 October 2026: Zilla's enquiry, search on Inquiries, DIY button in the header
 
 Status: Deployed.

@@ -1,0 +1,17 @@
+{
+  // Keeps the business Gmail connected: holds the Google refresh token and
+  // hands each connected phone a fresh one-hour access token on request.
+  // Deploy from owner-app/cloudflare/harness: node cf.mjs deploy ../gmail
+  // Secrets (set with the harness, value on stdin):
+  //   GOOGLE_CLIENT_ID      the web OAuth client id (same as config.js)
+  //   GOOGLE_CLIENT_SECRET  that client's secret (never in the app or repo)
+  //   TOKEN_KEY             32 random bytes, base64url: encrypts the refresh token at rest
+  "$schema": "https://unpkg.com/wrangler/config-schema.json",
+  "name": "mmqld-gmail",
+  "main": "src/index.js",
+  "compatibility_date": "2026-06-01",
+  "workers_dev": true,
+  "kv_namespaces": [{ "binding": "KV", "id": "840215926052407993d41ac75a45e825" }],
+  "vars": { "ALLOWED_EMAIL": "mymechanicqld@gmail.com" },
+  "observability": { "enabled": false }
+}

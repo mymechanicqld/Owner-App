@@ -14,6 +14,10 @@ The Settings passcode is a browser prompt implemented after page scripts load. I
 
 Invoice and inspection buckets are public. Anyone with an object URL can retrieve that PDF.
 
+### Gmail device keys
+
+Each connected phone holds a device key that can get Gmail access tokens from the Worker until it is disconnected. A lost phone should be disconnected (Settings > Gmail on another connected phone cannot do that for it yet; delete its `dev:` key in KV, or reset all).
+
 ### Browser token storage
 
 The Gmail access token is kept in local storage. It expires quickly, but any script running on the same origin can read it while valid.

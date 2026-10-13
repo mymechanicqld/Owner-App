@@ -155,9 +155,16 @@ Google Identity Services uses OAuth's browser token client with these scopes:
 
 The OAuth client is a Web application and must list the exact owner-app origin. The canonical production origin is `https://mmqld-app.vercel.app`.
 
-The returned access token is cached under `mmqld_gtok` until 60 seconds before expiry. The token cache is shared across the main app, invoice generator, inspection generator and Settings because all pages use the same origin.
+Since 13 October 2026 the app stays signed in (`gmail-auth.js` + the `mmqld-gmail` Worker in `cloudflare/gmail`):
 
-The token itself does not last permanently. The Google grant normally allows a new access token without showing the consent screen again.
+1. Once per phone, from a tap, Google Identity Services' **code** client (popup, `redirect_uri=postmessage`) grants offline access. The Worker swaps the code for a refresh token using the web client's secret (a Worker secret, never in the app), checks the mailbox is `mymechanicqld@gmail.com`, stores the refresh token AES-GCM encrypted in KV, and gives the phone a random device key (stored in KV as a SHA-256 hash, on the phone as `mmqld_gdev`).
+2. From then on `MMQLD_GAUTH.getToken()` uses the cached access token (`mmqld_gtok`), or asks the Worker's `/token` with the device key. The Worker reuses its own copy until 5 minutes before expiry, otherwise refreshes with Google. No popup.
+3. A Gmail 401 drops the access token and retries once quietly.
+4. If the Worker says the phone is unknown, or Google withdrew access, the device key is removed and the next tap opens Google again. Safari only allows the popup straight after a tap, so this asks for one more tap rather than failing.
+
+Settings > Gmail shows Connected / Connected for now (old one-hour token) / Not connected, with Connect, Reconnect and Disconnect this phone. The OAuth app was published (In production) on 13 Oct 2026; in Testing, Google expires refresh tokens after 7 days.
+
+The old one-hour token flow is kept as a fallback while the Worker is not configured.
 
 ### Thread search
 

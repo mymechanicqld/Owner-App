@@ -86,7 +86,7 @@
     } catch (_) {}
   }
 
-  const connected = () => !!(typeof cachedGToken === 'function' && cachedGToken()) || !!(STATE.gtoken && Date.now() < STATE.gexp);
+  const connected = () => !!(window.MMQLD_GAUTH && MMQLD_GAUTH.connected());
 
   /* ------------------------------------------------------------ helpers -- */
   function hdrs(payload) {
@@ -159,9 +159,9 @@
     } catch (e) {
       const msg = String((e && e.message) || e);
       if (/Gmail 401/.test(msg)) {
-        try { localStorage.removeItem('mmqld_gtok'); } catch (_) {}
-        STATE.gtoken = null; STATE.gexp = 0;
-        MAIL.needsAuth = true;
+        // gFetch already retried quietly; reaching here means this phone must connect again.
+        MMQLD_GAUTH.expire();
+        MAIL.needsAuth = !MMQLD_GAUTH.connected();
         throw new Error('Gmail sign-in has expired. Tap Connect Gmail to sign in again.');
       }
       if (/Gmail 429/.test(msg)) throw new Error('Gmail is busy right now. Give it a minute and refresh.');
