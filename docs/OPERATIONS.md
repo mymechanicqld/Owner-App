@@ -135,7 +135,7 @@ On iPhone:
 2. Use Share, then Add to Home Screen.
 3. If an old icon or old origin persists, remove the existing home-screen app and add it again.
 
-The app does not require or register a service worker. Do not re-enable one without reproducing Supabase Storage uploads on a real iPhone first.
+No service worker may control an app page. Do not add one without reproducing Supabase Storage uploads on a real iPhone first. The notification worker is the exception only because its scope is `/push/`; never widen that scope or give it a fetch handler.
 
 ## Document save model
 

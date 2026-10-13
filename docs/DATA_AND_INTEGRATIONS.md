@@ -208,7 +208,7 @@ Non-ASCII subject text is encoded with an RFC 2047 encoded word before Gmail sub
 
 ### Ashley inbox access
 
-Ashley can search message metadata and read a selected full message. Inbox read tools only run when a still-valid cached token exists. If not, Ashley offers a Connect Gmail button so the owner can create the required popup with a direct tap.
+Ashley can search message metadata and read a selected full message. Inbox read tools run when the phone is connected (a cached token or a device key that renews quietly). If not, Ashley offers a Connect Gmail button so the owner can create the required popup with a direct tap.
 
 ## Ashley and Cloudflare Workers AI
 
@@ -242,7 +242,9 @@ Clef is Cloudflare's own family of decision models (released 1 Oct 2026): given 
 | Key | Purpose | Typical lifetime |
 | --- | --- | --- |
 | `mmqld_settings` | local settings copy | until reset or site data is cleared |
-| `mmqld_gtok` | Gmail access token and expiry | about one hour |
+| `mmqld_gtok` | Gmail access token and expiry | about one hour, renewed quietly through the Gmail Worker |
+| `mmqld_gdev` | this phone's device key for the Gmail Worker (keeps Gmail signed in) | until Disconnect this phone, or Google access is withdrawn |
+| `mmqld_push_prefs` | which alerts this phone wants (new enquiries, customer replies) | until changed |
 | `mmqld_mail_v1` | Email tab: last customer list (60 summaries, no message bodies), the business address, last refresh time and unsent replies | until replaced or site data is cleared |
 | `mmqld_ashley_log` | visible Ashley chat and compact history | until cleared |
 | `mmqld_ashley_endpoint` | optional endpoint override | until removed |

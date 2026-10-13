@@ -23,7 +23,7 @@ Every page loads `config.js`. Pages that consume owner settings also load `setti
 Two independent deployments:
 
 - **Vercel** serves the static app from the `mymechanicqld/Owner-App` repository, redeploying on every push to `main`. `.vercelignore` keeps `cloudflare/` and `docs/` off the public site.
-- **Cloudflare Workers** runs `mmqld-ashley`, Ashley's model endpoint, from `cloudflare/ashley`. It is deployed by hand with `wrangler deploy`; a push to GitHub does not update it.
+- **Cloudflare Workers** (business account, free plan) runs `mmqld-ashley`, `mmqld-triage`, `mmqld-gmail` and `mmqld-listener` from `cloudflare/<name>`. They are deployed by hand with the harness (`node cf.mjs deploy ../<name>` from `cloudflare/harness`); a push to GitHub does not update them.
 
 Every owner-app page redirects non-canonical Vercel aliases to `mmqld-app.vercel.app`. This is necessary because Google OAuth authorises an exact origin. It also avoids branch aliases that can sit behind Vercel authentication.
 
@@ -39,7 +39,7 @@ Every owner-app page redirects non-canonical Vercel aliases to `mmqld-app.vercel
 On boot, the main page:
 
 1. redirects to the canonical Vercel host when necessary
-2. unregisters any service worker and removes old caches
+2. unregisters any service worker except the notification worker (scope `/push/`) and removes old caches
 3. loads external Supabase, Lucide and Google Identity scripts
 4. loads browser configuration
 5. applies local settings and starts a non-blocking cloud settings refresh
@@ -146,7 +146,7 @@ Cron every minute. Jobs: `newEnquiries` (Supabase rows after the last one seen; 
 
 Provides generator-page Gmail access. It waits for and can re-inject Google Identity Services, caches a short-lived token, searches for an existing conversation, and sends a multipart PDF attachment.
 
-The main shell has equivalent Gmail helpers in `app.js` because it predates this shared generator module. Both copies of `findThread()` finish with `latestInThread()`, so an invoice, report or Reply-sheet email answers the newest message in the conversation (bounces skipped) with the full `References` chain, not the first notification.
+`app.js` keeps its own Gmail helpers (thread search and sending) for the main shell; sign-in for both comes from `gmail-auth.js`. Both copies of `findThread()` finish with `latestInThread()`, so an invoice, report or Reply-sheet email answers the newest message in the conversation (bounces skipped) with the full `References` chain, not the first notification.
 
 ### `storage.js`
 
@@ -250,9 +250,11 @@ See `ASHLEY.md` for the complete harness and tool inventory.
 
 ## PWA and iOS behaviour
 
-The app has a manifest and home-screen icons, but no active service worker. This is intentional.
+The app has a manifest and home-screen icons. No service worker controls any page. This is intentional.
 
-A previously controlling service worker made iOS WebKit fail cross-origin requests with request bodies, including Supabase Storage uploads. Each main generator page now unregisters old workers before starting. `sw.js` remains in the repository as a legacy no-cache worker but is never registered by current code.
+A previously controlling service worker made iOS WebKit fail cross-origin requests with request bodies, including Supabase Storage uploads. Each page unregisters old workers before starting, except the notification worker `push/sw.js`, which is registered with scope `/push/` (no app page lives there), has no fetch handler and only shows alerts. `sw.js` remains in the repository as a legacy no-cache worker but is never registered by current code.
+
+Notifications on iPhone need iOS 16.4 or later and the app opened from its Home Screen icon.
 
 As a result:
 

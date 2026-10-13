@@ -142,7 +142,7 @@ The system instructions and tool registry both describe this policy. The registr
 
 ## Gmail handoff
 
-Inbox reads cannot safely open an OAuth popup several seconds after the initial Send tap. When no valid cached token exists, the Gmail read tools return a Connect Gmail card.
+Inbox reads cannot safely open an OAuth popup several seconds after the initial Send tap. On a phone that has connected Gmail once, they renew the token quietly through the Gmail Worker and never need a popup. Only on a phone that has never connected (or was disconnected) do the Gmail read tools return a Connect Gmail card.
 
 The card click calls the main app's `getToken()` directly while a genuine user gesture is active. Once connected, the owner repeats the question.
 
@@ -161,6 +161,10 @@ The model is instructed to:
 - never mention tools, IDs, databases, models or automation to the owner
 
 The UI and send path also clean dash punctuation. The business signature is deterministic browser code, not generated text.
+
+## Likely DIY enquiries
+
+`list_inquiries` returns `likely_diy` and `diy_reason` ("supplying their own parts" or "started the job themselves") for each enquiry, and accepts `likely_diy: true` to list only those. Her instructions tell her to decline them warmly with the matching reason, offer the whole job, never mention risk or blame, and never use the word DIY to a customer. Every email still needs the owner's Confirm.
 
 ## Rewrite with Ashley (Reply sheet)
 

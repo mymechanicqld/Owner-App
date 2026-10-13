@@ -1,6 +1,6 @@
 # Current limitations
 
-This file records verified gaps in the current owner-app code as of 19 September 2026. It is intended to prevent future work from trusting stale comments or UI descriptions.
+This file records verified gaps in the current owner-app code as of 13 October 2026. It is intended to prevent future work from trusting stale comments or UI descriptions.
 
 ## Security and access
 
@@ -33,6 +33,12 @@ It covers calendar events (including the `customer_email` column), invoice recor
 - `app_settings`
 
 Fresh environment setup needs the later migrations in addition to this file.
+
+### Notifications
+
+- They need Gmail connected on the phone, and on iPhone iOS 16.4+ with the app opened from the Home Screen icon.
+- Enquiry alerts can be up to about 3 minutes behind, to wait for the DIY check. The spam filter is a Clef-flash question and may let some spam through or, rarely, hold back a real enquiry (it leans towards alerting).
+- A "customer reply" is any new inbox email in a conversation the business has written in, so a reply from someone else in that thread counts too.
 
 ### `sw.js` is legacy
 
@@ -77,10 +83,9 @@ The main Records delete path removes the database row first, then makes best-eff
 
 ### Email tab
 
-- No live updates. New mail appears on Refresh, or when the tab is opened after a minute away. Push would need a Google Cloud Pub/Sub topic and a server endpoint.
+- The list itself does not update live: new mail appears on Refresh, or when the tab is opened after a minute away. A phone with notifications on is told about customer replies within about a minute.
 - Replies are plain text with the standard signature. There is no rich formatting, no attachments from the reply bar, and no CC.
 - The Customers list finds conversations by subject and by recent enquirers' addresses. A customer who emails directly from an address that never enquired shows under All inbox, not Customers.
-- Gmail sign-in lasts about an hour. After that the first Refresh may briefly open Google's window to issue a new token.
 
 ### Calendar
 

@@ -148,7 +148,7 @@ Each conversation is one Gmail thread. Nothing is copied into Supabase; Gmail st
 
 - **Refresh** on the page (and the header refresh button while on Email) asks Gmail what changed. Only threads Gmail reports as changed are re-read, so a refresh with nothing new is one request.
 - Opening the tab also catches up quietly when the last check is over a minute old.
-- There is no push: Gmail push needs a Google Cloud Pub/Sub topic and a server to receive it. Manual refresh was the agreed scope.
+- The list refreshes on demand, not live. A phone with notifications on is told about customer replies within about a minute (see Phone notifications).
 
 ### A conversation
 
@@ -175,7 +175,7 @@ If the phone has no current Gmail sign-in, the page shows a Connect Gmail card. 
 
 ## Search customers
 
-Search customers is in the sidebar (Day to day). It moved off the bottom navigation to make room for Email.
+The same search is at the top of the Inquiries page (see Inquiries), which is where the owner looks for it. Search customers in the sidebar (Day to day) is the older separate screen and still works. It moved off the bottom navigation to make room for Email.
 
 Search works across the already-loaded inquiry data. It matches:
 
@@ -380,7 +380,8 @@ The settings are stored on the phone and, once `app_settings` exists in Supabase
 | Price list | shortcut with the item count | the price list page |
 | Calendar | default job length, drag snap (15 or 30 minutes), day start and end hours, open in Day or Week | the calendar |
 | Ashley | on or off, ask before changing bookings; emails, texts and deletions always ask (shown locked) | Ashley |
-| Gmail | status, connect or reconnect | all sending |
+| Gmail | status, connect or reconnect, disconnect this phone | all sending; one sign-in per phone |
+| Notifications | turn on for this phone, send a test, new enquiries / customer replies switches, turn off | phone alerts from the listener Worker |
 | Passcode | optional numeric passcode | the app's opening prompt on this phone |
 | Storage on this phone | invoice and inspection draft counts with clear buttons, refresh the price list, clear Ashley's conversation, reset all settings | this phone only |
 | About | address, sync status, price list size, assistant | information |
@@ -399,4 +400,4 @@ Ashley is the assistant in the fifth tab. Her model is GLM 4.7 Flash on Cloudfla
 
 The manifest provides standalone portrait display, theme colours and 192/512 pixel icons. Apple touch icons are supplied for iPhone home-screen installation.
 
-The app deliberately has no active service worker, so it is not an offline application. Old service workers and caches are removed on page load to avoid the iOS cross-origin upload failure that previously blocked Supabase PDF saves.
+No service worker controls any app page, so it is not an offline application. The only service worker is the notification one, scoped to `/push/`. Old service workers and caches are removed on page load to avoid the iOS cross-origin upload failure that previously blocked Supabase PDF saves.
