@@ -109,7 +109,7 @@ Settings > Notifications turns alerts on for this phone. Within about a minute, 
 - **New enquiry**: "New enquiry: Zilla Lingwoodock", then the job, suburb and "Likely DIY" when the check thinks so, and the start of what they wrote. Obvious spam (casino ads and the like) is left out by a Clef-flash question.
 - **Customer reply**: "Reply from …" and the start of the email, for a new inbox email in a conversation the business has already written in. Website notifications, newsletters and bounces are ignored.
 
-Tapping an alert opens that enquiry's details or that Email conversation. Each kind can be switched off. A test button sends one straight away.
+Tapping an alert opens that enquiry's details or that Email conversation. On Android an alert vibrates strongly and stays on screen until dismissed; a second alert for the same conversation alerts again rather than replacing the first silently. Web apps cannot choose their own sound (iPhone always uses the system alert sound, Android the browser's); on Android a unique sound can be picked in the phone's notification settings for the app. Each kind can be switched off. A test button sends one straight away.
 
 Needs Gmail connected on the phone (the alerts carry customer names, so only a connected phone can sign up). iPhone needs iOS 16.4 or later and the app opened from its Home Screen icon. The alerts come from the listener Worker (`cloudflare/listener`).
 

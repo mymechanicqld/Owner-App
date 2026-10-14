@@ -21,6 +21,13 @@ self.addEventListener('push', (event) => {
     icon: ROOT + 'icon-192.png',
     badge: ROOT + 'icon-192.png',
     data: { url: d.url || '/' },
+    // Web apps cannot choose their own sound (iPhone always plays the system
+    // alert, Android the browser's), so make it strong where the phone allows:
+    // a long vibration and staying on screen until dismissed on Android, and a
+    // fresh alert, not a silent update, when the same conversation alerts again.
+    vibrate: [400, 150, 400, 150, 800],
+    requireInteraction: d.tag !== 'test',
+    renotify: !!d.tag,
   }));
 });
 
