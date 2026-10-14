@@ -221,6 +221,7 @@
     return {
       id: th.id,
       historyId: th.historyId || last.historyId || '',
+      lastMsgId: last.id || '',
       subject,
       enq,
       kind: enq ? 'enquiry' : /invoice/i.test(subject) ? 'invoice' : /inspection|report/i.test(subject) ? 'report' : 'email',
@@ -259,17 +260,36 @@
       await getToken();
       MAIL.needsAuth = false;
       await ensureMe();
-      const qs = '?maxResults=' + PAGE + '&q=' + encodeURIComponent(currentQuery()) + (more && MAIL.next ? '&pageToken=' + encodeURIComponent(MAIL.next) : '');
-      const res = await gm('/users/me/threads' + qs);
-      const list = res.threads || [];
-      const stale = list.filter((t) => !MAIL.meta[t.id] || MAIL.meta[t.id].historyId !== t.historyId);
+      /* Messages, not threads: Gmail lists threads in the order they started,
+         so a conversation from last week with a reply this morning fell off
+         the first page (found 14 Oct with the Vishal Verma test). Messages
+         come newest first, so the first time a thread shows up here is its
+         latest activity. */
+      const seen = new Set(more ? MAIL.ids : []);
+      const list = [];
+      let token = more ? MAIL.next : null, pages = 0;
+      do {
+        const qs = '?maxResults=100&q=' + encodeURIComponent(currentQuery()) + (token ? '&pageToken=' + encodeURIComponent(token) : '');
+        const res = await gm('/users/me/messages' + qs);
+        for (const m of res.messages || []) {
+          if (seen.has(m.threadId)) continue;
+          seen.add(m.threadId);
+          list.push({ id: m.threadId, newest: m.id });
+          if (list.length >= PAGE) break;
+        }
+        token = res.nextPageToken || null;
+      } while (list.length < PAGE && token && ++pages < 3);
+      // Re-read a conversation only when its newest message has changed.
+      const stale = list.filter((t) => !MAIL.meta[t.id] || MAIL.meta[t.id].lastMsgId !== t.newest);
       await pool(stale, 5, async (t) => {
         const th = await gm('/users/me/threads/' + t.id + '?format=metadata&metadataHeaders=From&metadataHeaders=To&metadataHeaders=Subject&metadataHeaders=Reply-To');
         MAIL.meta[t.id] = summarise(th);
       });
       const ids = list.map((t) => t.id).filter((id) => MAIL.meta[id]);
-      MAIL.ids = more ? MAIL.ids.concat(ids.filter((id) => !MAIL.ids.includes(id))) : ids;
-      MAIL.next = res.nextPageToken || null;
+      MAIL.ids = more ? MAIL.ids.concat(ids) : ids;
+      // Belt and braces: newest activity first.
+      MAIL.ids.sort((a, b) => ((MAIL.meta[b] && MAIL.meta[b].lastAt) || 0) - ((MAIL.meta[a] && MAIL.meta[a].lastAt) || 0));
+      MAIL.next = token;
       if (!MAIL.q && MAIL.tab === 'customers') MAIL.lastSync = Date.now();
       saveCache();
       updateBadge();

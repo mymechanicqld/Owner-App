@@ -2,6 +2,16 @@
 
 This file records completed owner-app changes, production updates and important verification details. Add new entries at the top.
 
+## 14 October 2026: A test reply did not show or alert (two fixes)
+
+Status: Deployed.
+
+A reply sent from the Vishal Verma test address (gursahib99888@gmail.com) at 8:39 am into the existing enquiry conversation did not appear on the Email tab and sent no alert. Two separate bugs:
+
+- **Email tab order.** The list came from `threads.list`, which orders conversations by when they started. The Vishal conversation began on 3 Oct, so with the enquiries since, it was not in the first 25 even with a new reply. The list now comes from `messages.list` (newest message first) and keeps the first 25 distinct conversations, then sorts by latest activity. Checked: the Vishal conversation went from missing to second.
+- **The listener never ran on its own.** Its every-minute cron trigger was registered, and Cloudflare listed a scheduled handler, but the scheduled-run log had no runs at all, while `mmqld-triage`'s identical cron ran every minute. Re-registering it did not help. The triage cron now starts the listener every minute through a service binding, and the listener's own cron was removed so it can never run twice. Checked in Cloudflare's run counts: 5 runs per 5 minutes, no errors. Before switching, the enquiry position was moved to "now" so the first run did not send alerts for every enquiry since the previous afternoon; the inbox position was left, so the test reply got its alert.
+- Enquiry alerts never worked before this fix for the same reason; the iPhone test alert worked because tests are sent directly, not by the schedule.
+
 ## 14 October 2026: Notifications on the old GitHub Pages copy
 
 Status: Deployed.

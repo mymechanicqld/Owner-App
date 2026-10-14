@@ -12,7 +12,9 @@
   "ai": { "binding": "AI" },
   "kv_namespaces": [{ "binding": "KV", "id": "ae859ccda89b469e91c1d822edb19f14" }],
   "services": [{ "binding": "GMAIL", "service": "mmqld-gmail" }],
-  "triggers": { "crons": ["* * * * *"] },
+  // No cron of its own: it never fired (13 to 14 Oct 2026). mmqld-triage's
+  // every-minute cron starts the jobs through a service binding instead.
+  "triggers": { "crons": [] },
   "vars": {
     "VAPID_PUBLIC": "BGb31Df8LR4NqgvWQKwi1D0XxrepxZvduf7Yw7hjEiiQDKQg0ADmtCDby4Grf_TZB5GDrES0NTxgi5i6RaWKez4",
     "VAPID_SUBJECT": "mailto:mymechanicqld@gmail.com"

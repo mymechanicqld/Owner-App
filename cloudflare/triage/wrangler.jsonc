@@ -5,6 +5,7 @@
   //   SUPABASE_URL   the project's address (same as config.js)
   //   SUPABASE_KEY   the project's publishable key (same as config.js)
   //   RUN_KEY        lets the harness trigger a run on demand (POST /run)
+  //   INTERNAL_KEY   same as mmqld-listener: lets this cron start its jobs
   "$schema": "https://unpkg.com/wrangler/config-schema.json",
   "name": "mmqld-triage",
   "main": "src/index.js",
@@ -12,6 +13,9 @@
   "workers_dev": true,
   "ai": { "binding": "AI" },
   "triggers": { "crons": ["* * * * *"] },
+  // This minute also starts the listener (phone notifications). The
+  // listener's own cron never fired (13 to 14 Oct 2026), this one does.
+  "services": [{ "binding": "LISTENER", "service": "mmqld-listener" }],
   "vars": {
     "WINDOW_HOURS": "48"
   },

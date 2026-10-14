@@ -101,6 +101,14 @@ async function pass(env) {
 
 export default {
   async scheduled(event, env, ctx) {
+    // Also the clock for the listener (phone notifications): its own cron
+    // trigger never fired, this one fires every minute. It runs as a separate
+    // request, with its own CPU budget.
+    if (env.LISTENER && env.INTERNAL_KEY) {
+      ctx.waitUntil(env.LISTENER.fetch('https://mmqld-listener/run', { method: 'POST', headers: { 'X-Internal-Key': env.INTERNAL_KEY } })
+        .then((r) => { if (!r.ok) console.error('[triage] listener run', r.status); })
+        .catch((e) => console.error('[triage] listener run failed', String(e.message || e).slice(0, 120))));
+    }
     if (!env.SUPABASE_URL || !env.SUPABASE_KEY) return;
     ctx.waitUntil(pass(env).catch((e) => console.error('[triage]', String(e.message || e).slice(0, 200))));
   },
