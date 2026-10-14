@@ -141,7 +141,7 @@ Runs every minute, started by `mmqld-triage`'s cron via a service binding (`POST
 
 ### `push.js` and `push/sw.js`
 
-`push.js` (Settings) asks permission, registers `push/sw.js` with scope `/push/`, subscribes with the VAPID public key and registers with the listener. `push/sw.js` shows alerts and opens `/?open=<id>` or `/?thread=<id>` (or messages an open window); `app.js` `openFromLink()` handles both. The worker's scope keeps it from controlling any page, which matters: a page-controlling service worker breaks PDF uploads on iPhone. The kill switch in each page head now removes every service worker except `/push/`.
+`push.js` (Settings) asks permission, registers `push/sw.js` with scope `/push/`, subscribes with the VAPID public key and registers with the listener. `push/sw.js` shows alerts. On a tap it writes the link to IndexedDB (`mmqld-push`, key `open`), then focuses the open app (and posts a message) or opens `/?open=<id>` / `/?thread=<id>`. `app.js` reads and removes that stored link on start, on `visibilitychange` and on focus (`takePendingLink()`), because on iPhone a message to a page the worker does not control is not delivered and opening a window can just bring the app forward. `openFromLink()` then opens the enquiry (reloading data first if it is brand new) or the conversation. The app also calls `update()` on the `/push/` registration at every start, since a worker that controls no page is rarely checked for new versions otherwise. The worker's scope keeps it from controlling any page, which matters: a page-controlling service worker breaks PDF uploads on iPhone. The kill switch in each page head now removes every service worker except `/push/`.
 
 ### `gmail-send.js`
 

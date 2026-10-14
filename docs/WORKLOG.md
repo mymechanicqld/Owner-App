@@ -2,6 +2,15 @@
 
 This file records completed owner-app changes, production updates and important verification details. Add new entries at the top.
 
+## 14 October 2026: Tapping an alert opens the right screen on iPhone
+
+Status: Deployed.
+
+- The reply alert arrived on the owner's tester's iPhone, but tapping it opened the app without opening the conversation. The app was already running, and the worker's message to it is not delivered on iPhone to a page the worker does not control.
+- The worker now also saves the tapped link in IndexedDB, and the app opens it when it starts or comes back to the front, then removes it. A tapped enquiry that is newer than the app's last load reloads the data first.
+- The app asks the notification worker to update on every start, so phones pick up worker changes.
+- Checked in the local copy with the stored link: return to the front and fresh start both opened the Vishal Verma conversation; the link was used once only.
+
 ## 14 October 2026: A test reply did not show or alert (two fixes)
 
 Status: Deployed.

@@ -1665,17 +1665,62 @@ function boot() {
      check. */
   const foot = $('#side-foot');
   if (foot) foot.textContent = location.host;
-  loadData().then(() => openFromLink(location.href));
+  loadData().then(async () => {
+    // A link in the address (the app was opened by the tap) wins; either way
+    // the stored one is used up so it cannot open again later.
+    const u = new URL(location.href);
+    const stored = await takePendingLink();
+    if (u.searchParams.get('open') || u.searchParams.get('thread')) openFromLink(location.href);
+    else if (stored) openFromLink(stored);
+  });
   setInterval(() => loadData(false), 60000);
   // Warm Google's sign-in script so the first Send does not wait on it.
   ensureGis(20000).catch(() => {});
-  // A tapped notification while the app is already open (push/sw.js).
-  if ('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('message', (e) => { if (e.data && e.data.mmqldOpen) openFromLink(e.data.mmqldOpen); });
+  // A tapped notification (push/sw.js): by message where the browser delivers
+  // one, and always through the link the worker leaves in IndexedDB, read on
+  // start and whenever the app comes back to the front.
+  if ('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('message', (e) => { if (e.data && e.data.mmqldOpen) { takePendingLink(); openFromLink(e.data.mmqldOpen); } });
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && STATE.loaded) openPendingLink(); });
+  // The notification worker controls no page, so the browser rarely checks it
+  // for a newer version on its own. Ask on every start.
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.getRegistration(new URL('push/', location.href).href).then((r) => { if (r) r.update().catch(() => {}); }).catch(() => {});
+  }
+  window.addEventListener('focus', () => { if (STATE.loaded) openPendingLink(); });
   // NOTE: no service worker controls this page. A controlling SW triggers an
   // iOS WebKit bug where cross-origin POSTs (PDF uploads) fail with "Load
   // failed". The only one allowed is the notification worker, scoped to
   // /push/ so it never controls a page; the kill-switch in each page's <head>
   // removes any other.
+}
+
+/* The link the notification worker saved when an alert was tapped, if it is
+   fresh (two minutes), removed as it is read. '' when there is none. */
+function takePendingLink() {
+  return new Promise((resolve) => {
+    try {
+      const req = indexedDB.open('mmqld-push', 1);
+      req.onupgradeneeded = () => req.result.createObjectStore('kv');
+      req.onsuccess = () => {
+        try {
+          const tx = req.result.transaction('kv', 'readwrite');
+          const st = tx.objectStore('kv');
+          const g = st.get('open');
+          g.onsuccess = () => {
+            const v = g.result;
+            if (v) st.delete('open');
+            resolve(v && v.url && Date.now() - v.at < 120000 ? v.url : '');
+          };
+          g.onerror = () => resolve('');
+        } catch (_) { resolve(''); }
+      };
+      req.onerror = () => resolve('');
+    } catch (_) { resolve(''); }
+  });
+}
+async function openPendingLink() {
+  const url = await takePendingLink();
+  if (url) openFromLink(url);
 }
 
 /* Notifications open the app at /?open=<enquiry id> or /?thread=<Gmail
@@ -1686,9 +1731,10 @@ function openFromLink(href) {
   if (!enq && !thread) return;
   if (u.search && location.search) history.replaceState(null, '', location.pathname);
   if (enq) {
-    const row = STATE.rows.find((r) => r.id === enq);
     setView('inquiries');
-    if (row) openDetail(row.id); else toast('That enquiry is not in the list yet, pull to refresh');
+    const show = () => { const row = STATE.rows.find((r) => r.id === enq); if (row) openDetail(row.id); return !!row; };
+    // A brand-new enquiry may be newer than the last load: fetch, then show.
+    if (!show()) loadData(false).then(() => { if (!show()) toast('Could not find that enquiry, it may have been deleted', 'err'); });
   } else if (thread && window.MMQLD_MAIL) {
     MMQLD_MAIL.openThread(thread);
   }

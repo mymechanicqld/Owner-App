@@ -24,11 +24,34 @@ self.addEventListener('push', (event) => {
   }));
 });
 
+/* The tapped link is also written to IndexedDB, which the app shares with
+   this worker. The app reads it whenever it starts or comes to the front.
+   That is what makes the tap reliable on iPhone: a message to an open window
+   is not delivered to a page this worker does not control (none, on
+   purpose), and opening a window may just bring the app forward. */
+function savePending(url) {
+  return new Promise((resolve) => {
+    try {
+      const req = indexedDB.open('mmqld-push', 1);
+      req.onupgradeneeded = () => req.result.createObjectStore('kv');
+      req.onsuccess = () => {
+        try {
+          const tx = req.result.transaction('kv', 'readwrite');
+          tx.objectStore('kv').put({ url, at: Date.now() }, 'open');
+          tx.oncomplete = () => resolve(); tx.onerror = () => resolve();
+        } catch (_) { resolve(); }
+      };
+      req.onerror = () => resolve();
+    } catch (_) { resolve(); }
+  });
+}
+
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   // Alerts carry app links like "/?open=<id>"; resolve them inside the app's folder.
   const url = new URL(String((event.notification.data && event.notification.data.url) || '').replace(/^\//, ''), ROOT).href;
   event.waitUntil((async () => {
+    await savePending(url);
     const wins = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
     for (const w of wins) {
       // The app is open: bring it forward and tell it what to show.
