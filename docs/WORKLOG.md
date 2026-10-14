@@ -2,6 +2,17 @@
 
 This file records completed owner-app changes, production updates and important verification details. Add new entries at the top.
 
+## 14 October 2026: Email list redesign
+
+Status: Deployed.
+
+The owner's tester found the list noisy: previews full of quoted history and signatures, an "Enquiry" tag on every row, and "Needs reply" on replies that needed nothing.
+
+- Previews show only what was written (quoted history, "Sent from my iPhone", sign-offs and signatures cut).
+- The "Enquiry" tag is gone. Rows show the job, the rego as a plate, the enquiry's pipeline status (when past New) and the DIY flag.
+- One state line per row: Customer replied · age (amber edge), New enquiry, no reply yet, Not delivered, Invoice/Report sent, or nothing when we replied last.
+- Quick filters: All, Waiting on you, Unread, with counts.
+
 ## 14 October 2026: Tapping an alert opens the right screen on iPhone
 
 Status: Deployed.

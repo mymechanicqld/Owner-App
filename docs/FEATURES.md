@@ -139,9 +139,13 @@ Each conversation is one Gmail thread. Nothing is copied into Supabase; Gmail st
 - **Customers** (default): threads whose subject is a website enquiry ("New booking"), an invoice ("Invoice from") or a report ("inspection report"), plus anything from someone who enquired in the last 45 days. Replies stay in their thread, so they are included automatically.
 - **All inbox**: the Gmail Primary inbox, for customers who email directly.
 - The search box searches Gmail itself within the chosen list (name, rego, email, any word).
-- Each row shows the customer (the name typed on the website form for enquiries), the service and rego, the last message and its time, the message count, and tags: Enquiry, Invoice, Report, **Needs reply** (the customer spoke last) and **Not delivered** (our last email bounced).
-- For an enquiry nobody has answered yet, the preview line shows what the customer wrote on the form rather than the notification's labels.
-- Unread conversations are bold with a blue dot, and the tab and sidebar show an unread count.
+- Each row: soft initials, the customer's name (the name typed on the website form for enquiries), the message count and time; then the job, the rego as a plate, the enquiry's status when it is past New (Contacted, Quoted, Booked, Won, Lost) and a DIY pill when flagged; then a clean preview of the last message, with quoted history, "Sent from my iPhone" and sign-offs removed ("You:" when we wrote last); then one line saying where things stand:
+  - **Customer replied · 2h ago** (amber, with an amber edge on the row): their turn has been taken, ours is next. Worded as a fact, since some replies ("see you then") need nothing.
+  - **New enquiry, no reply yet** (blue), with what they wrote on the form as the preview.
+  - **Not delivered** (red): our last email bounced.
+  - **Invoice sent / Report sent** (green) when that was our last email. Nothing when we simply replied last, so the list stays calm.
+- Quick filters above the list: **All**, **Waiting on you** (customer spoke last, or a new enquiry nobody has answered) and **Unread**, each with its count. An empty filter says "All caught up".
+- Unread conversations have a blue dot by the name and bold text, and the tab and sidebar show an unread count.
 - 25 conversations per page; "Load older" fetches the next page.
 
 ### Refresh

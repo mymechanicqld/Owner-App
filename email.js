@@ -40,6 +40,7 @@
 
   const MAIL = {
     tab: 'customers',       // customers | inbox
+    filter: 'all',          // all | waiting | unread (quick filters over the loaded list)
     q: '',                  // search box
     ids: [],                // thread ids in list order for the current tab/search
     next: null,             // Gmail page token for "Load more"
@@ -668,6 +669,7 @@
           <button data-mtab="inbox">All inbox</button>
         </div>
         <div class="search-bar"><i data-lucide="search"></i><input id="mail-search" type="search" placeholder="Search name, rego or email" autocomplete="off" /></div>
+        <div class="mail-filters" id="mail-filters"></div>
         <div id="mail-body"></div>`;
       const s = document.getElementById('mail-search');
       s.value = MAIL.q;
@@ -691,6 +693,15 @@
     if (sync) sync.textContent = MAIL.loading ? 'Checking Gmail...' : MAIL.lastSync ? 'Updated ' + relTime(new Date(MAIL.lastSync).toISOString()) : (MAIL.me || 'Business Gmail');
     const body = document.getElementById('mail-body');
     if (!body) return;
+    const fl = document.getElementById('mail-filters');
+    if (fl) {
+      const ts = MAIL.ids.map((id) => MAIL.meta[id]).filter(Boolean);
+      const nW = ts.filter((t) => t.waiting && !t.bounced).length, nU = ts.filter((t) => t.unread).length;
+      if (MAIL.filter === 'waiting' && !nW) MAIL.filter = 'all';
+      if (MAIL.filter === 'unread' && !nU) MAIL.filter = 'all';
+      fl.innerHTML = ts.length ? [['all', 'All', ''], ['waiting', 'Waiting on you', nW], ['unread', 'Unread', nU]]
+        .map(([k, l, n]) => `<button class="mf ${MAIL.filter === k ? 'on' : ''}" data-mfilter="${k}" ${k !== 'all' && !n ? 'disabled' : ''}>${l}${n !== '' ? `<span>${n}</span>` : ''}</button>`).join('') : '';
+    }
 
     if (!connected() && (MAIL.needsAuth || !MAIL.ids.length)) {
       body.innerHTML = `
@@ -726,29 +737,63 @@
     if (!t.lastNotice) return t.snippet;
     const row = linkedEnquiry(t.email, t.enq && t.enq.rego);
     const words = row && row.symptoms ? String(row.symptoms).trim() : '';
-    return words || ('New website enquiry' + (t.enq && t.enq.suburb ? ' from ' + t.enq.suburb : ''));
+    return words || ('No notes on the form' + (t.enq && t.enq.suburb ? ', from ' + t.enq.suburb : ''));
+  }
+
+  /* Only what the person actually wrote: no quoted history, no "Sent from my
+     iPhone", no sign-off or signature (ours or theirs). */
+  function cleanPreview(text) {
+    let t = String(text || '').replace(/\s+/g, ' ').trim();
+    const cuts = [/\s+On\s.{4,140}?\swrote:?/i, /\s+-{2,}\s*Original Message/i, /\s+From:\s.{3,90}?\s(Sent|Date):/i, /\s*Sent from my \w+/i, /\s+Get Outlook for/i];
+    for (const re of cuts) { const m = t.match(re); if (m && m.index > 0) t = t.slice(0, m.index); }
+    t = t.replace(/[\s,.]+(thank you|thanks|kind regards|best regards|warm regards|regards|cheers|many thanks),?\s+[A-Z][\w'-]*(\s.*)?$/i, '');
+    return t.trim() || String(text || '').trim();
+  }
+
+  /* Where the conversation stands, in plain words. Quiet when we spoke last. */
+  function stateLine(t) {
+    const ago = t.lastAt ? relTime(new Date(t.lastAt).toISOString()) : '';
+    if (t.bounced) return `<span class="mstate mstate--bad"><i data-lucide="mail-x"></i>Not delivered, check the address</span>`;
+    if (t.lastNotice) return `<span class="mstate mstate--new"><i data-lucide="sparkle"></i>New enquiry, no reply yet${ago ? ' · ' + esc(ago) : ''}</span>`;
+    if (t.waiting) return `<span class="mstate mstate--wait"><i data-lucide="corner-up-left"></i>Customer replied${ago ? ' · ' + esc(ago) : ''}</span>`;
+    if (t.lastMine && /invoice\b.*attached|attached.*invoice/i.test(t.snippet)) return `<span class="mstate mstate--doc"><i data-lucide="file-check"></i>Invoice sent</span>`;
+    if (t.lastMine && /report\b.*attached|attached.*report/i.test(t.snippet)) return `<span class="mstate mstate--doc"><i data-lucide="file-check"></i>Report sent</span>`;
+    return '';
   }
 
   function listHtml() {
-    return '<div class="mail-list">' + MAIL.ids.map((id) => MAIL.meta[id]).filter(Boolean).map((t) => {
-      const sub = t.enq ? [t.enq.service, t.enq.rego].filter(Boolean).join(' \u00b7 ') || 'Website enquiry' : t.subject;
-      const tag = t.kind === 'enquiry' ? '<span class="mtag mtag--enq">Enquiry</span>' : t.kind === 'invoice' ? '<span class="mtag">Invoice</span>' : t.kind === 'report' ? '<span class="mtag">Report</span>' : '';
-      const lr = t.kind === 'enquiry' ? linkedEnquiry(t.email, t.enq && t.enq.rego) : null;
-      const diy = lr && typeof isLikelyDiy === 'function' && isLikelyDiy(lr) ? '<span class="mtag mtag--diy">Likely DIY</span>' : '';
-      const status = t.bounced ? '<span class="mtag mtag--bad">Not delivered</span>' : t.waiting && t.count > 0 ? '<span class="mtag mtag--wait">Needs reply</span>' : '';
+    const all = MAIL.ids.map((id) => MAIL.meta[id]).filter(Boolean);
+    const shown = MAIL.filter === 'waiting' ? all.filter((t) => t.waiting && !t.bounced) : MAIL.filter === 'unread' ? all.filter((t) => t.unread) : all;
+    if (!shown.length) return `<div class="empty"><i data-lucide="check-circle-2"></i><h3>All caught up</h3><p>Nothing ${MAIL.filter === 'unread' ? 'unread' : 'waiting on you'} right now.</p></div>`;
+    return '<div class="mail-list">' + shown.map((t) => {
+      const lr = linkedEnquiry(t.email, t.enq && t.enq.rego);
+      const job = (t.enq && t.enq.service) || (lr && typeof svcLabel === 'function' ? svcLabel(lr.service_needed) : '') || '';
+      const rego = (t.enq && t.enq.rego) || (lr && lr.vehicle_rego) || '';
+      // "New" is the default and the state line already says so; show only statuses that tell you something.
+      const st = lr && typeof STATUS_LABEL !== 'undefined' && lr.status !== 'new' ? lr.status : '';
+      const diy = lr && typeof isLikelyDiy === 'function' && isLikelyDiy(lr);
+      const meta = [
+        job ? `<span class="mrow__job">${esc(job)}</span>` : (!t.enq ? `<span class="mrow__job">${esc(t.subject)}</span>` : ''),
+        rego ? `<span class="mplate">${esc(rego)}</span>` : '',
+        st ? `<span class="mpill" style="--c:${STATUS_COLOR[st] || '#78716C'}">${esc(STATUS_LABEL[st] || st)}</span>` : '',
+        diy ? '<span class="mpill mpill--diy">DIY</span>' : '',
+      ].filter(Boolean).join('');
+      const c = avColor(t.email || t.name);
+      const preview = cleanPreview(snippetFor(t));
+      const state = stateLine(t);
       return `
-      <button class="mrow ${t.unread ? 'unread' : ''}" data-thread="${esc(t.id)}">
-        <span class="mav" style="background:${avColor(t.email || t.name)}">${esc(initials(t.name, t.email))}</span>
+      <button class="mrow ${t.unread ? 'unread' : ''} ${t.waiting && !t.bounced ? 'waiting' : ''}" data-thread="${esc(t.id)}">
+        <span class="mav" style="background:${c}1f;color:${c}">${esc(initials(t.name, t.email))}</span>
         <span class="mrow__body">
-          <span class="mrow__top"><span class="mrow__name">${esc(t.name)}</span>${t.count > 1 ? `<span class="mrow__n">${t.count}</span>` : ''}<span class="mrow__when">${esc(shortWhen(t.lastAt))}</span></span>
-          <span class="mrow__sub">${esc(sub)}</span>
-          <span class="mrow__snip">${t.lastMine ? '<b>You:</b> ' : ''}${esc(snippetFor(t))}</span>
-          ${tag || status || diy ? `<span class="mrow__tags">${tag}${diy}${status}</span>` : ''}
+          <span class="mrow__top">${t.unread ? '<span class="mrow__dot" aria-label="Unread"></span>' : ''}<span class="mrow__name">${esc(t.name)}</span>${t.count > 1 ? `<span class="mrow__n" title="${t.count} messages">${t.count}</span>` : ''}<span class="mrow__when">${esc(shortWhen(t.lastAt))}</span></span>
+          ${meta ? `<span class="mrow__meta">${meta}</span>` : ''}
+          <span class="mrow__snip">${t.lastMine ? '<b>You:</b> ' : ''}${esc(preview)}</span>
+          ${state}
         </span>
-        ${t.unread ? '<span class="mrow__dot"></span>' : ''}
       </button>`;
     }).join('') + '</div>';
   }
+
 
   function paintThread(force) {
     const el = root();
@@ -1042,6 +1087,8 @@ Write only the body: no greeting line, no sign-off, no name, no business details
       return refreshList(false);
     }
     if (e.target.closest('#mail-refresh')) return refreshList(false);
+    const mf = e.target.closest('[data-mfilter]');
+    if (mf) { MAIL.filter = mf.dataset.mfilter; return paintList(); }
     if (e.target.closest('#mail-more')) return refreshList(true);
     if (e.target.closest('#mail-connect')) {
       // Straight from the tap, so Google's sign-in window is allowed to open.
